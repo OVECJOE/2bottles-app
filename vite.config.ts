@@ -56,7 +56,7 @@ export default defineConfig({
                 ws: true,
             },
         },
-        allowedHosts: ['fkgdz-102-89-22-88.a.free.pinggy.link']
+        allowedHosts: ['.a.free.pinggy.link']
     },
 
     // ----------------------------------------------------------

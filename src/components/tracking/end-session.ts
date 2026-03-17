@@ -71,24 +71,28 @@ export class EndSession extends LitElement {
     .venue-addr { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 1px; }
 
     .btn-primary {
-      width: 100%; padding: 14px;
+      display: block; width: 100%; padding: 13px var(--space-4);
       background: var(--color-blue); color: #fff;
       border: none; border-radius: var(--border-radius-md);
       font-family: var(--font-sans); font-size: var(--text-md);
       font-weight: var(--weight-bold); cursor: pointer;
       transition: background var(--duration-fast), transform var(--duration-fast);
+      line-height: 1;
     }
     .btn-primary:hover { background: var(--color-blue-mid); }
     .btn-primary:active { transform: scale(0.98); }
 
     .btn-save {
-      width: 100%; padding: 13px; margin-top: var(--space-2);
+      display: block; width: 100%; padding: 13px var(--space-4); margin-top: var(--space-2);
       background: var(--color-green); color: var(--color-green-text);
       border: none; border-radius: var(--border-radius-md);
       font-family: var(--font-sans); font-size: var(--text-sm);
       font-weight: var(--weight-bold); cursor: pointer;
+      line-height: 1;
+      transition: transform var(--duration-fast);
     }
     .btn-save:hover { background: var(--color-green-mid); }
+    .btn-save:active { transform: scale(0.98); }
   `;
 
     @state() private _saved = false;
@@ -118,7 +122,6 @@ export class EndSession extends LitElement {
 
     override render() {
         const v = sessionStore.selectedVenue;
-        const p = sessionStore.partner;
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
         return html`

@@ -38,6 +38,15 @@ class SessionStore {
     async init() {
         const saved = await get(DB_KEY);
         if (saved) {
+            // Bug 4: Check if session is stale (> 24h)
+            const isStale = saved.session?.createdAt && (Date.now() - saved.session.createdAt > 24 * 60 * 60 * 1000);
+            
+            if (isStale) {
+                console.log('[SessionStore] Clearing stale session.');
+                await this.endSession();
+                return;
+            }
+
             this.session = saved.session;
             this.partner = saved.partner;
             this.selectedVenue = saved.selectedVenue;
@@ -100,7 +109,7 @@ class SessionStore {
             id,
             link: `${window.location.origin}/join/${id}`,
             status: 'pending_partner',
-            createdAt: Date.now(),
+            createdAt: this.session?.id === id ? (this.session.createdAt || Date.now()) : Date.now(),
             venueId: null,
         };
         this.isHost = false;
@@ -123,6 +132,9 @@ class SessionStore {
     }
 
     async endSession() {
+        // Bug 3: Stop GPS tracking immediately
+        locationStore.stopWatching();
+        
         this.session = null;
         this.partner = null;
         this.venueSuggestions = [];
@@ -200,6 +212,7 @@ class SessionStore {
         if (this.session) {
             this.session = { ...this.session, venueId: venue.id };
         }
+        locationStore.setDestination({ lat: venue.coordinates.lat, lng: venue.coordinates.lng });
         this._notify();
         await this._save();
     }
@@ -223,6 +236,7 @@ class SessionStore {
     clearChat() {
         this.chatMessages = [];
         this._notify();
+        this._save(); // Bug 21: Persist chat clearance
     }
 
     // -----------------------------------------------------------

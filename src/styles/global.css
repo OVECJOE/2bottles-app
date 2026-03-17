@@ -47,6 +47,17 @@ app-shell {
     position: relative;
 }
 
+#outlet {
+    position: absolute;
+    inset: 0;
+    z-index: var(--z-sheet); /* Ensure it sits above the map */
+    pointer-events: none; /* Allow interaction with map when outlet is empty */
+}
+
+#outlet > * {
+    pointer-events: auto; /* Re-enable for the actual screens */
+}
+
 /* ----------------------------------------------------------
    Map View — the element itself IS the Mapbox container.
    Must have explicit dimensions or Mapbox renders at 0x0.

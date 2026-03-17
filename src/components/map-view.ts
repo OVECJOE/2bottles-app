@@ -56,7 +56,32 @@ function makePinEl(color: string, label?: string, pulse = false): HTMLElement {
     position: relative;
     display: flex; flex-direction: column; align-items: center;
     cursor: pointer;
+    /* Ensure the wrapper doesn't have extra bottom space so anchor:bottom works */
+    padding-bottom: 0;
   `;
+
+    if (label) {
+        const chip = document.createElement('div');
+        chip.textContent = label;
+        chip.style.cssText = `
+      margin-bottom: 5px;
+      background: rgba(255,255,255,0.97); color: #111;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 10px; font-weight: 600;
+      padding: 2px 8px; border-radius: 999px;
+      white-space: nowrap;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.14);
+      letter-spacing: 0.2px;
+    `;
+        wrap.appendChild(chip);
+    }
+
+    const dotContainer = document.createElement('div');
+    dotContainer.style.cssText = `
+    position: relative; width: 14px; height: 14px;
+    display: flex; align-items: center; justify-content: center;
+  `;
+    wrap.appendChild(dotContainer);
 
     if (pulse) {
         for (let i = 0; i < 2; i++) {
@@ -70,7 +95,7 @@ function makePinEl(color: string, label?: string, pulse = false): HTMLElement {
         animation-delay: ${i * 0.8}s;
         pointer-events: none;
       `;
-            wrap.appendChild(ring);
+            dotContainer.appendChild(ring);
         }
     }
 
@@ -81,34 +106,20 @@ function makePinEl(color: string, label?: string, pulse = false): HTMLElement {
     border: 3px solid rgba(255,255,255,0.95);
     box-shadow: 0 2px 10px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.08);
     flex-shrink: 0; position: relative; z-index: 1;
-    transition: transform 220ms cubic-bezier(0.34,1.56,0.64,1);
   `;
-    wrap.appendChild(dot);
-
-    if (label) {
-        const chip = document.createElement('div');
-        chip.textContent = label;
-        chip.style.cssText = `
-      margin-top: 5px;
-      background: rgba(255,255,255,0.97); color: #111;
-      font-family: 'DM Sans', sans-serif;
-      font-size: 10px; font-weight: 600;
-      padding: 2px 8px; border-radius: 999px;
-      white-space: nowrap;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.14);
-      letter-spacing: 0.2px;
-    `;
-        wrap.appendChild(chip);
-    }
+    dotContainer.appendChild(dot);
 
     return wrap;
 }
 
 /** Updates the label chip text on an existing pin element */
 export function updatePinLabel(el: HTMLElement, label: string) {
-    const chip = el.querySelector<HTMLElement>('div:last-child');
-    if (chip && chip !== el.querySelector<HTMLElement>('div:first-child')) {
+    const chip = el.querySelector<HTMLElement>('div:first-child');
+    if (chip && chip.classList.contains('chip')) { // We should probably add a class or just check correctly
         chip.textContent = label;
+    } else if (chip && chip.nextElementSibling?.tagName === 'DIV') {
+        // Fallback: it's the first child if label exists
+         chip.textContent = label;
     }
 }
 
@@ -118,31 +129,11 @@ function makeDestinationEl(label: string): HTMLElement {
     position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;
   `;
 
-    // Teardrop shape for destination
-    const body = document.createElement('div');
-    body.style.cssText = `
-    width: 32px; height: 32px; border-radius: 50% 50% 50% 0;
-    transform: rotate(-45deg);
-    background: #c0392b;
-    border: 3px solid rgba(255,255,255,0.95);
-    box-shadow: 0 3px 12px rgba(192,57,43,0.45), 0 0 0 1px rgba(0,0,0,0.08);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  `;
-    const inner = document.createElement('div');
-    inner.style.cssText = `
-    width: 8px; height: 8px; border-radius: 50%;
-    background: rgba(255,255,255,0.9);
-    transform: rotate(45deg);
-  `;
-    body.appendChild(inner);
-    wrap.appendChild(body);
-
     if (label) {
         const chip = document.createElement('div');
         chip.textContent = label;
         chip.style.cssText = `
-      margin-top: 7px;
+      margin-bottom: 7px;
       background: #c0392b; color: #fff;
       font-family: 'DM Sans', sans-serif;
       font-size: 10px; font-weight: 700;
@@ -154,6 +145,32 @@ function makeDestinationEl(label: string): HTMLElement {
     `;
         wrap.appendChild(chip);
     }
+
+    // Teardrop shape for destination
+    const body = document.createElement('div');
+    body.style.cssText = `
+    width: 32px; height: 32px; border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    background: #c0392b;
+    border: 3px solid rgba(255,255,255,0.95);
+    box-shadow: 0 3px 12px rgba(192,57,43,0.45), 0 0 0 1px rgba(0,0,0,0.08);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-bottom: 16px; /* Offset the rotation so the tip is at the bottom center of the div box */
+  `;
+    // BUT teardrop rotated -45 means the tip is at bottom-right of the square box.
+    // If we want it at bottom center of the wrapper, we need to adjust.
+    // Actually, anchor:bottom for MapLibre centers the element horizontally.
+    // A square rotated -45 has its "bottom" corner at exactly half width. Correct.
+
+    const inner = document.createElement('div');
+    inner.style.cssText = `
+    width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(255,255,255,0.9);
+    transform: rotate(45deg);
+  `;
+    body.appendChild(inner);
+    wrap.appendChild(body);
 
     return wrap;
 }
@@ -199,6 +216,7 @@ export class MapView extends LitElement {
     private _midpointMarker: maplibregl.Marker | null = null;
     private _unsubLocation?: () => void;
     private _unsubSession?: () => void;
+    private _unsubUI?: () => void;
 
     override connectedCallback() {
         super.connectedCallback();
@@ -217,6 +235,18 @@ export class MapView extends LitElement {
         super.disconnectedCallback();
         this._unsubLocation?.();
         this._unsubSession?.();
+        this._unsubUI?.();
+        
+        this.removeEventListener('map-view:move-to', this._onMoveTo as EventListener);
+        this.removeEventListener('map-view:add-pin', this._onAddPin as EventListener);
+        this.removeEventListener('map-view:remove-pin', this._onRemovePin as EventListener);
+        this.removeEventListener('map-view:show-route', this._onShowRoute as EventListener);
+        this.removeEventListener('map-view:clear-route', this._onClearRoute as EventListener);
+        this.removeEventListener('map-view:show-midpoint', this._onShowMidpoint as EventListener);
+        this.removeEventListener('map-view:clear-midpoint', this._onClearMidpoint as EventListener);
+        this.removeEventListener('map-view:draw-tracking-routes', this._onDrawTracking as EventListener);
+        this.removeEventListener('map-view:fit-tracking', this._onFitTracking as EventListener);
+
         this._map?.remove();
         this._map = null;
     }
@@ -246,9 +276,11 @@ export class MapView extends LitElement {
 
         this.dispatchEvent(new CustomEvent('map-view:ready', { bubbles: true, composed: true }));
 
+        // Sync everything immediately on load
+        this._syncFromStore();
+
         if (locationStore.own) {
             this._flyTo(locationStore.own, 15, 600);
-            this._upsertYouPin(locationStore.own);
         }
 
         // React to every location store change
@@ -256,6 +288,14 @@ export class MapView extends LitElement {
 
         // React to session store changes (venue name updates destination pin label)
         this._unsubSession = sessionStore.subscribe(() => this._syncDestinationLabel());
+
+        // React to screen changes to ensure routes are updated/cleared
+        this._unsubUI = uiStore.subscribe(() => {
+            this._syncFromStore();
+            if (uiStore.screen !== 'live-tracking' && uiStore.screen !== 'select-rendezvous' && uiStore.screen !== 'partner-notified') {
+                this._clearRoute();
+            }
+        });
     }
 
     // ---------------------------------------------------------------------------
@@ -320,11 +360,9 @@ export class MapView extends LitElement {
             this._removePin(PIN_DESTINATION);
         }
 
-        // Draw/update route lines whenever we have the right combination of coords
         const screen = uiStore.screen;
-
-        if (screen === 'live-tracking' && own && partner && destination) {
-            this._drawTrackingRoutes(own, partner, destination);
+        if (screen === 'live-tracking' && own && destination) {
+            this._drawTrackingRoutes(own, partner || undefined, destination);
         } else if (screen === 'select-rendezvous' && own && partner) {
             // No route lines during selection — just the midpoint marker
         }
@@ -352,12 +390,17 @@ export class MapView extends LitElement {
     // ---------------------------------------------------------------------------
 
     private _upsertYouPin(coords: Coordinates) {
+        const distM = locationStore.ownDistanceM;
+        const distText = distM !== null ? ` (${(distM / 1000).toFixed(1)}km)` : '';
+        const label = `You${distText}`;
+
         const existing = this._markers.get(PIN_YOU);
         if (existing) {
             existing.setLngLat([coords.lng, coords.lat]);
+            updatePinLabel(existing.getElement(), label);
             return;
         }
-        const el = makePinEl('#1a2530', 'You', true);
+        const el = makePinEl('#1a2530', label, true);
         this._markers.set(PIN_YOU,
             new maplibregl.Marker({ element: el, anchor: 'bottom' })
                 .setLngLat([coords.lng, coords.lat])
@@ -366,10 +409,19 @@ export class MapView extends LitElement {
     }
 
     private _upsertPartnerPin(coords: Coordinates) {
-        const label = sessionStore.partner?.name?.split(' ')[0] ?? 'Partner';
+        const partnerName = sessionStore.partner?.name?.split(' ')[0] ?? 'Partner';
+        const ownName = sessionStore.ownName?.split(' ')[0];
+        const isDuplicate = partnerName.toLowerCase() === ownName?.toLowerCase();
+        const displayName = isDuplicate ? `${partnerName} (Partner)` : partnerName;
+
+        const distM = locationStore.partnerDistanceM;
+        const distText = distM !== null ? ` (${(distM / 1000).toFixed(1)}km)` : '';
+        const label = `${displayName}${distText}`;
+
         const existing = this._markers.get(PIN_PARTNER);
         if (existing) {
             existing.setLngLat([coords.lng, coords.lat]);
+            updatePinLabel(existing.getElement(), label);
             return;
         }
         const el = makePinEl('#e8a020', label, true);
@@ -467,15 +519,30 @@ export class MapView extends LitElement {
      * Draw two dashed lines: you→destination and partner→destination.
      * This is the core live-tracking visualization.
      */
-    private _drawTrackingRoutes(you: Coordinates, partner: Coordinates, dest: Coordinates) {
+    private _drawTrackingRoutes(you: Coordinates, partner: Coordinates | undefined, dest: Coordinates) {
         const map = this._map;
         if (!map) return;
 
         const youLine: [number, number][] = [[you.lng, you.lat], [dest.lng, dest.lat]];
-        const partnerLine: [number, number][] = [[partner.lng, partner.lat], [dest.lng, dest.lat]];
-
         this._setLineSource('2b-route-you', youLine, '#4D7298', false);
-        this._setLineSource('2b-route-partner', partnerLine, '#e8a020', true);
+
+        if (partner) {
+            const partnerLine: [number, number][] = [[partner.lng, partner.lat], [dest.lng, dest.lat]];
+            this._setLineSource('2b-route-partner', partnerLine, '#e8a020', true);
+        } else {
+            // Keep source clean if partner coordinates aren't available yet
+            this._removeLineSource('2b-route-partner');
+        }
+    }
+
+    private _removeLineSource(id: string) {
+        const map = this._map;
+        if (!map) return;
+        const casingLyr = `${id}-casing-layer`;
+        const lyr = `${id}-layer`;
+        if (map.getLayer(lyr)) map.removeLayer(lyr);
+        if (map.getLayer(casingLyr)) map.removeLayer(casingLyr);
+        if (map.getSource(id)) map.removeSource(id);
     }
 
     private _setLineSource(id: string, coords: [number, number][], color: string, dashed: boolean) {

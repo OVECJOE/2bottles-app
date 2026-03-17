@@ -6,6 +6,7 @@ import { p2pService } from '../services/p2p.service.js';
 import { Router } from '@vaadin/router';
 
 import './map-view.js';
+import './ui/custom-dialog.js';
 
 @customElement('app-shell')
 export class AppShell extends LitElement {
@@ -13,6 +14,7 @@ export class AppShell extends LitElement {
 
     @state() private _toast: string | null = null;
     @state() private _loading = false;
+    @state() private _dialog: { title: string; message: string; confirmLabel?: string; cancelLabel?: string } | null = null;
 
     private _router?: Router;
     private _unsubUI?: () => void;
@@ -22,6 +24,7 @@ export class AppShell extends LitElement {
         this._unsubUI = uiStore.subscribe(() => {
             this._toast = uiStore.toastMessage;
             this._loading = uiStore.isLoading;
+            this._dialog = uiStore.dialogConfig;
         });
     }
 
@@ -92,6 +95,15 @@ export class AppShell extends LitElement {
           <div class="app-loading__spinner"></div>
         </div>
       ` : nothing}
+
+      <custom-dialog
+        ?open=${!!this._dialog}
+        .title=${this._dialog?.title || ''}
+        .message=${this._dialog?.message || ''}
+        .confirmLabel=${this._dialog?.confirmLabel || 'Confirm'}
+        .cancelLabel=${this._dialog?.cancelLabel || 'Cancel'}
+        @dialog-result=${(e: CustomEvent) => uiStore.handleDialogResult(e.detail.confirmed)}
+      ></custom-dialog>
     `;
     }
 }

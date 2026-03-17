@@ -34,7 +34,7 @@ export class BottomSheet extends LitElement {
     }
 
     :host([open]) .sheet {
-      transform: translateY(0);
+      transform: translateY(var(--drag-offset, 0px));
     }
 
     .handle-wrap {
@@ -58,8 +58,11 @@ export class BottomSheet extends LitElement {
     @property({ type: Boolean, reflect: true }) open = false;
 
     private _startY = 0;
-    private _currentY = 0;
     private _dragging = false;
+
+    private _setOffset(y: number) {
+        this.style.setProperty('--drag-offset', `${Math.max(0, y)}px`);
+    }
 
     override render() {
         return html`
@@ -86,16 +89,18 @@ export class BottomSheet extends LitElement {
 
     private _onDragMove(e: PointerEvent) {
         if (!this._dragging) return;
-        this._currentY = e.clientY - this._startY;
+        const delta = e.clientY - this._startY;
+        this._setOffset(delta);
     }
 
-    private _onDragEnd() {
+    private _onDragEnd(e: PointerEvent) {
         if (!this._dragging) return;
         this._dragging = false;
-        if (this._currentY > 60) {
+        const delta = e.clientY - this._startY;
+        if (delta > 60) {
             this.dispatchEvent(new CustomEvent('sheet-dismiss', { bubbles: true, composed: true }));
         }
-        this._currentY = 0;
+        this._setOffset(0);
     }
 }
 

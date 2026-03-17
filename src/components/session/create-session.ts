@@ -99,18 +99,24 @@ export class CreateSession extends LitElement {
       font-size: 14px; cursor: pointer; color: var(--color-text-muted); padding: 0;
     }
 
-    .btn-primary {
-      width: 100%; padding: 14px; margin-top: var(--space-3);
-      background: var(--color-blue); color: #fff;
+    .btn {
+      display: block; width: 100%; padding: 13px var(--space-4);
       border: none; border-radius: var(--border-radius-md);
       font-family: var(--font-sans); font-size: var(--text-md);
       font-weight: var(--weight-bold); cursor: pointer;
+      text-align: center; line-height: 1;
+      transition: all var(--duration-fast) var(--ease-out);
+      -webkit-tap-highlight-color: transparent;
+      margin-top: var(--space-3);
+    }
+    .btn:active { transform: scale(0.98); opacity: 0.9; }
+
+    .btn-primary {
+      background: var(--color-blue); color: #fff;
       display: flex; align-items: center; justify-content: center; gap: var(--space-2);
-      transition: background var(--duration-fast), transform var(--duration-fast);
     }
     .btn-primary:hover { background: var(--color-blue-mid); }
-    .btn-primary:active { transform: scale(0.98); }
-    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
     .error {
       font-size: var(--text-xs); color: var(--color-danger-text);
@@ -241,6 +247,7 @@ export class CreateSession extends LitElement {
         <div class="or-row">or enter address manually</div>
 
         <location-input
+          country="NG"
           placeholder="e.g. Nicon Town, Lekki Phase 1"
           @location-selected=${this._onLocationSelected}
         ></location-input>
@@ -264,7 +271,7 @@ export class CreateSession extends LitElement {
         ` : ''}
 
         <button
-          class="btn-primary"
+          class="btn btn-primary"
           ?disabled=${this._loading || !canProceed}
           @click=${this._handleCreate}
         >

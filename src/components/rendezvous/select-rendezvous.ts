@@ -117,13 +117,26 @@ export class SelectRendezvous extends LitElement {
     @state() private _selectedId: string | null = null;
     @state() private _venues: Venue[] = [];
     @state() private _customSpot: GeocodeSuggestion | null = null;
+    @state() private _isComputing = false;
 
     private _unsub?: () => void;
+    private _unsubSession?: () => void;
 
     override connectedCallback() {
         super.connectedCallback();
         this._computeVenues();
         this._frameMap();
+
+        this._unsub = locationStore.subscribe(() => {
+            // Only re-fetch if we have no venues yet and both coords are now available
+            if (!this._venues.length && !this._isComputing && locationStore.own && locationStore.partner) {
+                this._computeVenues();
+            }
+        });
+
+        this._unsubSession = sessionStore.subscribe(() => {
+            this.requestUpdate();
+        });
 
         if (!sessionStore.isHost) {
             uiStore.showToast(`Waiting for ${sessionStore.partnerName || 'host'} to pick a spot...`);
@@ -133,6 +146,7 @@ export class SelectRendezvous extends LitElement {
     override disconnectedCallback() {
         super.disconnectedCallback();
         this._unsub?.();
+        this._unsubSession?.();
         // Remove venue preview pin — destination pin will be set properly by locationStore
         this.dispatchEvent(new CustomEvent('map-view:remove-pin', {
             bubbles: true, composed: true, detail: { id: 'venue-preview' },
@@ -143,11 +157,12 @@ export class SelectRendezvous extends LitElement {
     private async _computeVenues() {
         const own = locationStore.own;
         const partner = locationStore.partner;
-        if (!own || !partner) return;
+        if (!own || !partner || this._isComputing) return;
 
         const mid = sessionStore.midpoint;
         if (!mid) return;
 
+        this._isComputing = true;
         uiStore.setLoading(true);
         const rawVenues = await fetchVenues(mid.lat, mid.lng);
         
@@ -182,6 +197,7 @@ export class SelectRendezvous extends LitElement {
         }));
         
         uiStore.setLoading(false);
+        this._isComputing = false;
     }
 
     private _frameMap() {
@@ -315,6 +331,7 @@ export class SelectRendezvous extends LitElement {
         ` : html`
           <div class="search-section">
             <location-input
+              country="NG"
               placeholder="Search for any place…"
               @location-selected=${this._onCustomLocation}
             ></location-input>
@@ -334,17 +351,35 @@ export class SelectRendezvous extends LitElement {
 
         ${sessionStore.isHost ? html`
             <button class="btn-primary" ?disabled=${!this._canProceed} @click=${this._suggest}>
-            Suggest This Spot →
+                Suggest This Spot →
             </button>
         ` : html`
             <div style="text-align:center; padding:var(--space-4); color:var(--color-text-muted); font-size:var(--text-sm)">
                 Waiting for ${sessionStore.partnerName || 'host'} to pick a spot...
             </div>
         `}
+
+        <button class="btn-ghost" @click=${this._cancel} style="width:100%; margin-top:var(--space-3)">
+            Cancel Session
+        </button>
       </div>
     
       </screen-shell>
     `;
+    }
+
+    private async _cancel() {
+        const confirmed = await uiStore.confirm({
+            title: 'Cancel Session?',
+            message: 'This will end the current rendezvous and stop location sharing.',
+            confirmLabel: 'Yes, Cancel',
+            cancelLabel: 'Keep Session'
+        });
+
+        if (confirmed) {
+            sessionStore.endSession();
+            uiStore.goHome();
+        }
     }
 }
 

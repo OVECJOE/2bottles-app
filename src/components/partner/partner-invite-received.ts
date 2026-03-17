@@ -7,10 +7,11 @@ import '../ui/screen-shell.js';
 
 @customElement('partner-invite-received')
 export class PartnerInviteReceived extends LitElement implements BeforeEnterObserver {
-    @state() private _connecting = false;
-    @state() private _name = '';
+  @state() private _connecting = false;
+  @state() private _accepting = false;
+  @state() private _name = '';
 
-    static override styles = css`
+  static override styles = css`
     :host { display: block; }
 
     .sheet {
@@ -67,6 +68,7 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
     }
 
     .name-input {
+        box-sizing: border-box;
         width: 100%; padding: 12px; margin-bottom: var(--space-4);
         border: 1px solid rgba(0,0,0,0.1); border-radius: var(--border-radius-md);
         font-family: var(--font-sans); font-size: var(--text-md);
@@ -74,67 +76,75 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
     }
   `;
 
-    async onBeforeEnter(location: RouterLocation) {
-        const peerId = location.params.peerId as string;
-        if (peerId) {
-            console.log('[PartnerInviteReceived] Extracted peerId:', peerId);
-            await this._handleAutoJoin(peerId);
-        }
+  async onBeforeEnter(location: RouterLocation) {
+    const peerId = location.params.peerId as string;
+    if (peerId) {
+      console.log('[PartnerInviteReceived] Extracted peerId:', peerId);
+      await this._handleAutoJoin(peerId);
     }
+  }
 
-    private async _handleAutoJoin(peerId: string) {
-        // If already in THIS session, don't re-join
-        if (sessionStore.session?.id === peerId) return;
+  private async _handleAutoJoin(peerId: string) {
+    // If already in THIS session, don't re-join
+    if (sessionStore.session?.id === peerId) return;
 
-        this._connecting = true;
-        uiStore.setLoading(true);
-        try {
-            if (sessionStore.session) {
-                console.log('[PartnerInviteReceived] Clearing old session.');
-                await sessionStore.endSession();
-            }
-            await sessionStore.joinSession(peerId);
-            await p2pService.connect(peerId);
-            console.log('[PartnerInviteReceived] Join successful.');
-        } catch (err) {
-            console.error('[PartnerInviteReceived] Join failed:', err);
-            uiStore.showToast('Could not connect to partner.');
-        } finally {
-            this._connecting = false;
-            uiStore.setLoading(false);
-        }
+    this._connecting = true;
+    uiStore.setLoading(true);
+    try {
+      if (sessionStore.session) {
+        console.log('[PartnerInviteReceived] Clearing old session.');
+        await sessionStore.endSession();
+      }
+      await sessionStore.joinSession(peerId);
+      await p2pService.connect(peerId);
+      console.log('[PartnerInviteReceived] Join successful.');
+    } catch (err) {
+      console.error('[PartnerInviteReceived] Join failed:', err);
+      uiStore.showToast('Could not connect to partner.');
+    } finally {
+      this._connecting = false;
+      uiStore.setLoading(false);
     }
+  }
 
-    private _accept() {
-        // 1. Share info
-        if (this._name) {
-            sessionStore.setOwnName(this._name);
-            p2pService.broadcastUserInfo(this._name);
-        }
+  private async _accept() {
+    this._accepting = true;
+    try {
+      // 1. Share info
+      if (this._name) {
+        sessionStore.setOwnName(this._name);
+        p2pService.broadcastUserInfo(this._name);
+      }
 
-        // 2. Peer accepts -> send status to host
-        p2pService.send({ type: 'partner:status', status: 'accepted' });
-        
-        // 3. Start watching location
-        locationStore.startWatching();
-        
-        // 4. Update local state
-        sessionStore.setPartnerStatus('accepted');
-        
-        // Host will receive 'accepted' and navigate to venue selection
-        // Joiner stays here until Host picks a venue and sends 'session:venue'
-        uiStore.showToast('Joined! Waiting for host to pick a spot.');
+      // 2. Peer accepts -> send status to host
+      p2pService.send({ type: 'partner:status', status: 'accepted' });
+
+      // 3. Start watching location
+      locationStore.startWatching();
+
+      // 4. Update local state
+      sessionStore.setPartnerStatus('accepted');
+
+      // Host will receive 'accepted' and navigate to venue selection
+      // Joiner stays here until Host picks a venue and sends 'session:venue'
+      // UPDATE: To smooth the flow, we now navigate directly to the selection screen
+      uiStore.showToast('Joined! Waiting for host to pick a spot.');
+      uiStore.goToSelectVenue();
+    } finally {
+      // Keep it disabled, navigation or state change will handle the rest
+      // but in case of some weird async delay, we don't want to re-enable too soon
     }
+  }
 
-    private _decline() {
-        p2pService.send({ type: 'partner:status', status: 'rejected' });
-        p2pService.disconnect();
-        sessionStore.endSession();
-        uiStore.goHome();
-    }
+  private _decline() {
+    p2pService.send({ type: 'partner:status', status: 'rejected' });
+    p2pService.disconnect();
+    sessionStore.endSession();
+    uiStore.goHome();
+  }
 
-    override render() {
-        return html`
+  override render() {
+    return html`
       <screen-shell screen='partner-notified'>
         <div class="sheet">
           <div class="handle"></div>
@@ -157,18 +167,18 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
             @input=${(e: any) => this._name = e.target.value}
           />
  
-          <button class="btn-primary" @click=${this._accept} ?disabled=${this._connecting || this._name.trim().length < 2}>
-            ${this._connecting ? 'Connecting...' : 'Accept Invite'}
+          <button class="btn-primary" @click=${this._accept} ?disabled=${this._connecting || this._accepting || this._name.trim().length < 2}>
+            ${this._connecting ? 'Connecting...' : this._accepting ? 'Joining...' : 'Accept Invite'}
           </button>
-          <button class="btn-ghost" @click=${this._decline} ?disabled=${this._connecting}>
+          <button class="btn-ghost" @click=${this._decline} ?disabled=${this._connecting || this._accepting}>
             Decline
           </button>
         </div>
       </screen-shell>
     `;
-    }
+  }
 }
 
 declare global {
-    interface HTMLElementTagNameMap { 'partner-invite-received': PartnerInviteReceived; }
+  interface HTMLElementTagNameMap { 'partner-invite-received': PartnerInviteReceived; }
 }

@@ -96,6 +96,8 @@ export class LocationInput extends LitElement {
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
+    .suggestion.selected { background: var(--color-blue-light); }
+
     .empty {
       padding: var(--space-4) var(--space-4);
       font-size: var(--text-sm); color: var(--color-text-muted); text-align: center;
@@ -109,10 +111,15 @@ export class LocationInput extends LitElement {
   @state() private _suggestions: GeocodeSuggestion[] = [];
   @state() private _loading = false;
   @state() private _open = false;
+  @state() private _selectedIndex = -1;
+
+  private _debounceTimer: any = null;
+  private _lastQuery = '';
 
   private async _onInput(e: InputEvent) {
     const val = (e.target as HTMLInputElement).value;
     this.value = val;
+    this._selectedIndex = -1;
 
     if (!val.trim() || val.trim().length < 3) {
       this._suggestions = [];
@@ -120,18 +127,46 @@ export class LocationInput extends LitElement {
       return;
     }
 
-    this._loading = true;
-    this._open = true;
+    if (this._debounceTimer) clearTimeout(this._debounceTimer);
+    this._debounceTimer = setTimeout(async () => {
+        this._lastQuery = val;
+        this._loading = true;
+        this._open = true;
 
-    try {
-      this._suggestions = await geocodeAutocomplete(val, {
-        debounceMs: 400,
-        countrycodes: this.country
-      });
-    } catch {
-      this._suggestions = [];
-    } finally {
-      this._loading = false;
+        try {
+            const results = await geocodeAutocomplete(val, {
+                immediate: true,
+                countrycodes: this.country
+            });
+            // Bug 39: Race condition check
+            if (this._lastQuery === val) {
+                this._suggestions = results;
+            }
+        } catch {
+            if (this._lastQuery === val) this._suggestions = [];
+        } finally {
+            if (this._lastQuery === val) this._loading = false;
+        }
+    }, 400);
+  }
+
+  private _onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      this._open = false;
+      return;
+    }
+
+    if (this._open && this._suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        this._selectedIndex = (this._selectedIndex + 1) % this._suggestions.length;
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        this._selectedIndex = (this._selectedIndex - 1 + this._suggestions.length) % this._suggestions.length;
+      } else if (e.key === 'Enter' && this._selectedIndex !== -1) {
+        e.preventDefault();
+        this._select(this._suggestions[this._selectedIndex]);
+      }
     }
   }
 
@@ -173,15 +208,19 @@ export class LocationInput extends LitElement {
           spellcheck="false"
           @input=${this._onInput}
           @blur=${this._onBlur}
-          @keydown=${(e: KeyboardEvent) => { if (e.key === 'Escape') { this._open = false; } }}
+          @keydown=${this._onKeyDown}
         />
         ${this._loading ? html`<div class="spinner"></div>` : ''}
       </div>
 
       ${this._open ? html`
         <div class="dropdown">
-          ${this._suggestions.length > 0 ? this._suggestions.map(s => html`
-            <div class="suggestion" @mousedown=${() => this._select(s)}>
+          ${this._suggestions.length > 0 ? this._suggestions.map((s, i) => html`
+            <div
+                class="suggestion ${this._selectedIndex === i ? 'selected' : ''}"
+                @mousedown=${() => this._select(s)}
+                @mouseenter=${() => { this._selectedIndex = i; }}
+            >
               <div class="sugg-icon">${this._typeIcon(s.type)}</div>
               <div class="sugg-text">
                 <div class="sugg-short">${s.shortName}</div>

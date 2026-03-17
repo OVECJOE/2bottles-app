@@ -36,21 +36,25 @@ export class PartnerEnded extends LitElement {
     .body  { font-size: var(--text-sm); color: var(--color-text-muted); text-align: center; margin-bottom: var(--space-5); line-height: var(--line-height-loose); }
 
     .btn-primary {
-      width: 100%; padding: 14px;
+      display: block; width: 100%; padding: 13px var(--space-4);
       background: var(--color-blue); color: #fff;
       border: none; border-radius: var(--border-radius-md);
       font-family: var(--font-sans); font-size: var(--text-md);
       font-weight: var(--weight-bold); cursor: pointer;
-      transition: background var(--duration-fast);
+      transition: background var(--duration-fast), transform var(--duration-fast);
+      line-height: 1;
     }
     .btn-primary:hover { background: var(--color-blue-mid); }
+    .btn-primary:active { transform: scale(0.98); }
 
     .btn-ghost {
-      width: 100%; padding: 13px; margin-top: var(--space-2);
-      background: transparent; color: var(--color-text-muted);
+      display: block; width: 100%; padding: 13px; margin-top: var(--space-2);
+      background: rgba(0,0,0,0.05); color: var(--color-text-secondary);
       border: none; border-radius: var(--border-radius-md);
       font-family: var(--font-sans); font-size: var(--text-sm); cursor: pointer;
+      transition: transform var(--duration-fast);
     }
+    .btn-ghost:active { transform: scale(0.98); }
   `;
 
     private _restart() {
@@ -66,7 +70,7 @@ export class PartnerEnded extends LitElement {
       <div class="sheet">
         <div class="handle"></div>
         <div class="icon-wrap">✕</div>
-        <div class="title">Session Ended</div>
+        <div class="title">Invite Declined</div>
         <div class="body">
           ${name} declined the invite.<br>
           You can invite someone else or try again later.

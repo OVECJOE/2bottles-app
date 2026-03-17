@@ -58,7 +58,7 @@ export class PartnerAgreeRefuse extends LitElement {
     }
 
     .chat-messages {
-      flex: 1; overflow-y: auto;
+      flex: 1; overflow-y: auto; overflow-x: hidden;
       display: flex; flex-direction: column; gap: var(--space-2);
       padding-bottom: var(--space-2);
     }
@@ -69,9 +69,10 @@ export class PartnerAgreeRefuse extends LitElement {
     .bubble {
       max-width: 72%; padding: var(--space-2) var(--space-3);
       border-radius: 16px; font-size: var(--text-sm); line-height: var(--line-height-base);
+      overflow-wrap: break-word; word-break: break-word;
     }
-    .bubble.them { background: rgba(0,0,0,0.07); color: var(--color-text-primary); border-bottom-left-radius: 4px; }
-    .bubble.mine { background: var(--color-blue); color: #fff; border-bottom-right-radius: 4px; }
+    .bubble.them { background: #E9EDEF; color: var(--color-text-primary); border-bottom-left-radius: 4px; }
+    .bubble.mine { background: var(--color-blue); color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 2px 4px rgba(77,114,152,0.2); }
 
     .chat-input-row {
       display: flex; gap: var(--space-2); align-items: center;
@@ -97,23 +98,27 @@ export class PartnerAgreeRefuse extends LitElement {
     .action-row { display: flex; gap: var(--space-2); margin-top: var(--space-2); flex-shrink: 0; }
 
     .btn-agree {
-      flex: 1; padding: 13px;
-      background: var(--color-green); color: var(--color-green-text);
+    .btn {
+      display: block; width: 100%; padding: 13px var(--space-4);
       border: none; border-radius: var(--border-radius-md);
       font-family: var(--font-sans); font-size: var(--text-md);
       font-weight: var(--weight-bold); cursor: pointer;
-      transition: background var(--duration-fast), transform var(--duration-fast);
+      text-align: center; line-height: 1;
+      transition: all var(--duration-fast) var(--ease-out);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.98); opacity: 0.9; }
+
+    .btn-agree {
+      flex: 1;
+      background: var(--color-green); color: var(--color-green-text);
     }
     .btn-agree:hover { background: var(--color-green-mid); }
-    .btn-agree:active { transform: scale(0.98); }
 
     .btn-refuse {
-      flex: 1; padding: 13px;
+      flex: 1;
       background: transparent; color: var(--color-blue);
-      border: 1.5px solid var(--color-blue); border-radius: var(--border-radius-md);
-      font-family: var(--font-sans); font-size: var(--text-sm);
-      font-weight: var(--weight-medium); cursor: pointer;
-      transition: background var(--duration-fast);
+      border: 1.5px solid var(--color-blue);
     }
     .btn-refuse:hover { background: var(--color-blue-light); }
   `;
@@ -150,6 +155,7 @@ export class PartnerAgreeRefuse extends LitElement {
         
         sessionStore.addMessage(msg);
         this._draft = '';
+        (this.renderRoot.querySelector('.chat-input') as HTMLInputElement).value = ''; // Bug 43: Clear physical input
         
         // Broadcast via P2P
         p2pService.send({ type: 'chat:message', text, timestamp });
@@ -164,6 +170,7 @@ export class PartnerAgreeRefuse extends LitElement {
     }
 
     private _agree() {
+        if (sessionStore.ownAgreed) return; // Bug 44: Guard against double-tap
         sessionStore.setOwnAgreed(true);
         p2pService.broadcastAgreement();
         
@@ -176,7 +183,16 @@ export class PartnerAgreeRefuse extends LitElement {
         }
     }
 
-    private _refuse() {
+    private async _refuse() {
+        const confirmed = await uiStore.confirm({
+            title: 'Change Meetup Spot?',
+            message: 'This will reset the agreement for both you and your partner.',
+            confirmLabel: 'Yes, Change',
+            cancelLabel: 'Stay Here'
+        });
+
+        if (!confirmed) return; // Bug 48: Confirmation
+
         sessionStore.setOwnAgreed(false);
         sessionStore.setPartnerAgreed(false);
         p2pService.broadcastReset();
@@ -235,10 +251,10 @@ export class PartnerAgreeRefuse extends LitElement {
             </div>
 
             <div class="action-row">
-            <button class="btn-agree" ?disabled=${sessionStore.ownAgreed} @click=${this._agree}>
+            <button class="btn btn-agree" ?disabled=${sessionStore.ownAgreed} @click=${this._agree}>
                 ${sessionStore.ownAgreed ? '✓ Waiting for partner' : '✓ Agree'}
             </button>
-            <button class="btn-refuse" @click=${this._refuse}>↩ Different spot</button>
+            <button class="btn btn-refuse" @click=${this._refuse}>↩ Different spot</button>
             </div>
         </div>
       </screen-shell>

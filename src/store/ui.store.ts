@@ -16,6 +16,9 @@ class UIStore {
     isLoading: boolean = false;
     isPartnerOnline: boolean = false;
     toastMessage: string | null = null;
+    dialogConfig: { title: string; message: string; confirmLabel?: string; cancelLabel?: string } | null = null;
+
+    private _dialogResolver: ((val: boolean) => void) | null = null;
 
     private _toastTimer: ReturnType<typeof setTimeout> | null = null;
     private _listeners = new Set<Listener>();
@@ -133,6 +136,27 @@ class UIStore {
     dismissToast() {
         if (this._toastTimer) clearTimeout(this._toastTimer);
         this.toastMessage = null;
+        this._notify();
+    }
+
+    // -----------------------------------------------------------
+    // Dialog
+    // -----------------------------------------------------------
+
+    confirm(config: { title: string; message: string; confirmLabel?: string; cancelLabel?: string }): Promise<boolean> {
+        return new Promise((resolve) => {
+            this.dialogConfig = config;
+            this._dialogResolver = resolve;
+            this._notify();
+        });
+    }
+
+    handleDialogResult(confirmed: boolean) {
+        if (this._dialogResolver) {
+            this._dialogResolver(confirmed);
+            this._dialogResolver = null;
+        }
+        this.dialogConfig = null;
         this._notify();
     }
 }

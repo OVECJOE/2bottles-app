@@ -9,6 +9,8 @@ export interface LocationState {
     destination: Coordinates | null;
     ownEtaMinutes: number | null;
     partnerEtaMinutes: number | null;
+    ownDistanceM: number | null;
+    partnerDistanceM: number | null;
     isWatching: boolean;
     accuracy: number | null;       // metres
 }

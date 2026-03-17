@@ -114,7 +114,8 @@ export class AppMenu extends LitElement {
       icon: '🔗',
       label: 'Copy session link',
       action: async () => {
-        await navigator.clipboard.writeText(`https://${s?.link ?? ''}`);
+        const link = s?.link || window.location.origin;
+        await navigator.clipboard.writeText(link);
         uiStore.showToast('Link copied');
         this._dismiss();
       },
@@ -124,10 +125,11 @@ export class AppMenu extends LitElement {
       icon: '📤',
       label: 'Share session',
       action: async () => {
+        const link = s?.link || window.location.origin;
         if (navigator.share) {
-          await navigator.share({ title: '2bottles', url: `https://${s?.link ?? ''}` });
+          await navigator.share({ title: '2bottles', url: link });
         } else {
-          await navigator.clipboard.writeText(`https://${s?.link ?? ''}`);
+          await navigator.clipboard.writeText(link);
           uiStore.showToast('Link copied');
         }
         this._dismiss();
@@ -137,7 +139,14 @@ export class AppMenu extends LitElement {
     const messagePartner: MenuItem = {
       icon: '💬',
       label: `Message ${p?.name?.split(' ')[0] ?? 'partner'}`,
-      action: () => { uiStore.navigate('partner-agree-refuse'); this._dismiss(); },
+      action: () => { 
+        if (this.screen === 'live-tracking') {
+          uiStore.navigate('live-chat');
+        } else {
+          uiStore.navigate('partner-agree-refuse');
+        }
+        this._dismiss();
+      },
     };
 
     const endSession: MenuItem = {

@@ -1,5 +1,5 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement } from 'lit/decorators.js';
 import { sessionStore, uiStore } from '../../store/index.js';
 import '../ui/screen-shell.js';
 
@@ -73,6 +73,14 @@ export class InvitePartner extends LitElement {
         50% { transform: scale(1.2); opacity: 1; }
         100% { transform: scale(0.8); opacity: 0.5; }
     }
+
+    .btn-ghost {
+        display: block; width: 100%; padding: 12px; margin-top: var(--space-4);
+        background: transparent; color: var(--color-text-muted);
+        border: none; font-size: var(--text-sm); cursor: pointer;
+        text-align: center;
+    }
+    .btn-ghost:hover { color: var(--color-text-primary); }
   `;
 
     private async _shareLink() {
@@ -114,14 +122,28 @@ export class InvitePartner extends LitElement {
             <div class="dot"></div>
             <span>Waiting for partner to join...</span>
           </div>
+
+          <button class="btn-ghost" @click=${this._cancel}>
+            Cancel Session
+          </button>
         </div>
       </screen-shell>
     `;
     }
-}
 
-declare global {
-    interface HTMLElementTagNameMap { 'invite-partner': InvitePartner; }
+    private async _cancel() {
+        const confirmed = await uiStore.confirm({
+            title: 'Cancel Session?',
+            message: 'This will end the current rendezvous and stop location sharing.',
+            confirmLabel: 'Yes, Cancel',
+            cancelLabel: 'Keep Session'
+        });
+
+        if (confirmed) {
+            sessionStore.endSession();
+            uiStore.goHome();
+        }
+    }
 }
 
 declare global {
