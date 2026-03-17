@@ -10,31 +10,20 @@ import { customElement, state } from 'lit/decorators.js';
 import { locationStore, uiStore, sessionStore } from '../../store/index.js';
 import { reverseGeocode } from '../../services/geocoding.service.js';
 import { p2pService } from '../../services/p2p.service.js';
+import { sharedStyles } from '../../styles/shared-styles.js';
 import '../../components/ui/location-input.js';
 import '../../components/ui/screen-shell.js';
 import type { GeocodeSuggestion } from '../../services/geocoding.service.js';
 
 @customElement('create-session')
 export class CreateSession extends LitElement {
-  static override styles = css`
+  static override styles = [
+    sharedStyles,
+    css`
     :host { display: block; }
 
-    .sheet {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      background: var(--color-sheet-bg);
-      border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
-      padding: var(--space-3) var(--space-5) calc(env(safe-area-inset-bottom, 0px) + var(--space-8));
-      z-index: var(--z-sheet);
-      animation: slide-up var(--duration-sheet) var(--ease-out) both;
-    }
-
-    .handle {
-      width: 36px; height: 4px; background: rgba(0,0,0,0.12);
-      border-radius: var(--border-radius-pill); margin: 0 auto var(--space-4);
-    }
-
-    .title    { font-size: var(--text-xl); font-weight: var(--weight-bold); margin-bottom: var(--space-1); }
-    .subtitle { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-4); }
+    /* Local overrides */
+    .sheet { animation: slide-up var(--duration-sheet) var(--ease-out) both; }
 
     .gps-row {
       display: flex; align-items: center; gap: var(--space-3);
@@ -99,38 +88,21 @@ export class CreateSession extends LitElement {
       font-size: 14px; cursor: pointer; color: var(--color-text-muted); padding: 0;
     }
 
-    .btn {
-      display: block; width: 100%; padding: 13px var(--space-4);
-      border: none; border-radius: var(--border-radius-md);
-      font-family: var(--font-sans); font-size: var(--text-md);
-      font-weight: var(--weight-bold); cursor: pointer;
-      text-align: center; line-height: 1;
-      transition: all var(--duration-fast) var(--ease-out);
-      -webkit-tap-highlight-color: transparent;
-      margin-top: var(--space-3);
-    }
-    .btn:active { transform: scale(0.98); opacity: 0.9; }
-
-    .btn-primary {
-      background: var(--color-blue); color: #fff;
-      display: flex; align-items: center; justify-content: center; gap: var(--space-2);
-    }
-    .btn-primary:hover { background: var(--color-blue-mid); }
-    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-
     .error {
       font-size: var(--text-xs); color: var(--color-danger-text);
       text-align: center; margin-top: var(--space-2);
     }
 
     .name-input {
-        width: 100%; padding: 12px; margin-top: var(--space-4);
+        box-sizing: border-box;
+        width: 100%; padding: 12px;
         border: 1px solid rgba(0,0,0,0.1); border-radius: var(--border-radius-md);
         font-family: var(--font-sans); font-size: var(--text-md);
         background: var(--color-sheet-bg);
     }
     .name-input:focus { outline: none; border-color: var(--color-blue); box-shadow: 0 0 0 2px rgba(77,114,152,0.1); }
-  `;
+    .name-input { margin-top: var(--space-4); }
+  `  ];
 
   @state() private _gpsName = 'Detecting your location…';
   @state() private _gpsReady = false;
@@ -204,7 +176,7 @@ export class CreateSession extends LitElement {
       }
 
       sessionStore.setOwnName(this._name);
-      
+
       const peerId = await p2pService.init();
       await sessionStore.createSession(peerId);
 
@@ -254,7 +226,7 @@ export class CreateSession extends LitElement {
 
         <input
           type="text"
-          class="name-input"
+          class="input-base name-input"
           placeholder="Your Name (Required)"
           .value=${this._name}
           @input=${(e: any) => { this._name = e.target.value; this._error = ''; }}

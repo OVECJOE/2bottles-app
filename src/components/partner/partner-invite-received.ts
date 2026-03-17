@@ -2,6 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
+import { sharedStyles } from '../../styles/shared-styles.js';
 import type { BeforeEnterObserver, RouterLocation } from '@vaadin/router';
 import '../ui/screen-shell.js';
 
@@ -11,23 +12,13 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
   @state() private _accepting = false;
   @state() private _name = '';
 
-  static override styles = css`
+  static override styles = [
+    sharedStyles,
+    css`
     :host { display: block; }
 
-    .sheet {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      background: var(--color-sheet-bg);
-      border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
-      padding: var(--space-3) var(--space-5) calc(env(safe-area-inset-bottom, var(--space-8)));
-      z-index: var(--z-sheet);
-      animation: slide-up var(--duration-sheet) var(--ease-out) both;
-    }
-
-    .handle { width: 36px; height: 4px; background: rgba(0,0,0,0.12); border-radius: var(--border-radius-pill); margin: 0 auto var(--space-4); }
-
-    .title { font-size: var(--text-xl); font-weight: var(--weight-bold); margin-bottom: var(--space-1); }
-    .subtitle { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-6); }
+    /* Local overrides */
+    .sheet { animation: slide-up var(--duration-sheet) var(--ease-out) both; }
 
     .host-info {
         display: flex;
@@ -49,32 +40,15 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
         font-weight: var(--weight-bold);
     }
 
-    .btn-primary {
-      width: 100%; padding: 14px;
-      background: var(--color-blue); color: #fff;
-      border: none; border-radius: var(--border-radius-md);
-      font-family: var(--font-sans); font-size: var(--text-md);
-      font-weight: var(--weight-bold); cursor: pointer;
-      transition: background var(--duration-fast), transform var(--duration-fast);
-      display: flex; align-items: center; justify-content: center; gap: var(--space-2);
-    }
-    .btn-primary:hover { background: var(--color-blue-mid); }
-    .btn-primary:active { transform: scale(0.98); }
-
-    .btn-ghost {
-      width: 100%; padding: 12px; margin-top: var(--space-3);
-      background: transparent; color: var(--color-text-muted);
-      border: none; font-size: var(--text-sm); cursor: pointer;
-    }
-
+    .btn-primary { margin-top: var(--space-2); }
     .name-input {
         box-sizing: border-box;
-        width: 100%; padding: 12px; margin-bottom: var(--space-4);
+        width: 100%; padding: 12px; margin-top: var(--space-4); margin-bottom: var(--space-4);
         border: 1px solid rgba(0,0,0,0.1); border-radius: var(--border-radius-md);
         font-family: var(--font-sans); font-size: var(--text-md);
         background: var(--color-sheet-bg);
     }
-  `;
+  `  ];
 
   async onBeforeEnter(location: RouterLocation) {
     const peerId = location.params.peerId as string;
@@ -161,16 +135,16 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
 
           <input
             type="text"
-            class="name-input"
+            class="input-base name-input"
             placeholder="Your Name (Required, 2+ chars)"
             .value=${this._name}
             @input=${(e: any) => this._name = e.target.value}
           />
  
-          <button class="btn-primary" @click=${this._accept} ?disabled=${this._connecting || this._accepting || this._name.trim().length < 2}>
+          <button class="btn btn-primary" @click=${this._accept} ?disabled=${this._connecting || this._accepting || this._name.trim().length < 2}>
             ${this._connecting ? 'Connecting...' : this._accepting ? 'Joining...' : 'Accept Invite'}
           </button>
-          <button class="btn-ghost" @click=${this._decline} ?disabled=${this._connecting || this._accepting}>
+          <button class="btn btn-ghost" @click=${this._decline} ?disabled=${this._connecting || this._accepting}>
             Decline
           </button>
         </div>

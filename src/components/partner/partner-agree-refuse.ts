@@ -2,12 +2,15 @@ import { LitElement, html, css } from 'lit';
 import { customElement, state, query } from 'lit/decorators.js';
 import { sessionStore, uiStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
+import { sharedStyles } from '../../styles/shared-styles.js';
 import type { ChatMessage } from '../../types/index.js';
 import '../ui/screen-shell.js';
 
 @customElement('partner-agree-refuse')
 export class PartnerAgreeRefuse extends LitElement {
-    static override styles = css`
+  static override styles = [
+    sharedStyles,
+    css`
     :host { display: block; }
 
     .venue-pill {
@@ -95,116 +98,91 @@ export class PartnerAgreeRefuse extends LitElement {
     }
     .send-btn:hover { background: var(--color-blue-mid); }
 
-    .action-row { display: flex; gap: var(--space-2); margin-top: var(--space-2); flex-shrink: 0; }
+    .action-row { margin-top: var(--space-4); }
+  `];
 
-    .btn-agree {
-    .btn {
-      display: block; width: 100%; padding: 13px var(--space-4);
-      border: none; border-radius: var(--border-radius-md);
-      font-family: var(--font-sans); font-size: var(--text-md);
-      font-weight: var(--weight-bold); cursor: pointer;
-      text-align: center; line-height: 1;
-      transition: all var(--duration-fast) var(--ease-out);
-      -webkit-tap-highlight-color: transparent;
+  @state() private _draft = '';
+  @query('.chat-messages') private _chatEl!: HTMLElement;
+
+  private _unsub?: () => void;
+
+  override connectedCallback() {
+    super.connectedCallback();
+    this._unsub = sessionStore.subscribe(() => {
+      this.requestUpdate();
+      this._scrollToBottom();
+    });
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    this._unsub?.();
+  }
+
+  private _send() {
+    const text = this._draft.trim();
+    if (!text) return;
+
+    const timestamp = Date.now();
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      senderId: 'me',
+      text,
+      timestamp,
+    };
+
+    sessionStore.addMessage(msg);
+    this._draft = '';
+    (this.renderRoot.querySelector('.chat-input') as HTMLInputElement).value = ''; // Bug 43: Clear physical input
+
+    // Broadcast via P2P
+    p2pService.send({ type: 'chat:message', text, timestamp });
+
+    this._scrollToBottom();
+  }
+
+  private _scrollToBottom() {
+    requestAnimationFrame(() => {
+      if (this._chatEl) this._chatEl.scrollTop = this._chatEl.scrollHeight;
+    });
+  }
+
+  private _agree() {
+    if (sessionStore.ownAgreed) return; // Bug 44: Guard against double-tap
+    sessionStore.setOwnAgreed(true);
+    p2pService.broadcastAgreement();
+
+    if (sessionStore.isVenueConfirmed) {
+      uiStore.showToast("Both agreed! Starting live tracking.");
+      uiStore.goToLiveTracking();
+      p2pService.broadcastSessionStatus('live');
+    } else {
+      uiStore.showToast(`Waiting for ${sessionStore.partnerName || 'partner'} to agree...`);
     }
-    .btn:active { transform: scale(0.98); opacity: 0.9; }
+  }
 
-    .btn-agree {
-      flex: 1;
-      background: var(--color-green); color: var(--color-green-text);
-    }
-    .btn-agree:hover { background: var(--color-green-mid); }
+  private async _refuse() {
+    const confirmed = await uiStore.confirm({
+      title: 'Change Meetup Spot?',
+      message: 'This will reset the agreement for both you and your partner.',
+      confirmLabel: 'Yes, Change',
+      cancelLabel: 'Stay Here'
+    });
 
-    .btn-refuse {
-      flex: 1;
-      background: transparent; color: var(--color-blue);
-      border: 1.5px solid var(--color-blue);
-    }
-    .btn-refuse:hover { background: var(--color-blue-light); }
-  `;
+    if (!confirmed) return; // Bug 48: Confirmation
 
-    @state() private _draft = '';
-    @query('.chat-messages') private _chatEl!: HTMLElement;
+    sessionStore.setOwnAgreed(false);
+    sessionStore.setPartnerAgreed(false);
+    p2pService.broadcastReset();
+    sessionStore.clearVenueSelection();
+    uiStore.goToSelectVenue();
+  }
 
-    private _unsub?: () => void;
+  override render() {
+    const v = sessionStore.selectedVenue;
+    const messages = sessionStore.chatMessages;
 
-    override connectedCallback() {
-        super.connectedCallback();
-        this._unsub = sessionStore.subscribe(() => {
-            this.requestUpdate();
-            this._scrollToBottom();
-        });
-    }
-
-    override disconnectedCallback() {
-        super.disconnectedCallback();
-        this._unsub?.();
-    }
-
-    private _send() {
-        const text = this._draft.trim();
-        if (!text) return;
-
-        const timestamp = Date.now();
-        const msg: ChatMessage = {
-            id: crypto.randomUUID(),
-            senderId: 'me',
-            text,
-            timestamp,
-        };
-        
-        sessionStore.addMessage(msg);
-        this._draft = '';
-        (this.renderRoot.querySelector('.chat-input') as HTMLInputElement).value = ''; // Bug 43: Clear physical input
-        
-        // Broadcast via P2P
-        p2pService.send({ type: 'chat:message', text, timestamp });
-        
-        this._scrollToBottom();
-    }
-
-    private _scrollToBottom() {
-        requestAnimationFrame(() => {
-            if (this._chatEl) this._chatEl.scrollTop = this._chatEl.scrollHeight;
-        });
-    }
-
-    private _agree() {
-        if (sessionStore.ownAgreed) return; // Bug 44: Guard against double-tap
-        sessionStore.setOwnAgreed(true);
-        p2pService.broadcastAgreement();
-        
-        if (sessionStore.isVenueConfirmed) {
-            uiStore.showToast("Both agreed! Starting live tracking.");
-            uiStore.goToLiveTracking();
-            p2pService.broadcastSessionStatus('live');
-        } else {
-            uiStore.showToast(`Waiting for ${sessionStore.partnerName || 'partner'} to agree...`);
-        }
-    }
-
-    private async _refuse() {
-        const confirmed = await uiStore.confirm({
-            title: 'Change Meetup Spot?',
-            message: 'This will reset the agreement for both you and your partner.',
-            confirmLabel: 'Yes, Change',
-            cancelLabel: 'Stay Here'
-        });
-
-        if (!confirmed) return; // Bug 48: Confirmation
-
-        sessionStore.setOwnAgreed(false);
-        sessionStore.setPartnerAgreed(false);
-        p2pService.broadcastReset();
-        sessionStore.clearVenueSelection();
-        uiStore.goToSelectVenue();
-    }
-
-    override render() {
-        const v = sessionStore.selectedVenue;
-        const messages = sessionStore.chatMessages;
-
-        return html`
+    return html`
       <screen-shell screen='partner-notified'>
         ${v ? html`
             <div class="venue-pill">
@@ -229,13 +207,13 @@ export class PartnerAgreeRefuse extends LitElement {
 
             <div class="chat-messages">
             ${messages.map((m: ChatMessage) => {
-                const isMe = m.senderId === 'me';
-                return html`
+      const isMe = m.senderId === 'me';
+      return html`
                 <div class="msg ${isMe ? 'mine' : ''}">
                     <div class="bubble ${isMe ? 'mine' : 'them'}">${m.text}</div>
                 </div>
                 `;
-            })}
+    })}
             </div>
 
             <div class="chat-input-row">
@@ -251,17 +229,19 @@ export class PartnerAgreeRefuse extends LitElement {
             </div>
 
             <div class="action-row">
-            <button class="btn btn-agree" ?disabled=${sessionStore.ownAgreed} @click=${this._agree}>
-                ${sessionStore.ownAgreed ? '✓ Waiting for partner' : '✓ Agree'}
-            </button>
-            <button class="btn btn-refuse" @click=${this._refuse}>↩ Different spot</button>
+              <button class="btn btn-primary btn-agree" ?disabled=${sessionStore.ownAgreed} @click=${this._agree}>
+                ${sessionStore.ownAgreed ? 'Waiting for partner…' : 'Agree & Meet Here'}
+              </button>
+              <button class="btn btn-ghost btn-refuse" @click=${this._refuse}>
+                No, change spot
+              </button>
             </div>
         </div>
       </screen-shell>
     `;
-    }
+  }
 }
 
 declare global {
-    interface HTMLElementTagNameMap { 'partner-agree-refuse': PartnerAgreeRefuse; }
+  interface HTMLElementTagNameMap { 'partner-agree-refuse': PartnerAgreeRefuse; }
 }

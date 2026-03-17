@@ -8,7 +8,7 @@ import { sessionStore, uiStore, locationStore } from '../../store/index.js';
 
 @customElement('end-session')
 export class EndSession extends LitElement {
-    static override styles = css`
+  static override styles = css`
     :host { display: block; }
 
     .arrived-badge {
@@ -95,36 +95,36 @@ export class EndSession extends LitElement {
     .btn-save:active { transform: scale(0.98); }
   `;
 
-    @state() private _saved = false;
+  @state() private _saved = false;
 
-    private _avgEta(): number {
-        const v = sessionStore.selectedVenue;
-        if (!v) return 0;
-        return Math.round((v.etaMinutesFromYou + v.etaMinutesFromPartner) / 2);
-    }
+  private _avgEta(): number {
+    const v = sessionStore.selectedVenue;
+    if (!v) return 0;
+    return Math.round((v.etaMinutesFromYou + v.etaMinutesFromPartner) / 2);
+  }
 
-    private _messageCount(): number {
-        return sessionStore.chatMessages.length;
-    }
+  private _messageCount(): number {
+    return sessionStore.chatMessages.length;
+  }
 
-    private _save() {
-        this._saved = true;
-        uiStore.showToast(`📌 ${sessionStore.selectedVenue?.name ?? 'Spot'} saved`);
-    }
+  private _save() {
+    this._saved = true;
+    uiStore.showToast(`📌 ${sessionStore.selectedVenue?.name ?? 'Spot'} saved`);
+  }
 
-    private _end() {
-        sessionStore.endSession();
-        locationStore.reset();
-        this.dispatchEvent(new CustomEvent('map-view:clear-midpoint', { bubbles: true, composed: true }));
-        this.dispatchEvent(new CustomEvent('map-view:clear-route', { bubbles: true, composed: true }));
-        uiStore.goHome();
-    }
+  private _end() {
+    sessionStore.endSession();
+    locationStore.reset();
+    this.dispatchEvent(new CustomEvent('map-view:clear-midpoint', { bubbles: true, composed: true }));
+    this.dispatchEvent(new CustomEvent('map-view:clear-route', { bubbles: true, composed: true }));
+    uiStore.goHome();
+  }
 
-    override render() {
-        const v = sessionStore.selectedVenue;
-        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  override render() {
+    const v = sessionStore.selectedVenue;
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        return html`
+    return html`
       <div class="arrived-badge">
         <span class="arrived-text">✓ Both arrived at ${v?.name ?? 'destination'}!</span>
       </div>
@@ -173,9 +173,9 @@ export class EndSession extends LitElement {
         </button>
       </div>
     `;
-    }
+  }
 }
 
 declare global {
-    interface HTMLElementTagNameMap { 'end-session': EndSession; }
+  interface HTMLElementTagNameMap { 'end-session': EndSession; }
 }

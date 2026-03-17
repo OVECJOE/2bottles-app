@@ -1,9 +1,12 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { property } from 'lit/decorators.js';
+import { sharedStyles } from '../../styles/shared-styles.js';
 
-@customElement('custom-dialog')
+// @customElement('custom-dialog')
 export class CustomDialog extends LitElement {
-    static override styles = css`
+    static override styles = [
+        sharedStyles,
+        css`
         :host {
             display: block;
             position: fixed;
@@ -63,38 +66,12 @@ export class CustomDialog extends LitElement {
             line-height: var(--line-height-base);
         }
 
-        .actions {
+    .actions {
             display: flex;
             flex-direction: column;
             gap: var(--space-2);
         }
-
-        .btn {
-            width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: var(--border-radius-md);
-            font-family: var(--font-sans);
-            font-size: var(--text-md);
-            font-weight: var(--weight-bold);
-            cursor: pointer;
-            transition: transform var(--duration-fast);
-        }
-
-        .btn:active {
-            transform: scale(0.98);
-        }
-
-        .btn-confirm {
-            background: var(--color-blue);
-            color: #fff;
-        }
-
-        .btn-cancel {
-            background: rgba(0, 0, 0, 0.05);
-            color: var(--color-text-muted);
-        }
-    `;
+    `    ];
 
     @property({ type: Boolean, reflect: true }) open = false;
     @property() title = '';
@@ -117,10 +94,10 @@ export class CustomDialog extends LitElement {
                 ${this.title ? html`<div class="title">${this.title}</div>` : ''}
                 <div class="message">${this.message}</div>
                 <div class="actions">
-                    <button class="btn btn-confirm" @click=${() => this._handleAction(true)}>
+                    <button class="btn btn-primary" @click=${() => this._handleAction(true)}>
                         ${this.confirmLabel}
                     </button>
-                    <button class="btn btn-cancel" @click=${() => this._handleAction(false)}>
+                    <button class="btn btn-ghost" @click=${() => this._handleAction(false)}>
                         ${this.cancelLabel}
                     </button>
                 </div>
@@ -131,4 +108,8 @@ export class CustomDialog extends LitElement {
 
 declare global {
     interface HTMLElementTagNameMap { 'custom-dialog': CustomDialog; }
+}
+
+if (!customElements.get('custom-dialog')) {
+    customElements.define('custom-dialog', CustomDialog);
 }

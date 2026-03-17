@@ -13,11 +13,11 @@
  *   darkBar   — true for dark-mode status bar text (over dark overlays)
  */
 import { LitElement, html, css } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { property, state } from 'lit/decorators.js';
 import './app-menu.js';
 import type { AppScreen } from '../../types/index.js';
 
-@customElement('screen-shell')
+// @customElement('screen-shell')
 export class ScreenShell extends LitElement {
   static override styles = css`
     :host { display: block; }
@@ -116,4 +116,8 @@ export class ScreenShell extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap { 'screen-shell': ScreenShell; }
+}
+
+if (!customElements.get('screen-shell')) {
+  customElements.define('screen-shell', ScreenShell);
 }

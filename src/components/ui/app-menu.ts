@@ -9,7 +9,7 @@
  *   menu-closed — when dismissed
  */
 import { LitElement, html, css } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { property } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
 import type { AppScreen } from '../../types/index.js';
 
@@ -20,7 +20,7 @@ interface MenuItem {
   danger?: boolean;
 }
 
-@customElement('app-menu')
+// @customElement('app-menu') -- Replaced with safe manual registration below
 export class AppMenu extends LitElement {
   static override styles = css`
     :host { display: block; }
@@ -68,8 +68,8 @@ export class AppMenu extends LitElement {
       border: none; background: none; width: 100%; text-align: left;
       -webkit-tap-highlight-color: transparent;
     }
-    .item:hover  { background: rgba(0,0,0,0.04); }
-    .item:active { background: rgba(0,0,0,0.08); }
+    .item:hover  { background: rgba(0,0,0,0.04); border-radius: var(--border-radius-sm); margin: 0 var(--space-1); width: calc(100% - var(--space-2)); }
+    .item:active { background: rgba(0,0,0,0.08); transform: scale(0.98); }
 
     .item.danger { color: var(--color-danger-text); }
     .item.danger:hover { background: var(--color-danger-bg); }
@@ -250,4 +250,8 @@ export class AppMenu extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap { 'app-menu': AppMenu; }
+}
+
+if (!customElements.get('app-menu')) {
+  customElements.define('app-menu', AppMenu);
 }

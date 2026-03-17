@@ -3,7 +3,8 @@ import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
 import { haversineMeters } from '../../services/geocoding.service.js';
-import type { Coordinates } from '../../types/index.js';
+import { sharedStyles } from '../../styles/shared-styles.js';
+import type { Coordinates, ChatMessage } from '../../types/index.js';
 import '../ui/screen-shell.js';
 
 const ARRIVAL_RADIUS_M = 60; // Bug 50: Reduced from 150m for urban precision
@@ -12,7 +13,9 @@ const REFRAME_THROTTLE_MS = 10000; // Bug 49: Throttle reframing
 
 @customElement('live-tracking')
 export class LiveTracking extends LitElement {
-    static override styles = css`
+  static override styles = [
+    sharedStyles,
+    css`
     :host { display: block; }
 
     .top-bar {
@@ -50,20 +53,8 @@ export class LiveTracking extends LitElement {
     }
     .reframe-btn:hover { background: rgba(255,255,255,0.22); }
 
-    .sheet {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      background: var(--color-sheet-bg);
-      border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
-      padding: var(--space-3) var(--space-5) calc(env(safe-area-inset-bottom, 0px) + var(--space-8));
-      z-index: var(--z-sheet);
-      animation: slide-up var(--duration-sheet) var(--ease-out) both;
-    }
-
-    .handle {
-      width: 36px; height: 4px; background: rgba(0,0,0,0.12);
-      border-radius: var(--border-radius-pill); margin: 0 auto var(--space-4);
-    }
-
+    /* Local overrides */
+    .sheet { max-height: 55vh; }
     .eta-row { display: flex; gap: var(--space-3); margin-bottom: var(--space-3); }
 
     .eta-card {
@@ -106,29 +97,7 @@ export class LiveTracking extends LitElement {
     .status-strip.alert .status-text   { color: var(--color-partner); }
     .status-strip.arrived .status-text { color: var(--color-green-text); }
 
-    /* Design System Compliant Buttons */
-    .btn {
-      display: block; width: 100%; padding: 13px var(--space-4);
-      border: none; border-radius: var(--border-radius-md);
-      font-family: var(--font-sans); font-size: var(--text-md);
-      font-weight: var(--weight-bold); cursor: pointer;
-      text-align: center; line-height: 1;
-      transition: all var(--duration-fast) var(--ease-out);
-      -webkit-tap-highlight-color: transparent;
-      margin-top: var(--space-2);
-    }
-    .btn:active { transform: scale(0.98); opacity: 0.9; }
-
-    .btn-outline {
-      background: transparent; color: var(--color-blue);
-      border: 1.5px solid var(--color-blue);
-    }
-    .btn-outline:hover { background: var(--color-blue-light); }
-
-    .btn-finish {
-      background: var(--color-green); color: var(--color-green-text);
-    }
-    .btn-finish:hover { background: var(--color-green-mid); }
+    .status-strip.arrived .status-text { color: var(--color-green-text); }
 
     /* Premium Chat Widget */
     .chat-widget {
@@ -170,177 +139,177 @@ export class LiveTracking extends LitElement {
     }
     .send-btn:active { transform: scale(0.9); }
     .send-btn:hover { background: var(--color-blue-mid); }
-  `;
+  `];
 
-    @state() private _ownArrived = false;
-    @state() private _partnerArrived = false;
-    @state() private _view: 'eta' | 'chat' = 'eta';
-    @state() private _draft = '';
+  @state() private _ownArrived = false;
+  @state() private _partnerArrived = false;
+  @state() private _view: 'eta' | 'chat' = 'eta';
+  @state() private _draft = '';
 
-    private _unsubLoc?: () => void;
-    private _unsubSession?: () => void;
-    private _lastReframeTime = 0;
-    private _lastReframedPos: Coordinates | null = null;
+  private _unsubLoc?: () => void;
+  private _unsubSession?: () => void;
+  private _lastReframeTime = 0;
+  private _lastReframedPos: Coordinates | null = null;
 
-    override connectedCallback() {
-        super.connectedCallback();
+  override connectedCallback() {
+    super.connectedCallback();
 
-        locationStore.startWatching();
-        this._unsubLoc = locationStore.subscribe(() => {
-            this._onLocationUpdate();
-            this.requestUpdate();
-        });
+    locationStore.startWatching();
+    this._unsubLoc = locationStore.subscribe(() => {
+      this._onLocationUpdate();
+      this.requestUpdate();
+    });
 
-        this._unsubSession = sessionStore.subscribe(() => {
-            this.requestUpdate();
-            this._scrollToBottom();
-        });
+    this._unsubSession = sessionStore.subscribe(() => {
+      this.requestUpdate();
+      this._scrollToBottom();
+    });
 
-        // Give the map a tick to settle then frame all three points and draw routes
-        // Bug 66: Wait for a moment to ensure stable GPS before first reframe
-        setTimeout(() => {
-            this._fireMapEvent('map-view:fit-tracking', {});
-            this._fireMapEvent('map-view:draw-tracking-routes', {});
-        }, 800);
+    // Give the map a tick to settle then frame all three points and draw routes
+    // Bug 66: Wait for a moment to ensure stable GPS before first reframe
+    setTimeout(() => {
+      this._fireMapEvent('map-view:fit-tracking', {});
+      this._fireMapEvent('map-view:draw-tracking-routes', {});
+    }, 800);
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    this._unsubLoc?.();
+    this._unsubSession?.();
+  }
+
+  private _fireMapEvent(type: string, detail: unknown) {
+    this.dispatchEvent(new CustomEvent(type, { bubbles: true, composed: true, detail }));
+  }
+
+  private _onLocationUpdate() {
+    const own = locationStore.own;
+    const dest = locationStore.destination;
+    if (!own || !dest) return;
+
+    // Perform calculations (Using 10 min/km for city/mixed travel)
+    const dist = haversineMeters(own, dest);
+    let ownEta: number | null = dist < ARRIVAL_RADIUS_M ? 0 : Math.max(1, Math.round((dist / 1000) * 10));
+
+    // Safety guard: Ensure we don't push NaN to stores
+    if (!isFinite(dist) || isNaN(dist)) return;
+    if (!isFinite(ownEta) || isNaN(ownEta)) ownEta = null;
+
+    const partner = locationStore.partner;
+    let pDist: number | null = null;
+    let pEta: number | null = null;
+
+    if (partner && isFinite(partner.lat) && isFinite(partner.lng)) {
+      pDist = haversineMeters(partner, dest);
+      if (isFinite(pDist)) {
+        pEta = pDist < ARRIVAL_RADIUS_M ? 0 : Math.max(1, Math.round((pDist / 1000) * 10));
+      }
     }
 
-    override disconnectedCallback() {
-        super.disconnectedCallback();
-        this._unsubLoc?.();
-        this._unsubSession?.();
+    // Batch store updates
+    locationStore.setDistances(dist, pDist);
+    locationStore.setEtas(ownEta, pEta);
+
+    // Arrival logic
+    if (dist <= ARRIVAL_RADIUS_M && !this._ownArrived) {
+      this._ownArrived = true;
+      sessionStore.setPartnerStatus('arrived');
+      p2pService.send({ type: 'partner:status', status: 'arrived' });
+      this._checkBothArrived();
     }
 
-    private _fireMapEvent(type: string, detail: unknown) {
-        this.dispatchEvent(new CustomEvent(type, { bubbles: true, composed: true, detail }));
+    if (sessionStore.partner?.status === 'arrived') {
+      this._partnerArrived = true;
+      this._checkBothArrived();
     }
 
-    private _onLocationUpdate() {
-        const own = locationStore.own;
-        const dest = locationStore.destination;
-        if (!own || !dest) return;
+    // Visual updates
+    this._fireMapEvent('map-view:draw-tracking-routes', {});
 
-        // Perform calculations (Using 10 min/km for city/mixed travel)
-        const dist = haversineMeters(own, dest);
-        let ownEta: number | null = dist < ARRIVAL_RADIUS_M ? 0 : Math.max(1, Math.round((dist / 1000) * 10));
+    // Bug 49: Throttled/Thresholded Re-framing
+    const now = Date.now();
+    const distMoved = this._lastReframedPos ? haversineMeters(own, this._lastReframedPos) : Infinity;
 
-        // Safety guard: Ensure we don't push NaN to stores
-        if (!isFinite(dist) || isNaN(dist)) return;
-        if (!isFinite(ownEta) || isNaN(ownEta)) ownEta = null;
-
-        const partner = locationStore.partner;
-        let pDist: number | null = null;
-        let pEta: number | null = null;
-
-        if (partner && isFinite(partner.lat) && isFinite(partner.lng)) {
-            pDist = haversineMeters(partner, dest);
-            if (isFinite(pDist)) {
-                pEta = pDist < ARRIVAL_RADIUS_M ? 0 : Math.max(1, Math.round((pDist / 1000) * 10));
-            }
-        }
-
-        // Batch store updates
-        locationStore.setDistances(dist, pDist);
-        locationStore.setEtas(ownEta, pEta);
-
-        // Arrival logic
-        if (dist <= ARRIVAL_RADIUS_M && !this._ownArrived) {
-            this._ownArrived = true;
-            sessionStore.setPartnerStatus('arrived');
-            p2pService.send({ type: 'partner:status', status: 'arrived' });
-            this._checkBothArrived();
-        }
-
-        if (sessionStore.partner?.status === 'arrived') {
-            this._partnerArrived = true;
-            this._checkBothArrived();
-        }
-
-        // Visual updates
-        this._fireMapEvent('map-view:draw-tracking-routes', {});
-        
-        // Bug 49: Throttled/Thresholded Re-framing
-        const now = Date.now();
-        const distMoved = this._lastReframedPos ? haversineMeters(own, this._lastReframedPos) : Infinity;
-        
-        if (now - this._lastReframeTime > REFRAME_THROTTLE_MS || distMoved > REFRAME_THRESHOLD_M) {
-            this._fireMapEvent('map-view:fit-tracking', {});
-            this._lastReframeTime = now;
-            this._lastReframedPos = { ...own };
-        }
+    if (now - this._lastReframeTime > REFRAME_THROTTLE_MS || distMoved > REFRAME_THRESHOLD_M) {
+      this._fireMapEvent('map-view:fit-tracking', {});
+      this._lastReframeTime = now;
+      this._lastReframedPos = { ...own };
     }
+  }
 
-    private _checkBothArrived() {
-        // Bug 51: Removed auto-termination timeout. User will click "Finish"
+  private _checkBothArrived() {
+    // Bug 51: Removed auto-termination timeout. User will click "Finish"
+  }
+
+  private async _manualFinish() {
+    const confirmed = await uiStore.confirm({
+      title: 'Finish Session?',
+      message: 'Are you sure you want to end tracking?',
+      confirmLabel: 'Yes, End It',
+      cancelLabel: 'Continue'
+    });
+
+    if (confirmed) {
+      uiStore.goToEndSession();
     }
+  }
 
-    private async _manualFinish() {
-        const confirmed = await uiStore.confirm({
-            title: 'Finish Session?',
-            message: 'Are you sure you want to end tracking?',
-            confirmLabel: 'Yes, End It',
-            cancelLabel: 'Continue'
-        });
-
-        if (confirmed) {
-            uiStore.goToEndSession();
-        }
+  private _toggleChat() {
+    this._view = this._view === 'chat' ? 'eta' : 'chat';
+    if (this._view === 'chat') {
+      this._scrollToBottom();
     }
+  }
 
-    private _toggleChat() {
-        this._view = this._view === 'chat' ? 'eta' : 'chat';
-        if (this._view === 'chat') {
-            this._scrollToBottom();
-        }
-    }
+  private _scrollToBottom() {
+    requestAnimationFrame(() => {
+      const el = this.renderRoot.querySelector('.chat-messages');
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }
 
-    private _scrollToBottom() {
-        requestAnimationFrame(() => {
-            const el = this.renderRoot.querySelector('.chat-messages');
-            if (el) el.scrollTop = el.scrollHeight;
-        });
-    }
+  private _send() {
+    if (!this._draft.trim()) return;
+    const timestamp = Date.now();
+    sessionStore.addMessage({
+      id: crypto.randomUUID(),
+      senderId: 'me',
+      text: this._draft,
+      timestamp
+    });
+    p2pService.send({ type: 'chat:message', text: this._draft, timestamp });
+    this._draft = '';
+    (this.renderRoot.querySelector('.chat-input') as HTMLInputElement).value = '';
+  }
 
-    private _send() {
-        if (!this._draft.trim()) return;
-        const timestamp = Date.now();
-        sessionStore.addMessage({
-            id: crypto.randomUUID(),
-            senderId: 'me',
-            text: this._draft,
-            timestamp
-        });
-        p2pService.send({ type: 'chat:message', text: this._draft, timestamp });
-        this._draft = '';
-        (this.renderRoot.querySelector('.chat-input') as HTMLInputElement).value = '';
-    }
+  private _reframe() {
+    this._fireMapEvent('map-view:fit-tracking', {});
+  }
 
-    private _reframe() {
-        this._fireMapEvent('map-view:fit-tracking', {});
-    }
+  override render() {
+    const dest = sessionStore.selectedVenue;
+    const partner = sessionStore.partner;
+    const pName = partner?.name?.split(' ')[0] ?? 'Partner';
+    const ownEta = locationStore.ownEtaMinutes;
+    const partnerEta = locationStore.partnerEtaMinutes;
 
-    override render() {
-        const dest = sessionStore.selectedVenue;
-        const partner = sessionStore.partner;
-        const pName = partner?.name?.split(' ')[0] ?? 'Partner';
-        const ownEta = locationStore.ownEtaMinutes;
-        const partnerEta = locationStore.partnerEtaMinutes;
+    const isPartnerOffline = !uiStore.isPartnerOnline;
 
-        const isPartnerOffline = !uiStore.isPartnerOnline;
+    const statusMsg = this._ownArrived && this._partnerArrived
+      ? `Both arrived at ${dest?.name ?? 'destination'}! 🎉`
+      : isPartnerOffline
+        ? `Connection lost... attempting to reconnect to ${pName}.`
+        : this._ownArrived
+          ? `You're there — waiting for ${pName}…`
+          : this._partnerArrived
+            ? `${pName} arrived — you're almost there!`
+            : `Both moving toward ${dest?.name ?? 'destination'}`;
 
-        const statusMsg = this._ownArrived && this._partnerArrived
-            ? `Both arrived at ${dest?.name ?? 'destination'}! 🎉`
-            : isPartnerOffline
-                ? `Connection lost... attempting to reconnect to ${pName}.`
-                : this._ownArrived
-                    ? `You're there — waiting for ${pName}…`
-                    : this._partnerArrived
-                        ? `${pName} arrived — you're almost there!`
-                        : `Both moving toward ${dest?.name ?? 'destination'}`;
-        
-        const statusClass = (this._ownArrived && this._partnerArrived) || this._ownArrived || this._partnerArrived ? 'arrived' 
-                         : isPartnerOffline ? 'alert' : 'moving';
+    const statusClass = (this._ownArrived && this._partnerArrived) || this._ownArrived || this._partnerArrived ? 'arrived'
+      : isPartnerOffline ? 'alert' : 'moving';
 
-        return html`
+    return html`
       <screen-shell screen='live-tracking'>
 
       <div class="top-bar">
@@ -393,7 +362,7 @@ export class LiveTracking extends LitElement {
         </button>
 
         ${(this._ownArrived || this._partnerArrived) && this._view === 'eta' ? html`
-            <button class="btn btn-finish" @click=${this._manualFinish}>
+            <button class="btn btn-green" @click=${this._manualFinish}>
                 Finish Session
             </button>
         ` : ''}
@@ -401,9 +370,9 @@ export class LiveTracking extends LitElement {
 
       </screen-shell>
     `;
-    }
+  }
 }
 
 declare global {
-    interface HTMLElementTagNameMap { 'live-tracking': LiveTracking; }
+  interface HTMLElementTagNameMap { 'live-tracking': LiveTracking; }
 }
