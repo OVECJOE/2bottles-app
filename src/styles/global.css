@@ -153,6 +153,7 @@ map-view {
 ---------------------------------------------------------- */
 .bottom-sheet {
     position: absolute;
+    overflow-y: auto;
     bottom: 0;
     left: 0;
     right: 0;

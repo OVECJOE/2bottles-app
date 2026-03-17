@@ -11,6 +11,7 @@ export type AppScreen =
     | 'partner-agree-refuse' // partner sees suggestion + chat
     | 'session-link'         // both agreed → link generated
     | 'live-tracking'        // en route, real-time location
+    | 'live-chat'            // full-screen chat during tracking
     | 'end-session';         // arrived, wrap up
 
 export interface UIState {

@@ -1,183 +1,170 @@
-/**
- * <partner-invite-received> — shown while waiting for partner to
- * accept or reject. Polls (or in production, listens over WebSocket)
- * for a status change and auto-navigates when it arrives.
- *
- * For the prototype we simulate a 4-second auto-accept.
- */
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
+import { p2pService } from '../../services/p2p.service.js';
+import type { BeforeEnterObserver, RouterLocation } from '@vaadin/router';
+import '../ui/screen-shell.js';
 
 @customElement('partner-invite-received')
-export class PartnerInviteReceived extends LitElement {
+export class PartnerInviteReceived extends LitElement implements BeforeEnterObserver {
+    @state() private _connecting = false;
+    @state() private _name = '';
+
     static override styles = css`
     :host { display: block; }
-
-    .notif-banner {
-      position: absolute;
-      top: calc(var(--map-status-bar-height) + var(--space-2));
-      left: var(--space-4); right: var(--space-4);
-      background: rgba(26,37,48,0.94);
-      border-radius: var(--border-radius-lg);
-      padding: var(--space-3) var(--space-3);
-      display: flex; align-items: center; gap: var(--space-3);
-      z-index: var(--z-notification);
-      box-shadow: var(--shadow-lg);
-      backdrop-filter: blur(8px);
-      animation: slide-down var(--duration-slow) var(--ease-spring) both;
-    }
-
-    .notif-icon {
-      width: 38px; height: 38px;
-      border-radius: var(--border-radius-sm);
-      background: var(--color-blue); color: #fff;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px; flex-shrink: 0;
-    }
-
-    .notif-text { flex: 1; }
-    .notif-title { font-size: var(--text-sm); font-weight: var(--weight-bold); color: #fff; }
-    .notif-body { font-size: var(--text-xs); color: var(--color-text-on-dark-muted); margin-top: 1px; }
 
     .sheet {
       position: absolute;
       bottom: 0; left: 0; right: 0;
       background: var(--color-sheet-bg);
       border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
-      padding: var(--space-3) var(--space-5) env(safe-area-inset-bottom, var(--space-8));
+      padding: var(--space-3) var(--space-5) calc(env(safe-area-inset-bottom, var(--space-8)));
       z-index: var(--z-sheet);
       animation: slide-up var(--duration-sheet) var(--ease-out) both;
     }
 
     .handle { width: 36px; height: 4px; background: rgba(0,0,0,0.12); border-radius: var(--border-radius-pill); margin: 0 auto var(--space-4); }
 
-    .partner-row {
-      display: flex; align-items: center; gap: var(--space-3);
-      margin-bottom: var(--space-4);
-    }
-
-    .avatar {
-      width: 48px; height: 48px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: var(--weight-bold); font-size: 15px; flex-shrink: 0;
-    }
-
     .title { font-size: var(--text-xl); font-weight: var(--weight-bold); margin-bottom: var(--space-1); }
-    .subtitle { font-size: var(--text-sm); color: var(--color-text-muted); }
+    .subtitle { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-6); }
 
-    .status-card {
-      display: flex; align-items: center; gap: var(--space-3);
-      background: rgba(0,0,0,0.04); border-radius: var(--border-radius-md);
-      padding: var(--space-3); margin-bottom: var(--space-3);
+    .host-info {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        background: rgba(0,0,0,0.04);
+        padding: var(--space-4);
+        border-radius: var(--border-radius-md);
+        margin-bottom: var(--space-6);
+    }
+    .avatar {
+        width: 44px; height: 44px;
+        background: var(--color-partner);
+        color: #fff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: var(--weight-bold);
     }
 
-    .status-dot {
-      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-      animation: pulse-ring 1.8s ease-in-out infinite;
+    .btn-primary {
+      width: 100%; padding: 14px;
+      background: var(--color-blue); color: #fff;
+      border: none; border-radius: var(--border-radius-md);
+      font-family: var(--font-sans); font-size: var(--text-md);
+      font-weight: var(--weight-bold); cursor: pointer;
+      transition: background var(--duration-fast), transform var(--duration-fast);
+      display: flex; align-items: center; justify-content: center; gap: var(--space-2);
     }
-    .status-dot.waiting { background: var(--color-partner); box-shadow: 0 0 0 0 rgba(232,160,32,0.4); }
-
-    .status-text { font-size: var(--text-sm); font-weight: var(--weight-medium); }
-    .status-sub  { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 1px; }
-
-    .progress-bar-wrap {
-      height: 3px; background: rgba(0,0,0,0.07);
-      border-radius: var(--border-radius-pill); overflow: hidden;
-      margin-bottom: var(--space-4);
-    }
-    .progress-bar {
-      height: 100%; background: var(--color-blue);
-      border-radius: var(--border-radius-pill);
-      animation: progress-fill 4s linear forwards;
-    }
-    @keyframes progress-fill { from { width: 0; } to { width: 100%; } }
+    .btn-primary:hover { background: var(--color-blue-mid); }
+    .btn-primary:active { transform: scale(0.98); }
 
     .btn-ghost {
-      width: 100%; padding: 13px;
-      background: rgba(0,0,0,0.05); color: var(--color-text-secondary);
-      border: none; border-radius: var(--border-radius-md);
-      font-family: var(--font-sans); font-size: var(--text-sm);
-      font-weight: var(--weight-medium); cursor: pointer;
+      width: 100%; padding: 12px; margin-top: var(--space-3);
+      background: transparent; color: var(--color-text-muted);
+      border: none; font-size: var(--text-sm); cursor: pointer;
     }
-    .btn-ghost:hover { background: rgba(0,0,0,0.09); }
+
+    .name-input {
+        width: 100%; padding: 12px; margin-bottom: var(--space-4);
+        border: 1px solid rgba(0,0,0,0.1); border-radius: var(--border-radius-md);
+        font-family: var(--font-sans); font-size: var(--text-md);
+        background: var(--color-sheet-bg);
+    }
   `;
 
-    @state() private _elapsed = 0;
-    private _interval?: ReturnType<typeof setInterval>;
+    async onBeforeEnter(location: RouterLocation) {
+        const peerId = location.params.peerId as string;
+        if (peerId) {
+            console.log('[PartnerInviteReceived] Extracted peerId:', peerId);
+            await this._handleAutoJoin(peerId);
+        }
+    }
 
-    override connectedCallback() {
-        super.connectedCallback();
-        // Simulate partner accepting after 4 seconds (replace with WS in prod)
-        this._interval = setInterval(() => {
-            this._elapsed += 1;
-            if (this._elapsed >= 4) {
-                clearInterval(this._interval);
-                sessionStore.setPartnerStatus('accepted');
+    private async _handleAutoJoin(peerId: string) {
+        // If already in THIS session, don't re-join
+        if (sessionStore.session?.id === peerId) return;
 
-                // Simulate partner having a location
-                const own = locationStore.own;
-                if (own) {
-                    const partnerCoords = { lat: own.lat + 0.02, lng: own.lng + 0.025 };
-                    locationStore.setPartnerLocation(partnerCoords);
-                    sessionStore.setPartner({ ...sessionStore.partner!, location: partnerCoords });
-                }
-
-                uiStore.goToSelectVenue();
+        this._connecting = true;
+        uiStore.setLoading(true);
+        try {
+            if (sessionStore.session) {
+                console.log('[PartnerInviteReceived] Clearing old session.');
+                await sessionStore.endSession();
             }
-        }, 1000);
+            await sessionStore.joinSession(peerId);
+            await p2pService.connect(peerId);
+            console.log('[PartnerInviteReceived] Join successful.');
+        } catch (err) {
+            console.error('[PartnerInviteReceived] Join failed:', err);
+            uiStore.showToast('Could not connect to partner.');
+        } finally {
+            this._connecting = false;
+            uiStore.setLoading(false);
+        }
     }
 
-    override disconnectedCallback() {
-        super.disconnectedCallback();
-        clearInterval(this._interval);
+    private _accept() {
+        // 1. Share info
+        if (this._name) {
+            sessionStore.setOwnName(this._name);
+            p2pService.broadcastUserInfo(this._name);
+        }
+
+        // 2. Peer accepts -> send status to host
+        p2pService.send({ type: 'partner:status', status: 'accepted' });
+        
+        // 3. Start watching location
+        locationStore.startWatching();
+        
+        // 4. Update local state
+        sessionStore.setPartnerStatus('accepted');
+        
+        // Host will receive 'accepted' and navigate to venue selection
+        // Joiner stays here until Host picks a venue and sends 'session:venue'
+        uiStore.showToast('Joined! Waiting for host to pick a spot.');
     }
 
-    private _cancel() {
-        clearInterval(this._interval);
+    private _decline() {
+        p2pService.send({ type: 'partner:status', status: 'rejected' });
+        p2pService.disconnect();
         sessionStore.endSession();
-        locationStore.reset();
         uiStore.goHome();
     }
 
     override render() {
-        const p = sessionStore.partner;
-        if (!p) return html``;
-
         return html`
-      <div class="notif-banner">
-        <div class="notif-icon">📍</div>
-        <div class="notif-text">
-          <div class="notif-title">2bottles · Invite Sent</div>
-          <div class="notif-body">Waiting for ${p.name} to respond…</div>
-        </div>
-      </div>
+      <screen-shell screen='partner-notified'>
+        <div class="sheet">
+          <div class="handle"></div>
+          <div class="title">Join Rendezvous</div>
+          <div class="subtitle">A partner has invited you to meet halfway.</div>
 
-      <div class="sheet">
-        <div class="handle"></div>
-
-        <div class="partner-row">
-          <div class="avatar" style="background:${p.avatarBg};color:${p.avatarColor}">${p.initials}</div>
-          <div>
-            <div class="title">${p.name}</div>
-            <div class="subtitle">Invite sent — awaiting response</div>
+          <div class="host-info">
+            <div class="avatar">${sessionStore.partnerName ? sessionStore.partnerName[0].toUpperCase() : '?'}</div>
+            <div>
+                <div style="font-weight:var(--weight-bold)">${sessionStore.partnerName || 'Partner'}</div>
+                <div style="font-size:var(--text-xs);color:var(--color-text-muted)">Awaiting your response</div>
+            </div>
           </div>
-        </div>
 
-        <div class="status-card">
-          <div class="status-dot waiting"></div>
-          <div>
-            <div class="status-text">Notification delivered</div>
-            <div class="status-sub">They'll see it any moment now</div>
-          </div>
-        </div>
+          <input
+            type="text"
+            class="name-input"
+            placeholder="Your Name (Optional)"
+            .value=${this._name}
+            @input=${(e: any) => this._name = e.target.value}
+          />
 
-        <div class="progress-bar-wrap">
-          <div class="progress-bar"></div>
+          <button class="btn-primary" @click=${this._accept} ?disabled=${this._connecting}>
+            ${this._connecting ? 'Connecting...' : 'Accept Invite'}
+          </button>
+          <button class="btn-ghost" @click=${this._decline} ?disabled=${this._connecting}>
+            Decline
+          </button>
         </div>
-
-        <button class="btn-ghost" @click=${this._cancel}>Cancel invite</button>
-      </div>
+      </screen-shell>
     `;
     }
 }

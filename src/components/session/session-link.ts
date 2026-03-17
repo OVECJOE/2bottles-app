@@ -5,6 +5,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
+import '../ui/screen-shell.js';
 
 @customElement('session-link')
 export class SessionLink extends LitElement {
@@ -118,6 +119,8 @@ export class SessionLink extends LitElement {
     private _startTracking() {
         locationStore.startWatching();
         sessionStore.setSessionStatus('live');
+        // Clear midpoint marker — we're moving to tracking mode
+        this.dispatchEvent(new CustomEvent('map-view:clear-midpoint', { bubbles: true, composed: true }));
         uiStore.goToLiveTracking();
     }
 
@@ -127,6 +130,7 @@ export class SessionLink extends LitElement {
         const v = sessionStore.selectedVenue;
 
         return html`
+      <screen-shell screen='session-link'>
       <div class="sheet">
         <div class="handle"></div>
 

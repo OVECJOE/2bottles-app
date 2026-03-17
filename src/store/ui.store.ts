@@ -1,13 +1,10 @@
-// =============================================================
-// 2bottles — UI Store
-//
-// Controls which screen is active, bottom sheet open/close,
-// loading state, and transient toast messages.
-// =============================================================
-
+import { get, set, del } from 'idb-keyval';
+import { Router } from '@vaadin/router';
 import type { AppScreen } from '../types/index.js';
 
 type Listener = () => void;
+
+const DB_KEY = '2b:ui_store';
 
 class UIStore {
     // -----------------------------------------------------------
@@ -21,6 +18,22 @@ class UIStore {
 
     private _toastTimer: ReturnType<typeof setTimeout> | null = null;
     private _listeners = new Set<Listener>();
+
+    // -----------------------------------------------------------
+    // Init (load from IndexedDB)
+    // -----------------------------------------------------------
+
+    async init() {
+        const saved = await get(DB_KEY);
+        if (saved) {
+            this.screen = saved.screen || 'create-session';
+            this._notify();
+        }
+    }
+
+    private async _save() {
+        await set(DB_KEY, { screen: this.screen });
+    }
 
     // -----------------------------------------------------------
     // Subscribe / notify
@@ -39,22 +52,42 @@ class UIStore {
     // Screen navigation
     // -----------------------------------------------------------
 
-    navigate(screen: AppScreen) {
+    async navigate(screen: AppScreen, params?: Record<string, string>) {
         this.screen = screen;
-        this.sheetOpen = true;  // new screen always opens the sheet
+        this.sheetOpen = true; 
+        
+        let path = '/';
+        switch (screen) {
+            case 'create-session': path = '/'; break;
+            case 'invite-partner': path = '/invite'; break;
+            case 'partner-notified': path = `/join/${params?.peerId || ''}`; break;
+            case 'select-rendezvous': path = '/select-venue'; break;
+            case 'partner-agree-refuse': path = '/coordinate'; break;
+            case 'live-tracking': path = '/tracking'; break;
+            case 'live-chat': path = '/chat'; break;
+            case 'session-link': path = '/session-link'; break;
+            case 'end-session': path = '/ended'; break;
+        }
+
+        Router.go(path);
         this._notify();
+        await this._save();
     }
 
-    // Convenience aliases that follow the flow diagram
+    // Convenience aliases
     goToInvite() { this.navigate('invite-partner'); }
-    goToPartnerNotified() { this.navigate('partner-notified'); }
+    goToPartnerNotified(peerId: string) { this.navigate('partner-notified', { peerId }); }
     goToRejected() { this.navigate('partner-rejected'); }
     goToSelectVenue() { this.navigate('select-rendezvous'); }
     goToAgreeRefuse() { this.navigate('partner-agree-refuse'); }
     goToSessionLink() { this.navigate('session-link'); }
     goToLiveTracking() { this.navigate('live-tracking'); }
+    goToLiveChat() { this.navigate('live-chat'); }
     goToEndSession() { this.navigate('end-session'); }
-    goHome() { this.navigate('create-session'); }
+    async goHome() { 
+        await del(DB_KEY);
+        this.navigate('create-session'); 
+    }
 
     // -----------------------------------------------------------
     // Bottom sheet
