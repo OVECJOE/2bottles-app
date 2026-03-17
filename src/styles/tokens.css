@@ -1,0 +1,176 @@
+/* ==========================================================
+   2bottles — Design Tokens
+   Single source of truth for all visual values.
+   ========================================================== */
+
+:root {
+    /* ----------------------------------------------------------
+     Brand Colors
+  ---------------------------------------------------------- */
+    --color-green: #D0EFB1;
+    --color-green-mid: #9DD674;
+    /* hover / active states   */
+    --color-green-dark: #7ab84a;
+    /* pressed / focus rings   */
+    --color-green-text: #2d5a0e;
+    /* text on --color-green   */
+
+    --color-blue: #4D7298;
+    --color-blue-light: #dbe8f4;
+    /* subtle backgrounds      */
+    --color-blue-mid: #3a5e80;
+    /* hover                   */
+    --color-blue-dark: #2e4a63;
+    /* pressed / headings      */
+    --color-blue-text: #ffffff;
+    /* text on --color-blue    */
+
+    /* ----------------------------------------------------------
+     Neutrals (dark-first — map background is always visible)
+  ---------------------------------------------------------- */
+    --color-surface-900: #0f1a22;
+    /* app chrome / shell bg   */
+    --color-surface-800: #1a2530;
+    /* map overlay bg          */
+    --color-surface-700: #243240;
+    /* elevated panels         */
+    --color-surface-600: #2f4155;
+    /* borders on dark bg      */
+
+    --color-sheet-bg: rgba(250, 252, 248, 0.97);
+    /* bottom sheets         */
+    --color-sheet-bg-solid: #fafcf8;
+    /* non-backdrop version  */
+
+    --color-text-primary: #111111;
+    --color-text-secondary: #555555;
+    --color-text-muted: #888888;
+    --color-text-inverted: #ffffff;
+    --color-text-on-dark: rgba(255, 255, 255, 0.85);
+    --color-text-on-dark-muted: rgba(255, 255, 255, 0.45);
+
+    /* ----------------------------------------------------------
+     Semantic
+  ---------------------------------------------------------- */
+    --color-success-bg: #D0EFB1;
+    /* reuses brand green      */
+    --color-success-text: #2d5a0e;
+    --color-danger-bg: #fdecea;
+    --color-danger-text: #c0392b;
+    --color-warning-bg: #fff4e0;
+    --color-warning-text: #8a5c00;
+
+    --color-partner: #e8a020;
+    /* partner pin / ETA       */
+    --color-destination: #c0392b;
+    /* venue / destination pin */
+    --color-you: #1a2530;
+    /* your own pin            */
+
+    /* ----------------------------------------------------------
+     Borders
+  ---------------------------------------------------------- */
+    --border-radius-sm: 8px;
+    --border-radius-md: 12px;
+    --border-radius-lg: 16px;
+    --border-radius-xl: 22px;
+    --border-radius-pill: 999px;
+
+    --border-width: 0.5px;
+    --border-color: rgba(0, 0, 0, 0.10);
+    --border-color-dark: rgba(255, 255, 255, 0.12);
+
+    /* ----------------------------------------------------------
+     Spacing scale (4px base)
+  ---------------------------------------------------------- */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+
+    /* ----------------------------------------------------------
+     Typography
+  ---------------------------------------------------------- */
+    --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'DM Mono', 'Fira Code', monospace;
+
+    --text-xs: 11px;
+    --text-sm: 12px;
+    --text-base: 13px;
+    --text-md: 14px;
+    --text-lg: 16px;
+    --text-xl: 18px;
+    --text-2xl: 22px;
+    --text-3xl: 28px;
+
+    --weight-regular: 400;
+    --weight-medium: 500;
+    --weight-bold: 600;
+
+    --line-height-tight: 1.3;
+    --line-height-base: 1.5;
+    --line-height-loose: 1.7;
+
+    /* ----------------------------------------------------------
+     Shadows
+  ---------------------------------------------------------- */
+    --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.12);
+    --shadow-md: 0 2px 12px rgba(0, 0, 0, 0.16);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.24);
+    --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.40);
+
+    /* ----------------------------------------------------------
+     Z-index layers
+  ---------------------------------------------------------- */
+    --z-map: 0;
+    /* Mapbox canvas                    */
+    --z-map-overlay: 5;
+    /* route lines, radius circles      */
+    --z-pins: 10;
+    /* map pins / markers               */
+    --z-fabs: 15;
+    /* floating action buttons          */
+    --z-sheet: 20;
+    /* bottom sheets                    */
+    --z-topbar: 25;
+    /* search / nav pills               */
+    --z-notification: 30;
+    /* push notification banners        */
+    --z-modal: 40;
+    /* full-screen modals               */
+    --z-toast: 50;
+    /* transient toasts                 */
+
+    /* ----------------------------------------------------------
+     Motion
+  ---------------------------------------------------------- */
+    --duration-fast: 150ms;
+    --duration-base: 250ms;
+    --duration-slow: 400ms;
+    --duration-sheet: 320ms;
+
+    --ease-out: cubic-bezier(0.0, 0.0, 0.2, 1);
+    --ease-in-out: cubic-bezier(0.4, 0.0, 0.2, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* ----------------------------------------------------------
+     Bottom sheet heights (as % of viewport height)
+  ---------------------------------------------------------- */
+    --sheet-peek: 72px;
+    /* just the handle showing       */
+    --sheet-half: 45vh;
+    --sheet-tall: 72vh;
+    --sheet-full: 92vh;
+
+    /* ----------------------------------------------------------
+     Map
+  ---------------------------------------------------------- */
+    --map-status-bar-height: 38px;
+    --fab-size: 42px;
+    --pin-size: 14px;
+}

@@ -1,0 +1,104 @@
+/**
+ * <bottom-sheet> — animated bottom sheet container.
+ *
+ * Usage:
+ *   <bottom-sheet ?open=${true}>
+ *     <slot></slot>
+ *   </bottom-sheet>
+ *
+ * Dispatches:
+ *   sheet-dismiss — when the backdrop or handle is dragged down
+ */
+import { LitElement, html, css } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
+
+@customElement('bottom-sheet')
+export class BottomSheet extends LitElement {
+    static override styles = css`
+    :host {
+      display: block;
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      z-index: var(--z-sheet);
+      pointer-events: none;
+    }
+
+    .sheet {
+      background: var(--color-sheet-bg);
+      border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
+      padding: 0 var(--space-5) env(safe-area-inset-bottom, var(--space-8));
+      pointer-events: all;
+      transform: translateY(100%);
+      transition: transform var(--duration-sheet) var(--ease-out);
+      will-change: transform;
+    }
+
+    :host([open]) .sheet {
+      transform: translateY(0);
+    }
+
+    .handle-wrap {
+      display: flex;
+      justify-content: center;
+      padding: var(--space-3) 0 var(--space-2);
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .handle {
+      width: 36px; height: 4px;
+      background: rgba(0, 0, 0, 0.12);
+      border-radius: var(--border-radius-pill);
+      transition: background var(--duration-fast);
+    }
+
+    .handle-wrap:active .handle { background: rgba(0,0,0,0.22); }
+  `;
+
+    @property({ type: Boolean, reflect: true }) open = false;
+
+    private _startY = 0;
+    private _currentY = 0;
+    private _dragging = false;
+
+    override render() {
+        return html`
+      <div class="sheet">
+        <div
+          class="handle-wrap"
+          @pointerdown=${this._onDragStart}
+          @pointermove=${this._onDragMove}
+          @pointerup=${this._onDragEnd}
+          @pointercancel=${this._onDragEnd}
+        >
+          <div class="handle"></div>
+        </div>
+        <slot></slot>
+      </div>
+    `;
+    }
+
+    private _onDragStart(e: PointerEvent) {
+        this._startY = e.clientY;
+        this._dragging = true;
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    }
+
+    private _onDragMove(e: PointerEvent) {
+        if (!this._dragging) return;
+        this._currentY = e.clientY - this._startY;
+    }
+
+    private _onDragEnd() {
+        if (!this._dragging) return;
+        this._dragging = false;
+        if (this._currentY > 60) {
+            this.dispatchEvent(new CustomEvent('sheet-dismiss', { bubbles: true, composed: true }));
+        }
+        this._currentY = 0;
+    }
+}
+
+declare global {
+    interface HTMLElementTagNameMap { 'bottom-sheet': BottomSheet; }
+}
