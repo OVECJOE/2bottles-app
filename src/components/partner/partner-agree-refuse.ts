@@ -116,7 +116,7 @@ export class PartnerAgreeRefuse extends LitElement {
 
     const timestamp = Date.now();
     const msg: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).slice(2),
       senderId: 'me',
       text,
       timestamp,

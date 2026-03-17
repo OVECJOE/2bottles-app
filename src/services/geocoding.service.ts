@@ -3,7 +3,7 @@ const NOMINATIM_MIN_INTERVAL_MS = Number(import.meta.env.VITE_NOMINATIM_MIN_INTE
 const NOMINATIM_CACHE_TTL_MS = 2 * 60 * 1000;
 const REVERSE_CACHE_TTL_MS = 5 * 60 * 1000;
 const VENUE_QUERY_COOLDOWN_MS = 60 * 1000;
-const NOMINATIM_HARD_COOLDOWN_MS = 3 * 60 * 1000;
+const NOMINATIM_HARD_COOLDOWN_MS = 45 * 1000;
 
 import type { Venue } from '../types/venue.types.js';
 import type { Coordinates } from '../types/location.types.js';
@@ -85,10 +85,9 @@ async function fetchNominatimJson(pathAndQuery: string): Promise<NominatimResult
             lastError = err;
             const message = err instanceof Error ? err.message : String(err);
             const isRateLimited = message.includes(' 429') || message.includes('429');
-            const isCorsOrNetworkBlocked = err instanceof TypeError || /Failed to fetch|NetworkError|CORS/i.test(message);
 
-            if (isRateLimited || isCorsOrNetworkBlocked) {
-                // Public endpoint is throttling/blocking: stop retry storm globally for a while.
+            if (isRateLimited) {
+                // Public endpoint is throttling: stop retry storm briefly.
                 _nominatimHardCooldownUntil = Date.now() + NOMINATIM_HARD_COOLDOWN_MS;
                 _venueQueryCooldownUntil = Math.max(_venueQueryCooldownUntil, Date.now() + NOMINATIM_HARD_COOLDOWN_MS);
                 break;

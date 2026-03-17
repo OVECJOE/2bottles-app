@@ -12,6 +12,7 @@ import { LitElement, html, css } from 'lit';
 import { property } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
+import { copyText } from '../../services/clipboard.service.js';
 import type { AppScreen } from '../../types/index.js';
 
 interface MenuItem {
@@ -116,8 +117,8 @@ export class AppMenu extends LitElement {
       label: 'Copy session link',
       action: async () => {
         const link = s?.link || window.location.origin;
-        await navigator.clipboard.writeText(link);
-        uiStore.showToast('Link copied');
+        const ok = await copyText(link);
+        uiStore.showToast(ok ? 'Link copied' : 'Unable to copy automatically. Please copy manually.');
         this._dismiss();
       },
     };
@@ -130,8 +131,8 @@ export class AppMenu extends LitElement {
         if (navigator.share) {
           await navigator.share({ title: '2bottles', url: link });
         } else {
-          await navigator.clipboard.writeText(link);
-          uiStore.showToast('Link copied');
+          const ok = await copyText(link);
+          uiStore.showToast(ok ? 'Link copied' : 'Unable to copy automatically. Please copy manually.');
         }
         this._dismiss();
       },

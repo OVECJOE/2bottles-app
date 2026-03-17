@@ -625,7 +625,7 @@ export class MapView extends LitElement {
     }
 
     private _drawRoute(coordinates: [number, number][]) {
-        this._setLineSource('2b-route', coordinates, '#4D7298', true);
+        this._setLineSource(SOURCE_ROUTE_SINGLE, coordinates, '#4D7298', true);
     }
 
     private _clearRoute() {

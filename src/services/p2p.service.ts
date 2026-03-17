@@ -21,6 +21,13 @@ class P2PService {
     private _reconciliationTimer: any = null;
     private _signalingReconnectAttempts = 0;
     private _signalingReconnectTimer: any = null;
+    private _maxQueueSize = 300;
+
+    private _newId() {
+        return typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : Math.random().toString(36).slice(2);
+    }
 
     get isConnected(): boolean {
         return !!this._conn?.open;
@@ -59,11 +66,7 @@ class P2PService {
                 if (err.type === 'id-taken' && id) {
                     const newId = `${id}-${Math.floor(Math.random() * 1000)}`;
                     if (sessionStore.session) {
-                        sessionStore.session = {
-                            ...sessionStore.session,
-                            id: newId,
-                            link: `${window.location.origin}/join/${newId}`,
-                        };
+                        void sessionStore.setSessionIdentity(newId);
                     }
                     this.init(newId).then(resolve).catch(reject);
                 } else if (err.type === 'id-taken') {
@@ -248,6 +251,9 @@ class P2PService {
         if (this._conn && this._conn.open) {
             this._conn.send(msg);
         } else {
+            if (this._sendQueue.length >= this._maxQueueSize) {
+                this._sendQueue.shift();
+            }
             this._sendQueue.push(msg);
         }
     }
@@ -329,7 +335,7 @@ class P2PService {
 
             case 'chat:message':
                 sessionStore.addMessage({
-                    id: crypto.randomUUID(),
+                    id: this._newId(),
                     senderId: 'partner',
                     text: msg.text,
                     timestamp: msg.timestamp,

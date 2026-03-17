@@ -1,5 +1,5 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement } from 'lit/decorators.js';
 import { sessionStore, uiStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
 import { copyText } from '../../services/clipboard.service.js';

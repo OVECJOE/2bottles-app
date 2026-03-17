@@ -70,8 +70,8 @@ export class SessionLink extends LitElement {
   @state() private _copied = false;
 
   private async _copyLink() {
-    const link = sessionStore.session?.link ?? '';
-    const ok = await copyText(`https://${link}`);
+    const link = sessionStore.session?.link ?? window.location.origin;
+    const ok = await copyText(link);
     if (ok) {
       this._copied = true;
       setTimeout(() => { this._copied = false; }, 2000);
@@ -81,13 +81,13 @@ export class SessionLink extends LitElement {
   }
 
   private async _shareLink() {
-    const link = sessionStore.session?.link ?? '';
+    const link = sessionStore.session?.link ?? window.location.origin;
     const venue = sessionStore.selectedVenue?.name ?? 'our spot';
     if (navigator.share) {
       await navigator.share({
         title: '2bottles',
         text: `Let's meet at ${venue}! Join my session:`,
-        url: `https://${link}`,
+        url: link,
       });
     } else {
       this._copyLink();

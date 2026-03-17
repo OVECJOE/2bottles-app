@@ -101,6 +101,16 @@ export class SelectRendezvous extends LitElement {
   private _lastSuggestKey = '';
   private _retryTimer: ReturnType<typeof setTimeout> | null = null;
 
+  private _midpointShiftMeters(a: string, b: string): number {
+    if (!a || !b) return Infinity;
+    const [aLat, aLng] = a.split('_').map(Number);
+    const [bLat, bLng] = b.split('_').map(Number);
+    if ([aLat, aLng, bLat, bLng].some((n) => Number.isNaN(n))) return Infinity;
+    const dLat = (aLat - bLat) * 111_320;
+    const dLng = (aLng - bLng) * 111_320 * Math.cos(((aLat + bLat) / 2) * Math.PI / 180);
+    return Math.sqrt(dLat * dLat + dLng * dLng);
+  }
+
     override connectedCallback() {
         super.connectedCallback();
         if (!locationStore.own && !locationStore.isWatching) {
@@ -146,11 +156,14 @@ export class SelectRendezvous extends LitElement {
     const mid = sessionStore.midpoint;
     if (!mid) return;
 
-    const now = Date.now();
-    if (now < this._nextSuggestAt) return;
-
     const suggestKey = `${mid.lat.toFixed(4)}_${mid.lng.toFixed(4)}`;
-    if (this._venues.length > 0 && this._lastSuggestKey === suggestKey) return;
+    const shiftedMeters = this._midpointShiftMeters(this._lastSuggestKey, suggestKey);
+    const hasMaterialShift = shiftedMeters > 120;
+
+    const now = Date.now();
+    if (!hasMaterialShift && now < this._nextSuggestAt) return;
+
+    if (!hasMaterialShift && this._venues.length > 0 && this._lastSuggestKey === suggestKey) return;
 
     this._isComputing = true;
     this._suggestionError = '';
@@ -163,7 +176,7 @@ export class SelectRendezvous extends LitElement {
         midpoint: mid,
         maxResults: 10,
       });
-      this._nextSuggestAt = Date.now() + 30_000;
+      this._nextSuggestAt = Date.now() + (hasMaterialShift ? 8_000 : 30_000);
       sessionStore.setVenueSuggestions(this._venues);
 
       this.dispatchEvent(new CustomEvent('map-view:show-midpoint', {

@@ -137,6 +137,17 @@ class SessionStore {
         await this._save();
     }
 
+    async setSessionIdentity(id: string) {
+        if (!this.session) return;
+        this.session = {
+            ...this.session,
+            id,
+            link: `${window.location.origin}/join/${id}`,
+        };
+        this._notify();
+        await this._save();
+    }
+
     async endSession() {
         locationStore.reset();
         
