@@ -1,16 +1,9 @@
-/**
- * Geocoding service backed by Nominatim (OpenStreetMap).
- * No API key required. Rate-limited to 1 req/s per OSM policy.
- *
- * For production, swap the ENDPOINT to a self-hosted Nominatim
- * instance or a commercial provider (Geoapify, Maptiler, etc.)
- * to get higher rate limits and better coverage.
- */
-
 const NOMINATIM_ENDPOINT = (import.meta.env.VITE_NOMINATIM_ENDPOINT as string | undefined) || 'https://nominatim.openstreetmap.org';
 const NOMINATIM_MIN_INTERVAL_MS = Number(import.meta.env.VITE_NOMINATIM_MIN_INTERVAL_MS ?? 1200);
 const NOMINATIM_CACHE_TTL_MS = 2 * 60 * 1000;
 const REVERSE_CACHE_TTL_MS = 5 * 60 * 1000;
+const VENUE_QUERY_COOLDOWN_MS = 60 * 1000;
+const NOMINATIM_HARD_COOLDOWN_MS = 3 * 60 * 1000;
 
 import type { Venue } from '../types/venue.types.js';
 import type { Coordinates } from '../types/location.types.js';
@@ -38,6 +31,8 @@ const _nominatimCache = new Map<string, { expiry: number; data: NominatimResult[
 const _reverseCache = new Map<string, { expiry: number; label: string }>();
 const _reverseInflight = new Map<string, Promise<string>>();
 let _reverseCooldownUntil = 0;
+let _venueQueryCooldownUntil = 0;
+let _nominatimHardCooldownUntil = 0;
 
 async function fetchOrThrow(url: string, init?: RequestInit): Promise<Response> {
     const res = await fetch(url, init);
@@ -66,10 +61,14 @@ async function scheduleNominatim<T>(task: () => Promise<T>): Promise<T> {
 }
 
 async function fetchNominatimJson(pathAndQuery: string): Promise<NominatimResult[]> {
+    const nowStart = Date.now();
+    if (nowStart < _nominatimHardCooldownUntil) {
+        throw new Error('nominatim-hard-cooldown');
+    }
+
     const url = `${NOMINATIM_ENDPOINT}${pathAndQuery}`;
-    const now = Date.now();
     const cached = _nominatimCache.get(url);
-    if (cached && cached.expiry > now) return cached.data;
+    if (cached && cached.expiry > nowStart) return cached.data;
 
     let lastError: unknown;
     const maxAttempts = 3;
@@ -84,6 +83,17 @@ async function fetchNominatimJson(pathAndQuery: string): Promise<NominatimResult
             return data;
         } catch (err) {
             lastError = err;
+            const message = err instanceof Error ? err.message : String(err);
+            const isRateLimited = message.includes(' 429') || message.includes('429');
+            const isCorsOrNetworkBlocked = err instanceof TypeError || /Failed to fetch|NetworkError|CORS/i.test(message);
+
+            if (isRateLimited || isCorsOrNetworkBlocked) {
+                // Public endpoint is throttling/blocking: stop retry storm globally for a while.
+                _nominatimHardCooldownUntil = Date.now() + NOMINATIM_HARD_COOLDOWN_MS;
+                _venueQueryCooldownUntil = Math.max(_venueQueryCooldownUntil, Date.now() + NOMINATIM_HARD_COOLDOWN_MS);
+                break;
+            }
+
             if (attempt < maxAttempts) {
                 // Back off aggressively on public endpoints to avoid 429 loops.
                 await wait(attempt * 1800);
@@ -259,26 +269,35 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
  */
 export async function fetchVenues(lat: number, lng: number, radius = 3000): Promise<Venue[]> {
     try {
+        if (Date.now() < _venueQueryCooldownUntil) return [];
+
         const center = { lat, lng };
         const radiusKm = Math.max(1, Math.round(radius / 1000));
         const viewbox = buildViewBox(center, radiusKm);
-        const searchTerms: Array<{ q: string; category: string }> = [
+        const searchTermsPrimary: Array<{ q: string; category: string }> = [
             { q: 'cafe', category: 'cafe' },
             { q: 'restaurant', category: 'restaurant' },
             { q: 'park', category: 'park' },
             { q: 'bar', category: 'bar' },
         ];
+        const searchTermsSecondary: Array<{ q: string; category: string }> = [
+            { q: 'hotel', category: 'hotel' },
+            { q: 'mall', category: 'mall' },
+            { q: 'supermarket', category: 'supermarket' },
+            { q: 'pharmacy', category: 'pharmacy' },
+        ];
 
         const mapped: Venue[] = [];
         const seen = new Set<string>();
+        let hadQueryFailure = false;
 
-        for (const term of searchTerms) {
+        const collectFromTerm = async (term: { q: string; category: string }, limit: string) => {
             const params = new URLSearchParams({
                 q: term.q,
                 format: 'json',
                 addressdetails: '1',
                 dedupe: '1',
-                limit: '5',
+                limit,
                 viewbox,
                 bounded: '1',
             });
@@ -287,7 +306,9 @@ export async function fetchVenues(lat: number, lng: number, radius = 3000): Prom
             try {
                 rows = await fetchNominatimJson(`/search?${params}`);
             } catch {
-                continue;
+                hadQueryFailure = true;
+                _venueQueryCooldownUntil = Date.now() + VENUE_QUERY_COOLDOWN_MS;
+                return;
             }
 
             for (const r of rows) {
@@ -313,6 +334,19 @@ export async function fetchVenues(lat: number, lng: number, radius = 3000): Prom
                     etaMinutesFromPartner: 0,
                 });
             }
+        };
+
+        for (const term of searchTermsPrimary) {
+            if (hadQueryFailure) break;
+            await collectFromTerm(term, '5');
+        }
+
+        // Expand categories while keeping strict midpoint bounds.
+        if (mapped.length < 4 && !hadQueryFailure) {
+            for (const term of searchTermsSecondary) {
+                if (hadQueryFailure) break;
+                await collectFromTerm(term, '4');
+            }
         }
 
         return mapped;
@@ -324,10 +358,14 @@ export async function fetchVenues(lat: number, lng: number, radius = 3000): Prom
 
 export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise<Venue[]> {
     const { own, partner, midpoint } = input;
-    const maxResults = Math.max(3, Math.min(input.maxResults ?? 6, 12));
-    const radii = [2500, 4500];
+    const maxResults = Math.max(3, Math.min(input.maxResults ?? 10, 10));
+    const radii = [1800, 2800, 3800];
     const merged: Venue[] = [];
     const seen = new Set<string>();
+
+    const pairDistanceKm = getDistance(own.lat, own.lng, partner.lat, partner.lng);
+    const maxMidpointDetourKm = Math.max(0.9, Math.min(3.8, pairDistanceKm * 0.35));
+    const maxFairnessGapMinutes = Math.max(4, Math.min(12, Math.round(pairDistanceKm * 1.2)));
 
     for (const radius of radii) {
         const batch = await fetchVenues(midpoint.lat, midpoint.lng, radius);
@@ -350,12 +388,13 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
             const etaPartner = Math.max(1, Math.round((dPartner / 18) * 60));
 
             const fairnessGap = Math.abs(etaYou - etaPartner);
-            const fairnessPenalty = Math.min(42, fairnessGap * 2);
-            const midpointPenalty = Math.min(30, dMid * 4);
+            const fairnessPenalty = Math.min(50, fairnessGap * 3);
+            const midpointPenalty = Math.min(40, dMid * 7);
+            const travelPenalty = Math.min(22, (etaYou + etaPartner) * 0.35);
             const addressBonus = v.address && v.address !== 'Nearby Spot' ? 4 : 0;
             const categoryBonus = /cafe|restaurant|park|garden|pub|bar/.test(v.category || '') ? 8 : 0;
             const genericNamePenalty = /unknown|unnamed|place/i.test(v.name) ? 18 : 0;
-            const score = 100 - fairnessPenalty - midpointPenalty + addressBonus + categoryBonus - genericNamePenalty;
+            const score = 100 - fairnessPenalty - midpointPenalty - travelPenalty + addressBonus + categoryBonus - genericNamePenalty;
 
             return {
                 venue: {
@@ -365,13 +404,36 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
                     etaMinutesFromPartner: etaPartner,
                 },
                 score,
+                fairnessGap,
+                dMid,
             };
         })
+        // Keep places close to midpoint and balanced for both parties.
+        .filter((x) => x.dMid <= maxMidpointDetourKm && x.fairnessGap <= maxFairnessGapMinutes)
         .sort((a, b) => b.score - a.score);
+
+    const candidatePool = scored.length > 0
+        ? scored
+        : merged
+            .map((v) => {
+                const dMid = getDistance(midpoint.lat, midpoint.lng, v.coordinates.lat, v.coordinates.lng);
+                const dYou = getDistance(own.lat, own.lng, v.coordinates.lat, v.coordinates.lng);
+                const dPartner = getDistance(partner.lat, partner.lng, v.coordinates.lat, v.coordinates.lng);
+                return {
+                    venue: {
+                        ...v,
+                        distanceKm: parseFloat(dYou.toFixed(1)),
+                        etaMinutesFromYou: Math.max(1, Math.round((dYou / 18) * 60)),
+                        etaMinutesFromPartner: Math.max(1, Math.round((dPartner / 18) * 60)),
+                    },
+                    score: 100 - Math.min(60, dMid * 10),
+                };
+            })
+            .sort((a, b) => b.score - a.score);
 
     const diversified: Venue[] = [];
     const categoryCount = new Map<string, number>();
-    for (const item of scored) {
+    for (const item of candidatePool) {
         const cat = item.venue.category || 'other';
         const count = categoryCount.get(cat) ?? 0;
         if (count >= 2 && diversified.length < Math.floor(maxResults * 0.7)) continue;
@@ -380,21 +442,7 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
         if (diversified.length >= maxResults) break;
     }
 
-    if (diversified.length > 0) return diversified;
-
-    const dYou = getDistance(own.lat, own.lng, midpoint.lat, midpoint.lng);
-    const dPartner = getDistance(partner.lat, partner.lng, midpoint.lat, midpoint.lng);
-    return [{
-        id: `synthetic-midpoint-${Date.now()}`,
-        name: 'Midpoint Rendezvous Spot',
-        category: 'midpoint',
-        emoji: '📍',
-        address: 'Auto-generated midway fallback',
-        coordinates: midpoint,
-        distanceKm: parseFloat(dYou.toFixed(1)),
-        etaMinutesFromYou: Math.max(1, Math.round((dYou / 18) * 60)),
-        etaMinutesFromPartner: Math.max(1, Math.round((dPartner / 18) * 60)),
-    }];
+    return diversified;
 }
 
 function _getEmojiForAmenity(amenity: string): string {

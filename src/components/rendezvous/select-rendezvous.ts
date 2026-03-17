@@ -103,7 +103,9 @@ export class SelectRendezvous extends LitElement {
 
     override connectedCallback() {
         super.connectedCallback();
-        locationStore.startWatching();
+        if (!locationStore.own && !locationStore.isWatching) {
+          locationStore.startWatching();
+        }
         this._computeVenues();
         this._frameMap();
 
@@ -159,7 +161,7 @@ export class SelectRendezvous extends LitElement {
         own,
         partner,
         midpoint: mid,
-        maxResults: 6,
+        maxResults: 10,
       });
       this._nextSuggestAt = Date.now() + 30_000;
       sessionStore.setVenueSuggestions(this._venues);

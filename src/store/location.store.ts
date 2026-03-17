@@ -25,6 +25,7 @@ class LocationStore implements LocationState {
     private _errorCount = 0;
     private _lastErrorLogTime = 0;
     private _lastPermissionToastAt = 0;
+    private _lastSignalToastAt = 0;
 
     private _canUseGeolocation(): boolean {
         return typeof window !== 'undefined' && !!navigator.geolocation && window.isSecureContext;
@@ -131,7 +132,8 @@ class LocationStore implements LocationState {
             this._errorCount++;
 
             const now = Date.now();
-            if (now - this._lastErrorLogTime > 2000) {
+            const logWindow = err.code === 2 ? 15000 : 2000;
+            if (now - this._lastErrorLogTime > logWindow) {
                 console.warn(`[LocationStore] Watch error (${err.code}):`, err.message);
                 this._lastErrorLogTime = now;
             }
@@ -146,17 +148,32 @@ class LocationStore implements LocationState {
                 return;
             }
 
+            if (err.code === 2) {
+                // Keep tracking alive on transient signal loss.
+                if (options.enableHighAccuracy) {
+                    console.info('[LocationStore] Retrying without High Accuracy...');
+                    options.enableHighAccuracy = false;
+                    if (this._watchId !== null) navigator.geolocation.clearWatch(this._watchId);
+                    this._watchId = navigator.geolocation.watchPosition(success, error, options);
+                    this._notify();
+                    return;
+                }
+
+                const nowToast = Date.now();
+                if (nowToast - this._lastSignalToastAt > 20000) {
+                    uiStore.showToast('GPS signal is weak. Tracking will resume automatically when signal improves.');
+                    this._lastSignalToastAt = nowToast;
+                }
+
+                this._notify();
+                return;
+            }
+
             if (this._errorCount > 3 && !this.isCoolingOff) {
                 console.error('[LocationStore] Too many GPS errors. Cooling off...');
                 this.isCoolingOff = true;
                 this.stopWatching();
                 this._notify();
-
-                if (err.code === 2) {
-                    uiStore.showToast('GPS signal is unstable. You can continue with manual location search.');
-                    this.isCoolingOff = false;
-                    return;
-                }
 
                 setTimeout(() => {
                     this.isCoolingOff = false;
@@ -168,12 +185,6 @@ class LocationStore implements LocationState {
                 return;
             }
 
-            if (options.enableHighAccuracy) {
-                console.info('[LocationStore] Retrying without High Accuracy...');
-                options.enableHighAccuracy = false;
-                if (this._watchId !== null) navigator.geolocation.clearWatch(this._watchId);
-                this._watchId = navigator.geolocation.watchPosition(success, error, options);
-            }
             this._notify();
         };
 
