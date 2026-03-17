@@ -182,7 +182,7 @@ export class CreateSession extends LitElement {
   }
 
   private async _handleCreate() {
-    const canProceed = this._usingGps ? this._gpsReady : !!this._manualSelection;
+    const canProceed = (this._usingGps ? this._gpsReady : !!this._manualSelection) && this._name.trim().length >= 2;
     if (!canProceed) {
       this._error = 'We need your location to find a fair meetup spot.';
       return;
@@ -248,9 +248,11 @@ export class CreateSession extends LitElement {
         <input
           type="text"
           class="name-input"
-          placeholder="Your Name (Optional)"
+          placeholder="Your Name (Required)"
           .value=${this._name}
-          @input=${(e: any) => this._name = e.target.value}
+          @input=${(e: any) => { this._name = e.target.value; this._error = ''; }}
+          required
+          minlength="2"
         />
 
         ${this._manualSelection && !this._usingGps ? html`

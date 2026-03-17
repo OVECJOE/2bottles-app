@@ -2,22 +2,11 @@ import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
+import { haversineMeters } from '../../services/geocoding.service.js';
 import '../ui/screen-shell.js';
 import type { Coordinates } from '../../types/index.js';
 
 const ARRIVAL_RADIUS_M = 150;
-
-function haversineMeters(a: Coordinates, b: Coordinates): number {
-    const R = 6_371_000;
-    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-    const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-    const h =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos((a.lat * Math.PI) / 180) *
-        Math.cos((b.lat * Math.PI) / 180) *
-        Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
 
 @customElement('live-tracking')
 export class LiveTracking extends LitElement {

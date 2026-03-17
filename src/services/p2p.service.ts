@@ -16,6 +16,8 @@ class P2PService {
     private _peer: Peer | null = null;
     private _conn: DataConnection | null = null;
     private _isHost = false;
+    private _sendQueue: P2PMessage[] = [];
+    private _reconnectTimer: any = null;
 
     async init(id?: string): Promise<string> {
         return new Promise((resolve, reject) => {
@@ -97,6 +99,20 @@ class P2PService {
 
     private _setupConnection(conn: DataConnection) {
         this._conn = conn;
+        uiStore.setPartnerOnline(true);
+        if (this._reconnectTimer) {
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = null;
+        }
+
+        conn.on('open', () => {
+            console.log('[P2P] Connection fully open, flushing queue...');
+            this._flushQueue();
+            // If host, push current state to partner
+            if (this._isHost) {
+                this.syncPartner();
+            }
+        });
 
         conn.on('data', (data) => {
             this._handleMessage(data as P2PMessage);
@@ -105,15 +121,58 @@ class P2PService {
         conn.on('close', () => {
             console.log('[P2P] Connection closed');
             this._conn = null;
+            uiStore.setPartnerOnline(false);
             uiStore.showToast('Partner disconnected');
+            
+            // Auto-reconnect if we are the partner and host might have refreshed
+            if (!this._isHost && sessionStore.session?.id) {
+                this._attemptReconnect();
+            }
         });
+    }
 
-        // Connection established
+    private _attemptReconnect() {
+        if (this._reconnectTimer) return;
+        console.log('[P2P] Attempting auto-reconnect to host...');
+        this._reconnectTimer = setTimeout(async () => {
+            this._reconnectTimer = null;
+            try {
+                if (sessionStore.session?.id) {
+                    await this.connect(sessionStore.session.id);
+                }
+            } catch (e) {
+                this._attemptReconnect(); // retry
+            }
+        }, 3000);
+    }
+
+    private _flushQueue() {
+        while (this._sendQueue.length > 0 && this._conn?.open) {
+            const msg = this._sendQueue.shift();
+            if (msg) this._conn.send(msg);
+        }
+    }
+
+    /**
+     * Pushes current critical state from Host to a (re)connecting Partner
+     */
+    syncPartner() {
+        if (!this._isHost) return;
+        const s = sessionStore;
+        this.send({ type: 'user:info', name: s.ownName });
+        if (s.selectedVenue) {
+            this.send({ type: 'session:venue', venue: s.selectedVenue });
+        }
+        this.send({ type: 'session:status', status: s.session?.status || 'pending_partner' });
+        if (s.ownAgreed) this.broadcastAgreement();
     }
 
     send(msg: P2PMessage) {
         if (this._conn && this._conn.open) {
             this._conn.send(msg);
+        } else {
+            console.log('[P2P] Connection not open, queuing message:', msg.type);
+            this._sendQueue.push(msg);
         }
     }
 

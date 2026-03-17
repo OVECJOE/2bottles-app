@@ -118,6 +118,8 @@ export class SelectRendezvous extends LitElement {
     @state() private _venues: Venue[] = [];
     @state() private _customSpot: GeocodeSuggestion | null = null;
 
+    private _unsub?: () => void;
+
     override connectedCallback() {
         super.connectedCallback();
         this._computeVenues();
@@ -130,6 +132,7 @@ export class SelectRendezvous extends LitElement {
 
     override disconnectedCallback() {
         super.disconnectedCallback();
+        this._unsub?.();
         // Remove venue preview pin — destination pin will be set properly by locationStore
         this.dispatchEvent(new CustomEvent('map-view:remove-pin', {
             bubbles: true, composed: true, detail: { id: 'venue-preview' },
@@ -292,7 +295,12 @@ export class SelectRendezvous extends LitElement {
 
         ${this._tab === 'midpoint' ? html`
           <div class="venues">
-            ${this._venues.map(v => html`
+            ${this._venues.length === 0 ? html`
+              <div style="text-align:center; padding:var(--space-6); color:var(--color-text-muted)">
+                <div style="font-size:32px; margin-bottom:var(--space-2)">☕?</div>
+                <div>No spots found near the midpoint. Try searching for a specific place.</div>
+              </div>
+            ` : this._venues.map(v => html`
               <venue-card
                 .emoji=${v.emoji}
                 .name=${v.name}

@@ -163,7 +163,7 @@ class SessionStore {
     }
 
     setOwnName(name: string) {
-        this.ownName = name;
+        this.ownName = name.trim();
         this._notify();
         this._save();
     }
@@ -268,13 +268,11 @@ class SessionStore {
 
         let midLngRad = toRad(own.lng) + Math.atan2(By, Math.cos(lat1Rad) + Bx);
 
-        // Normalize longitude to be between -180 and 180
-        midLngRad = ((midLngRad + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+        // Normalize longitude and convert back to degrees
+        const lat = toDeg(midLatRad);
+        const lng = ((toDeg(midLngRad) + 540) % 360) - 180;
 
-        return {
-            lat: toDeg(midLatRad),
-            lng: toDeg(midLngRad)
-        };
+        return { lat, lng };
     }
 }
 

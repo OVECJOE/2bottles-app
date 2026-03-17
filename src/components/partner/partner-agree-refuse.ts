@@ -206,7 +206,9 @@ export class PartnerAgreeRefuse extends LitElement {
             <div class="partner-header">
             <div class="avatar">${sessionStore.partnerName ? sessionStore.partnerName[0].toUpperCase() : '?'}</div>
             <span class="partner-name">${sessionStore.partnerName || 'Partner'}</span>
-            <span class="online-badge">● Online</span>
+            <span class="online-badge" style="background: ${uiStore.isPartnerOnline ? 'var(--color-green)' : '#ccc'}; color: ${uiStore.isPartnerOnline ? 'var(--color-green-text)' : '#666'}">
+                ● ${uiStore.isPartnerOnline ? 'Online' : 'Offline'}
+            </span>
             </div>
 
             <div class="chat-messages">

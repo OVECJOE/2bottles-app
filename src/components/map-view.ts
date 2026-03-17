@@ -335,11 +335,14 @@ export class MapView extends LitElement {
         const venueName = sessionStore.selectedVenue?.name;
         if (!dest || !venueName) return;
 
-        // If a destination marker already exists, replace it with updated label
-        const existing = this._markers.get(PIN_DESTINATION);
-        if (existing) {
-            existing.remove();
-            this._markers.delete(PIN_DESTINATION);
+        const existingMarker = this._markers.get(PIN_DESTINATION);
+        if (existingMarker) {
+            const el = existingMarker.getElement();
+            const chip = el.querySelector<HTMLElement>('div:last-child');
+            if (chip && chip.textContent !== venueName) {
+                chip.textContent = venueName;
+            }
+        } else {
             this._upsertDestinationPin(dest);
         }
     }
@@ -442,7 +445,10 @@ export class MapView extends LitElement {
      * Used by select-rendezvous (you+partner) and live-tracking (you+partner+dest).
      */
     fitBounds(a: Coordinates, b: Coordinates, paddingPx = 100, c?: Coordinates) {
-        if (!this._map) return;
+        if (!this._map || !this._map.loaded()) {
+            console.warn('[MapView] Attempting to fit bounds before map is ready.');
+            return;
+        }
 
         const lngs = [a.lng, b.lng, ...(c ? [c.lng] : [])];
         const lats = [a.lat, b.lat, ...(c ? [c.lat] : [])];

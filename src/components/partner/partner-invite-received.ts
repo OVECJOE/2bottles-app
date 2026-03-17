@@ -152,12 +152,12 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
           <input
             type="text"
             class="name-input"
-            placeholder="Your Name (Optional)"
+            placeholder="Your Name (Required, 2+ chars)"
             .value=${this._name}
             @input=${(e: any) => this._name = e.target.value}
           />
-
-          <button class="btn-primary" @click=${this._accept} ?disabled=${this._connecting}>
+ 
+          <button class="btn-primary" @click=${this._accept} ?disabled=${this._connecting || this._name.trim().length < 2}>
             ${this._connecting ? 'Connecting...' : 'Accept Invite'}
           </button>
           <button class="btn-ghost" @click=${this._decline} ?disabled=${this._connecting}>

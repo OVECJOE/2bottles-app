@@ -1,7 +1,7 @@
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { uiStore, sessionStore } from '../store/index.js';
+import { uiStore, sessionStore, locationStore } from '../store/index.js';
 import { p2pService } from '../services/p2p.service.js';
 import { Router } from '@vaadin/router';
 
@@ -29,7 +29,8 @@ export class AppShell extends LitElement {
         // 1. Initialize stores
         await Promise.all([
             uiStore.init(),
-            sessionStore.init()
+            sessionStore.init(),
+            locationStore.init()
         ]);
 
         // 2. Setup Router
@@ -49,15 +50,21 @@ export class AppShell extends LitElement {
             { path: '(.*)', component: 'create-session' }
         ]);
 
-        // 3. Handle reconnection logic (if not on a join route)
+        // 3. Handle reconnection logic
         const path = window.location.pathname;
-        if (!path.startsWith('/join/') && sessionStore.session && sessionStore.session.status !== 'ended') {
-            console.log('[AppShell] Resuming existing session:', sessionStore.session.id);
+        const session = sessionStore.session;
+        
+        if (session && session.status !== 'ended') {
+            console.log('[AppShell] Resuming existing session:', session.id);
             try {
                 if (sessionStore.isHost) {
-                    await p2pService.init(sessionStore.session.id);
-                } else if (sessionStore.session.id) {
-                    await p2pService.connect(sessionStore.session.id);
+                    await p2pService.init(session.id);
+                } else if (!path.startsWith('/join/')) {
+                    // If we are on home but have a session, maybe redirect to coordinate?
+                    await p2pService.connect(session.id);
+                } else {
+                    // If we are on /join/ID, the component handles it, but we can ensure p2p is ready
+                    await p2pService.init(); 
                 }
             } catch (err) {
                 console.warn('[AppShell] Re-connect failed:', err);

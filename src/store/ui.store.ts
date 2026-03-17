@@ -14,6 +14,7 @@ class UIStore {
     screen: AppScreen = 'create-session';
     sheetOpen: boolean = true;
     isLoading: boolean = false;
+    isPartnerOnline: boolean = false;
     toastMessage: string | null = null;
 
     private _toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -106,6 +107,11 @@ class UIStore {
 
     setLoading(val: boolean) {
         this.isLoading = val;
+        this._notify();
+    }
+
+    setPartnerOnline(val: boolean) {
+        this.isPartnerOnline = val;
         this._notify();
     }
 
