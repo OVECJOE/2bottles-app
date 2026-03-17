@@ -14,6 +14,7 @@ import { sharedStyles } from '../../styles/shared-styles.js';
 import '../../components/ui/location-input.js';
 import '../../components/ui/screen-shell.js';
 import type { GeocodeSuggestion } from '../../services/geocoding.service.js';
+import type { Coordinates } from '../../types/index.js';
 
 @customElement('create-session')
 export class CreateSession extends LitElement {
@@ -111,8 +112,11 @@ export class CreateSession extends LitElement {
   @state() private _loading = false;
   @state() private _error = '';
   @state() private _name = '';
-
+ 
   private _unsub?: () => void;
+  private _lastGeocodeTime = 0;
+  private _lastGeocodePos: Coordinates | null = null;
+  private _reverseInFlight = false;
 
   override connectedCallback() {
     super.connectedCallback();
@@ -138,10 +142,25 @@ export class CreateSession extends LitElement {
     }));
 
     // Reverse geocode for a human-readable name
+    // Bug 205: Debounce to prevent 429 Rate Limit
+    const now = Date.now();
+    const distMoved = this._lastGeocodePos ? ( (Math.abs(own.lat - this._lastGeocodePos.lat) + Math.abs(own.lng - this._lastGeocodePos.lng)) * 111000 ) : Infinity;
+    
+    if (this._reverseInFlight) return;
+    if (now - this._lastGeocodeTime < 15000 && distMoved < 80) return;
+
     try {
+      this._reverseInFlight = true;
+      // Stamp now so frequent GPS updates don't queue concurrent reverse requests.
+      this._lastGeocodeTime = now;
       this._gpsName = await reverseGeocode(own.lat, own.lng);
+      this._lastGeocodePos = { ...own };
     } catch {
       this._gpsName = `${own.lat.toFixed(4)}, ${own.lng.toFixed(4)}`;
+      this._lastGeocodePos = { ...own };
+      this._lastGeocodeTime = Date.now();
+    } finally {
+      this._reverseInFlight = false;
     }
   }
 
@@ -172,7 +191,7 @@ export class CreateSession extends LitElement {
 
     try {
       if (!this._usingGps && this._manualSelection) {
-        locationStore.own = { lat: this._manualSelection.lat, lng: this._manualSelection.lng };
+        locationStore.setOwnLocation({ lat: this._manualSelection.lat, lng: this._manualSelection.lng });
       }
 
       sessionStore.setOwnName(this._name);
@@ -219,7 +238,6 @@ export class CreateSession extends LitElement {
         <div class="or-row">or enter address manually</div>
 
         <location-input
-          country="NG"
           placeholder="e.g. Nicon Town, Lekki Phase 1"
           @location-selected=${this._onLocationSelected}
         ></location-input>

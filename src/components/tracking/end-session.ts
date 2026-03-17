@@ -5,6 +5,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
+import { p2pService } from '../../services/p2p.service.js';
 
 @customElement('end-session')
 export class EndSession extends LitElement {
@@ -96,6 +97,16 @@ export class EndSession extends LitElement {
   `;
 
   @state() private _saved = false;
+  private static readonly ARRIVAL_RADIUS_M = 60;
+
+  private _stateSummary() {
+    const ownArrived = locationStore.ownDistanceM !== null && locationStore.ownDistanceM <= EndSession.ARRIVAL_RADIUS_M;
+    const partnerArrived =
+      (locationStore.partnerDistanceM !== null && locationStore.partnerDistanceM <= EndSession.ARRIVAL_RADIUS_M) ||
+      sessionStore.partner?.status === 'arrived';
+    const bothArrived = ownArrived && partnerArrived;
+    return { ownArrived, partnerArrived, bothArrived };
+  }
 
   private _avgEta(): number {
     const v = sessionStore.selectedVenue;
@@ -113,6 +124,7 @@ export class EndSession extends LitElement {
   }
 
   private _end() {
+    p2pService.endSessionForAll();
     sessionStore.endSession();
     locationStore.reset();
     this.dispatchEvent(new CustomEvent('map-view:clear-midpoint', { bubbles: true, composed: true }));
@@ -123,19 +135,32 @@ export class EndSession extends LitElement {
   override render() {
     const v = sessionStore.selectedVenue;
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const { ownArrived, partnerArrived, bothArrived } = this._stateSummary();
+    const headline = bothArrived ? 'Rendezvous Complete' : ownArrived || partnerArrived ? 'Session Ended Midway' : 'Session Ended Early';
+    const subtitle = bothArrived
+      ? `${v?.name ?? 'Meetup spot'} · ${now}`
+      : ownArrived
+        ? `You arrived but ${sessionStore.partnerName || 'partner'} has not reached the meetup yet.`
+        : partnerArrived
+          ? `${sessionStore.partnerName || 'Partner'} arrived but you did not reach the meetup yet.`
+          : 'Neither person reached the meetup point before ending this session.';
+    const outcomeLabel = bothArrived ? 'on time' : ownArrived || partnerArrived ? 'partially complete' : 'not completed';
+    const outcomeMark = bothArrived ? '✓' : ownArrived || partnerArrived ? '◐' : '✕';
 
     return html`
-      <div class="arrived-badge">
-        <span class="arrived-text">✓ Both arrived at ${v?.name ?? 'destination'}!</span>
-      </div>
+      ${bothArrived ? html`
+        <div class="arrived-badge">
+          <span class="arrived-text">✓ Both arrived at ${v?.name ?? 'destination'}!</span>
+        </div>
+      ` : ''}
 
       <div class="sheet">
         <div class="handle"></div>
 
         <div class="hero">
-          <span class="hero-emoji">🤝</span>
-          <div class="hero-title">Rendezvous Complete</div>
-          <div class="hero-sub">${v?.name ?? 'Meetup spot'} · ${now}</div>
+          <span class="hero-emoji">${bothArrived ? '🤝' : '🧭'}</span>
+          <div class="hero-title">${headline}</div>
+          <div class="hero-sub">${subtitle}</div>
         </div>
 
         <div class="stats-row">
@@ -148,8 +173,8 @@ export class EndSession extends LitElement {
             <div class="stat-label">messages</div>
           </div>
           <div class="stat-card highlight">
-            <div class="stat-val">✓</div>
-            <div class="stat-label">on time</div>
+            <div class="stat-val">${outcomeMark}</div>
+            <div class="stat-label">${outcomeLabel}</div>
           </div>
         </div>
 

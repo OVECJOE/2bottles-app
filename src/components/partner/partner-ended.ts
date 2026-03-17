@@ -5,6 +5,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
+import { p2pService } from '../../services/p2p.service.js';
 import { sharedStyles } from '../../styles/shared-styles.js';
 
 @customElement('partner-ended')
@@ -33,6 +34,7 @@ export class PartnerEnded extends LitElement {
   `    ];
 
     private _restart() {
+      p2pService.disconnect();
         sessionStore.endSession();
         locationStore.reset();
         uiStore.goHome();

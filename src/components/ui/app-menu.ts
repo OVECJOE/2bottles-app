@@ -11,6 +11,7 @@
 import { LitElement, html, css } from 'lit';
 import { property } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
+import { p2pService } from '../../services/p2p.service.js';
 import type { AppScreen } from '../../types/index.js';
 
 interface MenuItem {
@@ -68,7 +69,7 @@ export class AppMenu extends LitElement {
       border: none; background: none; width: 100%; text-align: left;
       -webkit-tap-highlight-color: transparent;
     }
-    .item:hover  { background: rgba(0,0,0,0.04); border-radius: var(--border-radius-sm); margin: 0 var(--space-1); width: calc(100% - var(--space-2)); }
+    .item:hover  { background: rgba(0,0,0,0.04); }
     .item:active { background: rgba(0,0,0,0.08); transform: scale(0.98); }
 
     .item.danger { color: var(--color-danger-text); }
@@ -154,6 +155,7 @@ export class AppMenu extends LitElement {
       label: 'End session',
       danger: true,
       action: () => {
+        p2pService.endSessionForAll();
         sessionStore.endSession();
         locationStore.reset();
         uiStore.goHome();
@@ -166,6 +168,7 @@ export class AppMenu extends LitElement {
       label: 'Cancel invite',
       danger: true,
       action: () => {
+        p2pService.endSessionForAll();
         sessionStore.endSession();
         locationStore.reset();
         uiStore.goHome();

@@ -60,6 +60,10 @@
     --color-warning-bg: #fff4e0;
     --color-warning-text: #8a5c00;
 
+    --color-online: #22c55e;
+    --color-offline: #94a3b8;
+
+
     --color-partner: #e8a020;
     /* partner pin / ETA       */
     --color-destination: #c0392b;

@@ -26,7 +26,7 @@ export class BottomSheet extends LitElement {
     .sheet {
       background: var(--color-sheet-bg);
       border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
-      padding: 0 var(--space-5) env(safe-area-inset-bottom, var(--space-8));
+      padding: 0 var(--space-5) env(safe-area-inset-bottom, var(--space-6));
       pointer-events: all;
       transform: translateY(100%);
       transition: transform var(--duration-sheet) var(--ease-out);
@@ -97,7 +97,7 @@ export class BottomSheet extends LitElement {
         if (!this._dragging) return;
         this._dragging = false;
         const delta = e.clientY - this._startY;
-        if (delta > 60) {
+        if (delta > 120) {
             this.dispatchEvent(new CustomEvent('sheet-dismiss', { bubbles: true, composed: true }));
         }
         this._setOffset(0);

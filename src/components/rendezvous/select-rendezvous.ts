@@ -12,7 +12,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
-import { fetchVenues, getDistance } from '../../services/geocoding.service.js';
+import { suggestMeetupVenues } from '../../services/geocoding.service.js';
 import { sharedStyles } from '../../styles/shared-styles.js';
 import './venue-card.js';
 import '../ui/location-input.js';
@@ -93,18 +93,22 @@ export class SelectRendezvous extends LitElement {
   @state() private _venues: Venue[] = [];
   @state() private _customSpot: GeocodeSuggestion | null = null;
   @state() private _isComputing = false;
+  @state() private _suggestionError = '';
 
   private _unsub?: () => void;
   private _unsubSession?: () => void;
+  private _nextSuggestAt = 0;
+  private _lastSuggestKey = '';
+  private _retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-  override connectedCallback() {
-    super.connectedCallback();
-    this._computeVenues();
-    this._frameMap();
+    override connectedCallback() {
+        super.connectedCallback();
+        locationStore.startWatching();
+        this._computeVenues();
+        this._frameMap();
 
     this._unsub = locationStore.subscribe(() => {
-      // Only re-fetch if we have no venues yet and both coords are now available
-      if (!this._venues.length && !this._isComputing && locationStore.own && locationStore.partner) {
+      if (!this._isComputing && locationStore.own && locationStore.partner && !this._venues.length) {
         this._computeVenues();
       }
     });
@@ -122,10 +126,13 @@ export class SelectRendezvous extends LitElement {
     super.disconnectedCallback();
     this._unsub?.();
     this._unsubSession?.();
-    // Remove venue preview pin — destination pin will be set properly by locationStore
-    this.dispatchEvent(new CustomEvent('map-view:remove-pin', {
-      bubbles: true, composed: true, detail: { id: 'venue-preview' },
-    }));
+    if (this._retryTimer) {
+      clearTimeout(this._retryTimer);
+      this._retryTimer = null;
+    }
+    if (!sessionStore.selectedVenue) {
+      locationStore.clearDestination();
+    }
     this.dispatchEvent(new CustomEvent('map-view:clear-midpoint', { bubbles: true, composed: true }));
   }
 
@@ -137,42 +144,44 @@ export class SelectRendezvous extends LitElement {
     const mid = sessionStore.midpoint;
     if (!mid) return;
 
+    const now = Date.now();
+    if (now < this._nextSuggestAt) return;
+
+    const suggestKey = `${mid.lat.toFixed(4)}_${mid.lng.toFixed(4)}`;
+    if (this._venues.length > 0 && this._lastSuggestKey === suggestKey) return;
+
     this._isComputing = true;
+    this._suggestionError = '';
+    this._lastSuggestKey = suggestKey;
     uiStore.setLoading(true);
-    const rawVenues = await fetchVenues(mid.lat, mid.lng);
+    try {
+      this._venues = await suggestMeetupVenues({
+        own,
+        partner,
+        midpoint: mid,
+        maxResults: 6,
+      });
+      this._nextSuggestAt = Date.now() + 30_000;
+      sessionStore.setVenueSuggestions(this._venues);
 
-    // Calculate distances and rank by fairness
-    const venues = rawVenues.map(v => {
-      const dYou = getDistance(own.lat, own.lng, v.coordinates.lat, v.coordinates.lng);
-      const dPart = getDistance(partner.lat, partner.lng, v.coordinates.lat, v.coordinates.lng);
-      return {
-        ...v,
-        distanceKm: parseFloat(dYou.toFixed(1)),
-        etaMinutesFromYou: Math.round(dYou * 15), // Rough estimate: 4km/h walking or traffic
-        etaMinutesFromPartner: Math.round(dPart * 15),
-      };
-    });
-
-    // Fairness: prefer spots where travel difference is < 2x
-    venues.sort((a, b) => {
-      const getFairness = (v: Venue) => {
-        const max = Math.max(v.etaMinutesFromYou, v.etaMinutesFromPartner);
-        const min = Math.max(1, Math.min(v.etaMinutesFromYou, v.etaMinutesFromPartner));
-        return max / min;
-      };
-      return getFairness(a) - getFairness(b);
-    });
-
-    this._venues = venues.slice(0, 5); // top 5 fair spots
-    sessionStore.setVenueSuggestions(this._venues);
-
-    this.dispatchEvent(new CustomEvent('map-view:show-midpoint', {
-      bubbles: true, composed: true,
-      detail: { coords: mid },
-    }));
-
-    uiStore.setLoading(false);
-    this._isComputing = false;
+      this.dispatchEvent(new CustomEvent('map-view:show-midpoint', {
+        bubbles: true, composed: true,
+        detail: { coords: mid },
+      }));
+    } catch (err) {
+      this._venues = [];
+      this._suggestionError = 'Could not load meetup suggestions. Retrying...';
+      uiStore.showToast(this._suggestionError);
+      this._nextSuggestAt = Date.now() + 45_000;
+      if (this._retryTimer) clearTimeout(this._retryTimer);
+      this._retryTimer = setTimeout(() => {
+        this._retryTimer = null;
+        this._computeVenues();
+      }, 45_000);
+    } finally {
+      uiStore.setLoading(false);
+      this._isComputing = false;
+    }
   }
 
   private _frameMap() {
@@ -187,17 +196,7 @@ export class SelectRendezvous extends LitElement {
 
   private _selectVenue(venue: Venue) {
     this._selectedId = venue.id;
-
-    // Remove any previous venue preview pin
-    this.dispatchEvent(new CustomEvent('map-view:remove-pin', {
-      bubbles: true, composed: true, detail: { id: 'venue-preview' },
-    }));
-
-    // Place a preview pin at the venue coordinate
-    this.dispatchEvent(new CustomEvent('map-view:add-pin', {
-      bubbles: true, composed: true,
-      detail: { id: 'venue-preview', coords: venue.coordinates, color: '#c0392b', label: venue.name },
-    }));
+    locationStore.setDestination(venue.coordinates);
 
     // Fit bounds to show you + partner + the venue
     const own = locationStore.own;
@@ -289,7 +288,7 @@ export class SelectRendezvous extends LitElement {
             ${this._venues.length === 0 ? html`
               <div style="text-align:center; padding:var(--space-6); color:var(--color-text-muted)">
                 <div style="font-size:32px; margin-bottom:var(--space-2)">☕?</div>
-                <div>No spots found near the midpoint. Try searching for a specific place.</div>
+                <div>${this._suggestionError || 'No spots found near the midpoint. Try searching for a specific place.'}</div>
               </div>
             ` : this._venues.map(v => html`
               <venue-card
@@ -306,7 +305,6 @@ export class SelectRendezvous extends LitElement {
         ` : html`
           <div class="search-section">
             <location-input
-              country="NG"
               placeholder="Search for any place…"
               @location-selected=${this._onCustomLocation}
             ></location-input>
@@ -352,6 +350,7 @@ export class SelectRendezvous extends LitElement {
     });
 
     if (confirmed) {
+      p2pService.endSessionForAll();
       sessionStore.endSession();
       uiStore.goHome();
     }

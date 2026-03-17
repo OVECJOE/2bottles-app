@@ -28,10 +28,17 @@ class UIStore {
     // -----------------------------------------------------------
 
     async init() {
-        const saved = await get(DB_KEY);
-        if (saved) {
-            this.screen = saved.screen || 'create-session';
-            this._notify();
+        try {
+            const saved = await get(DB_KEY);
+            if (saved) {
+                this.screen = saved.screen || 'create-session';
+                this._notify();
+            }
+        } catch (err) {
+            console.error('[UIStore] Navigation Error:', err);
+            this.isLoading = false;
+        } finally {
+            this.isLoading = false;
         }
     }
 
@@ -65,6 +72,7 @@ class UIStore {
             case 'create-session': path = '/'; break;
             case 'invite-partner': path = '/invite'; break;
             case 'partner-notified': path = `/join/${params?.peerId || ''}`; break;
+            case 'partner-rejected': path = '/rejected'; break;
             case 'select-rendezvous': path = '/select-venue'; break;
             case 'partner-agree-refuse': path = '/coordinate'; break;
             case 'live-tracking': path = '/tracking'; break;

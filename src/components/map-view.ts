@@ -1,34 +1,3 @@
-/**
- * <map-view> — the persistent map canvas.
- *
- * Responsibilities:
- *   1. Render a brand-styled MapLibre map as the full backdrop
- *   2. React to locationStore changes — move pins in real-time
- *   3. Draw/update the dashed route line between you, partner, and destination
- *   4. Expose a fitBounds() method and a custom-event command API
- *      for screens that need precise camera control
- *
- * Pin lifecycle driven entirely by locationStore:
- *   own        → PIN_YOU        (dark, pulsing)
- *   partner    → PIN_PARTNER    (amber, pulsing)
- *   destination → PIN_DESTINATION (red, venue name label)
- *
- * Route line:
- *   During live-tracking: you → destination and partner → destination
- *   During select-rendezvous: dashed arcs from both pins to midpoint
- *
- * Custom events (dispatch on any ancestor, map-view listens via bubbling):
- *   map-view:move-to       { coords, zoom? }
- *   map-view:add-pin       { id, coords, color?, label?, pulse? }
- *   map-view:remove-pin    { id }
- *   map-view:show-route    { coordinates: [lng,lat][] }
- *   map-view:clear-route
- *   map-view:show-midpoint { coords }
- *   map-view:clear-midpoint
- *   map-view:draw-tracking-routes  (triggers the you→dest + partner→dest lines)
- *   map-view:fit-tracking           (fits camera to all three: you, partner, dest)
- */
-
 import { LitElement, html } from 'lit';
 import { customElement, query } from 'lit/decorators.js';
 import maplibregl from 'maplibre-gl';
@@ -46,133 +15,125 @@ const DEFAULT_CENTER: [number, number] = [3.3792, 6.5244];
 const DEFAULT_ZOOM = 13;
 const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
+// Layer IDs
+const LAYER_YOU = 'layer-you';
+const LAYER_PARTNER = 'layer-partner';
+const LAYER_DESTINATION = 'layer-destination';
+
+// Source IDs
+const SOURCE_YOU = 'source-you';
+const SOURCE_PARTNER = 'source-partner';
+const SOURCE_DESTINATION = 'source-destination';
+
+const SOURCE_ROUTE_OWN = 'source-route-own';
+const SOURCE_ROUTE_PARTNER = 'source-route-partner';
+const SOURCE_ROUTE_SINGLE = 'source-route-single';
+
 // ---------------------------------------------------------------------------
-// Pin element factory
+// Procedural Icon Generation
 // ---------------------------------------------------------------------------
 
-function makePinEl(color: string, label?: string, pulse = false): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = `
-    position: relative;
-    display: flex; flex-direction: column; align-items: center;
-    cursor: pointer;
-    /* Ensure the wrapper doesn't have extra bottom space so anchor:bottom works */
-    padding-bottom: 0;
-  `;
+function createPinImage(color: string, initials?: string): ImageData {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d')!;
 
-    if (label) {
-        const chip = document.createElement('div');
-        chip.textContent = label;
-        chip.style.cssText = `
-      margin-bottom: 5px;
-      background: rgba(255,255,255,0.97); color: #111;
-      font-family: 'DM Sans', sans-serif;
-      font-size: 10px; font-weight: 600;
-      padding: 2px 8px; border-radius: 999px;
-      white-space: nowrap;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.14);
-      letter-spacing: 0.2px;
-    `;
-        wrap.appendChild(chip);
+    // Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 4;
+
+    // Outer circle
+    ctx.beginPath();
+    ctx.arc(32, 28, 22, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    // Inner circle (colored)
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.beginPath();
+    ctx.arc(32, 28, 18, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // Pin tip
+    ctx.beginPath();
+    ctx.moveTo(32, 60);
+    ctx.lineTo(22, 42);
+    ctx.lineTo(42, 42);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // White center dot or initials
+    if (initials) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 18px "DM Sans", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(initials.toUpperCase(), 32, 28);
+    } else {
+        ctx.beginPath();
+        ctx.arc(32, 28, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
     }
 
-    const dotContainer = document.createElement('div');
-    dotContainer.style.cssText = `
-    position: relative; width: 14px; height: 14px;
-    display: flex; align-items: center; justify-content: center;
-  `;
-    wrap.appendChild(dotContainer);
-
-    if (pulse) {
-        for (let i = 0; i < 2; i++) {
-            const ring = document.createElement('div');
-            ring.style.cssText = `
-        position: absolute; top: 50%; left: 50%;
-        width: 32px; height: 32px; margin: -16px 0 0 -16px;
-        border-radius: 50%; border: 2px solid ${color};
-        opacity: 0;
-        animation: pulse-ring 2.4s cubic-bezier(0.4,0,0.6,1) infinite;
-        animation-delay: ${i * 0.8}s;
-        pointer-events: none;
-      `;
-            dotContainer.appendChild(ring);
-        }
-    }
-
-    const dot = document.createElement('div');
-    dot.style.cssText = `
-    width: 14px; height: 14px; border-radius: 50%;
-    background: ${color};
-    border: 3px solid rgba(255,255,255,0.95);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.08);
-    flex-shrink: 0; position: relative; z-index: 1;
-  `;
-    dotContainer.appendChild(dot);
-
-    return wrap;
+    return ctx.getImageData(0, 0, 64, 64);
 }
 
-/** Updates the label chip text on an existing pin element */
-export function updatePinLabel(el: HTMLElement, label: string) {
-    const chip = el.querySelector<HTMLElement>('div:first-child');
-    if (chip && chip.classList.contains('chip')) { // We should probably add a class or just check correctly
-        chip.textContent = label;
-    } else if (chip && chip.nextElementSibling?.tagName === 'DIV') {
-        // Fallback: it's the first child if label exists
-         chip.textContent = label;
-    }
+function createDestinationImage(emoji: string): ImageData {
+    const canvas = document.createElement('canvas');
+    canvas.width = 80;
+    canvas.height = 80;
+    const ctx = canvas.getContext('2d')!;
+
+    // Pin shape
+    ctx.beginPath();
+    ctx.moveTo(40, 78);
+    ctx.bezierCurveTo(75, 40, 75, 10, 40, 10);
+    ctx.bezierCurveTo(5, 10, 5, 40, 40, 78);
+    ctx.fillStyle = '#ea4335';
+    ctx.fill();
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // White circle for icon
+    ctx.beginPath();
+    ctx.arc(40, 36, 22, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    // Emoji
+    ctx.font = '32px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, 40, 38);
+
+    return ctx.getImageData(0, 0, 80, 80);
 }
 
-function makeDestinationEl(label: string): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = `
-    position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;
-  `;
+function createFallbackPoiImage(): ImageData {
+    const canvas = document.createElement('canvas');
+    canvas.width = 48;
+    canvas.height = 48;
+    const ctx = canvas.getContext('2d')!;
 
-    if (label) {
-        const chip = document.createElement('div');
-        chip.textContent = label;
-        chip.style.cssText = `
-      margin-bottom: 7px;
-      background: #c0392b; color: #fff;
-      font-family: 'DM Sans', sans-serif;
-      font-size: 10px; font-weight: 700;
-      padding: 3px 10px; border-radius: 999px;
-      white-space: nowrap;
-      box-shadow: 0 2px 8px rgba(192,57,43,0.4);
-      letter-spacing: 0.3px;
-      max-width: 120px; overflow: hidden; text-overflow: ellipsis;
-    `;
-        wrap.appendChild(chip);
-    }
+    ctx.beginPath();
+    ctx.arc(24, 24, 18, 0, Math.PI * 2);
+    ctx.fillStyle = '#4D7298';
+    ctx.fill();
 
-    // Teardrop shape for destination
-    const body = document.createElement('div');
-    body.style.cssText = `
-    width: 32px; height: 32px; border-radius: 50% 50% 50% 0;
-    transform: rotate(-45deg);
-    background: #c0392b;
-    border: 3px solid rgba(255,255,255,0.95);
-    box-shadow: 0 3px 12px rgba(192,57,43,0.45), 0 0 0 1px rgba(0,0,0,0.08);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    margin-bottom: 16px; /* Offset the rotation so the tip is at the bottom center of the div box */
-  `;
-    // BUT teardrop rotated -45 means the tip is at bottom-right of the square box.
-    // If we want it at bottom center of the wrapper, we need to adjust.
-    // Actually, anchor:bottom for MapLibre centers the element horizontally.
-    // A square rotated -45 has its "bottom" corner at exactly half width. Correct.
+    ctx.beginPath();
+    ctx.arc(24, 24, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
 
-    const inner = document.createElement('div');
-    inner.style.cssText = `
-    width: 8px; height: 8px; border-radius: 50%;
-    background: rgba(255,255,255,0.9);
-    transform: rotate(45deg);
-  `;
-    body.appendChild(inner);
-    wrap.appendChild(body);
-
-    return wrap;
+    return ctx.getImageData(0, 0, 48, 48);
 }
 
 function makeMidpointEl(): HTMLElement {
@@ -212,23 +173,30 @@ export class MapView extends LitElement {
     @query('#map-container')
     private _mapContainer!: HTMLDivElement;
     private _map: maplibregl.Map | null = null;
-    private _markers = new Map<string, maplibregl.Marker>();
     private _midpointMarker: maplibregl.Marker | null = null;
     private _unsubLocation?: () => void;
     private _unsubSession?: () => void;
     private _unsubUI?: () => void;
+    private _animId: number | null = null;
+    private _hadPartner = false;
+    private _hadDestination = false;
+    private _handlers: Record<string, (e: any) => void> = {};
 
     override connectedCallback() {
         super.connectedCallback();
-        this.addEventListener('map-view:move-to', this._onMoveTo as EventListener);
-        this.addEventListener('map-view:add-pin', this._onAddPin as EventListener);
-        this.addEventListener('map-view:remove-pin', this._onRemovePin as EventListener);
-        this.addEventListener('map-view:show-route', this._onShowRoute as EventListener);
-        this.addEventListener('map-view:clear-route', this._onClearRoute as EventListener);
-        this.addEventListener('map-view:show-midpoint', this._onShowMidpoint as EventListener);
-        this.addEventListener('map-view:clear-midpoint', this._onClearMidpoint as EventListener);
-        this.addEventListener('map-view:draw-tracking-routes', this._onDrawTracking as EventListener);
-        this.addEventListener('map-view:fit-tracking', this._onFitTracking as EventListener);
+        this._handlers = {
+            'map-view:move-to': (e: any) => this._onMoveTo(e),
+            'map-view:show-route': (e: any) => this._onShowRoute(e),
+            'map-view:clear-route': () => this._onClearRoute(),
+            'map-view:show-midpoint': (e: any) => this._onShowMidpoint(e),
+            'map-view:clear-midpoint': () => this._onClearMidpoint(),
+            'map-view:draw-tracking-routes': () => this._onDrawTracking(),
+            'map-view:fit-tracking': () => this._onFitTracking(),
+        };
+
+        Object.entries(this._handlers).forEach(([evt, handler]) => {
+            window.addEventListener(evt, handler as EventListener);
+        });
     }
 
     override disconnectedCallback() {
@@ -236,17 +204,14 @@ export class MapView extends LitElement {
         this._unsubLocation?.();
         this._unsubSession?.();
         this._unsubUI?.();
-        
-        this.removeEventListener('map-view:move-to', this._onMoveTo as EventListener);
-        this.removeEventListener('map-view:add-pin', this._onAddPin as EventListener);
-        this.removeEventListener('map-view:remove-pin', this._onRemovePin as EventListener);
-        this.removeEventListener('map-view:show-route', this._onShowRoute as EventListener);
-        this.removeEventListener('map-view:clear-route', this._onClearRoute as EventListener);
-        this.removeEventListener('map-view:show-midpoint', this._onShowMidpoint as EventListener);
-        this.removeEventListener('map-view:clear-midpoint', this._onClearMidpoint as EventListener);
-        this.removeEventListener('map-view:draw-tracking-routes', this._onDrawTracking as EventListener);
-        this.removeEventListener('map-view:fit-tracking', this._onFitTracking as EventListener);
 
+        if (this._handlers) {
+            Object.entries(this._handlers).forEach(([evt, handler]) => {
+                window.removeEventListener(evt, handler as EventListener);
+            });
+        }
+
+        if (this._animId) cancelAnimationFrame(this._animId);
         this._map?.remove();
         this._map = null;
     }
@@ -269,10 +234,25 @@ export class MapView extends LitElement {
 
         this._map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
         this._map.once('load', () => this._onMapLoaded());
+        this._map.on('error', (e) => {
+            if (e.error?.message?.includes('Image') || e.error?.message?.includes('sprite')) return;
+            console.warn('[MapView] Map error:', e.error);
+        });
+
+        this._map.on('styleimagemissing', (e: any) => {
+            const missingId = e?.id;
+            if (!missingId || this._map?.hasImage(missingId)) return;
+            try {
+                this._map?.addImage(missingId, createFallbackPoiImage());
+            } catch {
+                // Ignore duplicate/add race.
+            }
+        });
     }
 
     private _onMapLoaded() {
         this._applyBrandStyle();
+        this._setupVectorLayers();
 
         this.dispatchEvent(new CustomEvent('map-view:ready', { bubbles: true, composed: true }));
 
@@ -283,13 +263,8 @@ export class MapView extends LitElement {
             this._flyTo(locationStore.own, 15, 600);
         }
 
-        // React to every location store change
         this._unsubLocation = locationStore.subscribe(() => this._syncFromStore());
-
-        // React to session store changes (venue name updates destination pin label)
         this._unsubSession = sessionStore.subscribe(() => this._syncDestinationLabel());
-
-        // React to screen changes to ensure routes are updated/cleared
         this._unsubUI = uiStore.subscribe(() => {
             this._syncFromStore();
             if (uiStore.screen !== 'live-tracking' && uiStore.screen !== 'select-rendezvous' && uiStore.screen !== 'partner-notified') {
@@ -337,132 +312,178 @@ export class MapView extends LitElement {
         });
     }
 
-    // ---------------------------------------------------------------------------
-    // Store sync — called on every locationStore update
-    // ---------------------------------------------------------------------------
-
     private _syncFromStore() {
+        if (!this._map) return;
         const { own, partner, destination } = locationStore;
 
-        if (own) {
-            this._upsertYouPin(own);
-        }
+        const hadPartner = this._hadPartner;
+        const hadDestination = this._hadDestination;
+        this._hadPartner = !!partner;
+        this._hadDestination = !!destination;
 
-        if (partner) {
-            this._upsertPartnerPin(partner);
-        } else {
-            this._removePin(PIN_PARTNER);
-        }
-
-        if (destination) {
-            this._upsertDestinationPin(destination);
-        } else {
-            this._removePin(PIN_DESTINATION);
-        }
+        this._updateSource(SOURCE_YOU, own);
+        this._updateSource(SOURCE_PARTNER, partner);
+        this._updateSource(SOURCE_DESTINATION, destination);
 
         const screen = uiStore.screen;
+
+        // Auto-fit if we just got a partner or destination
+        if ((partner && !hadPartner) || (destination && !hadDestination)) {
+            this._onFitTracking();
+        }
+
         if (screen === 'live-tracking' && own && destination) {
             this._drawTrackingRoutes(own, partner || undefined, destination);
-        } else if (screen === 'select-rendezvous' && own && partner) {
-            // No route lines during selection — just the midpoint marker
         }
+    }
+
+    private _updateSource(id: string, coords: Coordinates | null) {
+        if (!this._map) return;
+        const source = this._map.getSource(id) as maplibregl.GeoJSONSource;
+        if (!source) return;
+
+        if (!coords) {
+            source.setData({ type: 'FeatureCollection', features: [] });
+            return;
+        }
+
+        source.setData({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+            properties: {}
+        });
+    }
+
+    private _setupVectorLayers() {
+        const map = this._map!;
+
+        // Add pins images
+        map.addImage('pin-me', createPinImage('#4285f4', sessionStore.ownName?.charAt(0) || 'Y'));
+        map.addImage('pin-partner', createPinImage('#fbbc04', sessionStore.partnerName?.charAt(0) || 'P'));
+        map.addImage('pin-destination', createDestinationImage(sessionStore.selectedVenue?.emoji || '📍'));
+
+        // Add pins sources
+        [SOURCE_YOU, SOURCE_PARTNER, SOURCE_DESTINATION].forEach(id => {
+            if (!map.getSource(id)) {
+                map.addSource(id, {
+                    type: 'geojson',
+                    data: { type: 'FeatureCollection', features: [] }
+                });
+            }
+        });
+
+        // Add route sources
+        if (!map.getSource(SOURCE_ROUTE_OWN)) {
+            map.addSource(SOURCE_ROUTE_OWN, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        }
+        if (!map.getSource(SOURCE_ROUTE_PARTNER)) {
+            map.addSource(SOURCE_ROUTE_PARTNER, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        }
+        if (!map.getSource(SOURCE_ROUTE_SINGLE)) {
+            map.addSource(SOURCE_ROUTE_SINGLE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        }
+
+        // Pulse layer for You
+        map.addLayer({
+            id: 'pulse-you',
+            type: 'circle',
+            source: SOURCE_YOU,
+            paint: {
+                'circle-radius': 14,
+                'circle-color': '#4285f4',
+                'circle-opacity': 0.4,
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#ffffff'
+            }
+        });
+
+        // Layer for You
+        map.addLayer({
+            id: LAYER_YOU,
+            type: 'symbol',
+            source: SOURCE_YOU,
+            layout: {
+                'icon-image': 'pin-me',
+                'icon-size': 0.6,
+                'icon-anchor': 'bottom',
+                'icon-allow-overlap': true
+            }
+        });
+
+        // Pulse layer for Partner
+        map.addLayer({
+            id: 'pulse-partner',
+            type: 'circle',
+            source: SOURCE_PARTNER,
+            paint: {
+                'circle-radius': 14,
+                'circle-color': '#fbbc04',
+                'circle-opacity': 0.4,
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#ffffff'
+            }
+        });
+
+        // Layer for Partner
+        map.addLayer({
+            id: LAYER_PARTNER,
+            type: 'symbol',
+            source: SOURCE_PARTNER,
+            layout: {
+                'icon-image': 'pin-partner',
+                'icon-size': 0.6,
+                'icon-anchor': 'bottom',
+                'icon-allow-overlap': true
+            }
+        });
+
+        // Layer for Destination
+        map.addLayer({
+            id: LAYER_DESTINATION,
+            type: 'symbol',
+            source: SOURCE_DESTINATION,
+            layout: {
+                'icon-image': 'pin-destination',
+                'icon-size': 0.6,
+                'icon-anchor': 'bottom',
+                'icon-allow-overlap': true
+            }
+        });
+
+        // Sync again once images/layers are ready
+        this._syncFromStore();
+        this._startPulseAnimation();
+    }
+
+    private _startPulseAnimation() {
+        if (this._animId) cancelAnimationFrame(this._animId);
+
+        const animate = () => {
+            if (!this._map) return;
+            const time = Date.now() / 1000;
+            const radius = 12 + Math.sin(time * 3) * 4;
+            const opacity = 0.4 - Math.sin(time * 3) * 0.2;
+
+            if (this._map.getLayer('pulse-you')) {
+                this._map.setPaintProperty('pulse-you', 'circle-radius', radius);
+                this._map.setPaintProperty('pulse-you', 'circle-opacity', opacity);
+            }
+            if (this._map.getLayer('pulse-partner')) {
+                this._map.setPaintProperty('pulse-partner', 'circle-radius', radius);
+                this._map.setPaintProperty('pulse-partner', 'circle-opacity', opacity);
+            }
+
+            this._animId = requestAnimationFrame(animate);
+        };
+        animate();
     }
 
     private _syncDestinationLabel() {
-        const dest = locationStore.destination;
-        const venueName = sessionStore.selectedVenue?.name;
-        if (!dest || !venueName) return;
-
-        const existingMarker = this._markers.get(PIN_DESTINATION);
-        if (existingMarker) {
-            const el = existingMarker.getElement();
-            const chip = el.querySelector<HTMLElement>('div:last-child');
-            if (chip && chip.textContent !== venueName) {
-                chip.textContent = venueName;
-            }
-        } else {
-            this._upsertDestinationPin(dest);
-        }
+        // This function is no longer relevant for vector pins.
+        // Labels for vector pins would require a separate symbol layer or custom rendering.
+        // For now, we'll keep it empty or remove it if labels are not needed for vector pins.
     }
 
-    // ---------------------------------------------------------------------------
-    // Pin helpers
-    // ---------------------------------------------------------------------------
-
-    private _upsertYouPin(coords: Coordinates) {
-        const distM = locationStore.ownDistanceM;
-        const distText = distM !== null ? ` (${(distM / 1000).toFixed(1)}km)` : '';
-        const label = `You${distText}`;
-
-        const existing = this._markers.get(PIN_YOU);
-        if (existing) {
-            existing.setLngLat([coords.lng, coords.lat]);
-            updatePinLabel(existing.getElement(), label);
-            return;
-        }
-        const el = makePinEl('#1a2530', label, true);
-        this._markers.set(PIN_YOU,
-            new maplibregl.Marker({ element: el, anchor: 'bottom' })
-                .setLngLat([coords.lng, coords.lat])
-                .addTo(this._map!)
-        );
-    }
-
-    private _upsertPartnerPin(coords: Coordinates) {
-        const partnerName = sessionStore.partner?.name?.split(' ')[0] ?? 'Partner';
-        const ownName = sessionStore.ownName?.split(' ')[0];
-        const isDuplicate = partnerName.toLowerCase() === ownName?.toLowerCase();
-        const displayName = isDuplicate ? `${partnerName} (Partner)` : partnerName;
-
-        const distM = locationStore.partnerDistanceM;
-        const distText = distM !== null ? ` (${(distM / 1000).toFixed(1)}km)` : '';
-        const label = `${displayName}${distText}`;
-
-        const existing = this._markers.get(PIN_PARTNER);
-        if (existing) {
-            existing.setLngLat([coords.lng, coords.lat]);
-            updatePinLabel(existing.getElement(), label);
-            return;
-        }
-        const el = makePinEl('#e8a020', label, true);
-        this._markers.set(PIN_PARTNER,
-            new maplibregl.Marker({ element: el, anchor: 'bottom' })
-                .setLngLat([coords.lng, coords.lat])
-                .addTo(this._map!)
-        );
-    }
-
-    private _upsertDestinationPin(coords: Coordinates) {
-        const label = sessionStore.selectedVenue?.name ?? '';
-        const existing = this._markers.get(PIN_DESTINATION);
-        if (existing) {
-            existing.setLngLat([coords.lng, coords.lat]);
-            return;
-        }
-        const el = makeDestinationEl(label);
-        this._markers.set(PIN_DESTINATION,
-            new maplibregl.Marker({ element: el, anchor: 'bottom' })
-                .setLngLat([coords.lng, coords.lat])
-                .addTo(this._map!)
-        );
-    }
-
-    private _upsertPin(id: string, coords: Coordinates, color: string, label?: string, pulse = false) {
-        if (!this._map) return;
-        const existing = this._markers.get(id);
-        if (existing) { existing.setLngLat([coords.lng, coords.lat]); return; }
-        const el = makePinEl(color, label, pulse);
-        this._markers.set(id,
-            new maplibregl.Marker({ element: el, anchor: 'bottom' })
-                .setLngLat([coords.lng, coords.lat])
-                .addTo(this._map)
-        );
-    }
-
-    private _removePin(id: string) {
-        const m = this._markers.get(id);
-        if (m) { m.remove(); this._markers.delete(id); }
-    }
 
     // ---------------------------------------------------------------------------
     // Midpoint marker
@@ -497,41 +518,58 @@ export class MapView extends LitElement {
      * Used by select-rendezvous (you+partner) and live-tracking (you+partner+dest).
      */
     fitBounds(a: Coordinates, b: Coordinates, paddingPx = 100, c?: Coordinates) {
-        if (!this._map || !this._map.loaded()) {
-            console.warn('[MapView] Attempting to fit bounds before map is ready.');
-            return;
+        if (!this._map) return;
+
+        const lngs = [a.lng, b.lng];
+        const lats = [a.lat, b.lat];
+        if (c) {
+            lngs.push(c.lng);
+            lats.push(c.lat);
         }
 
-        const lngs = [a.lng, b.lng, ...(c ? [c.lng] : [])];
-        const lats = [a.lat, b.lat, ...(c ? [c.lat] : [])];
+        const validLngs = lngs.filter(l => typeof l === 'number' && !isNaN(l));
+        const validLats = lats.filter(l => typeof l === 'number' && !isNaN(l));
 
-        this._map.fitBounds(
-            [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-            { padding: paddingPx, duration: 1000, maxZoom: 15 }
+        if (validLngs.length < 2 || validLats.length < 2) return;
+
+        const bounds = new maplibregl.LngLatBounds(
+            [Math.min(...validLngs), Math.min(...validLats)],
+            [Math.max(...validLngs), Math.max(...validLats)]
         );
+
+        const camera = this._map.cameraForBounds(bounds, { padding: paddingPx });
+
+        const applyFit = () => {
+            if (camera) {
+                this._map?.flyTo({ ...camera, duration: 1500, essential: true });
+            }
+        };
+
+        if (this._map.loaded()) {
+            applyFit();
+        } else {
+            this._map.once('load', applyFit);
+            applyFit();
+        }
     }
 
     // ---------------------------------------------------------------------------
     // Route lines
     // ---------------------------------------------------------------------------
 
-    /**
-     * Draw two dashed lines: you→destination and partner→destination.
-     * This is the core live-tracking visualization.
-     */
     private _drawTrackingRoutes(you: Coordinates, partner: Coordinates | undefined, dest: Coordinates) {
         const map = this._map;
         if (!map) return;
 
         const youLine: [number, number][] = [[you.lng, you.lat], [dest.lng, dest.lat]];
-        this._setLineSource('2b-route-you', youLine, '#4D7298', false);
+        this._setLineSource(SOURCE_ROUTE_OWN, youLine, '#4285f4', true);
 
         if (partner) {
             const partnerLine: [number, number][] = [[partner.lng, partner.lat], [dest.lng, dest.lat]];
-            this._setLineSource('2b-route-partner', partnerLine, '#e8a020', true);
+            this._setLineSource(SOURCE_ROUTE_PARTNER, partnerLine, '#fbbc04', true);
         } else {
             // Keep source clean if partner coordinates aren't available yet
-            this._removeLineSource('2b-route-partner');
+            this._removeLineSource(SOURCE_ROUTE_PARTNER);
         }
     }
 
@@ -559,28 +597,31 @@ export class MapView extends LitElement {
 
         if (map.getSource(id)) {
             (map.getSource(id) as maplibregl.GeoJSONSource).setData(data);
-            return;
+        } else {
+            map.addSource(id, { type: 'geojson', data });
         }
 
-        map.addSource(id, { type: 'geojson', data });
-
         // White casing underneath for legibility
-        map.addLayer({
-            id: casingLyr, type: 'line', source: id,
-            layout: { 'line-join': 'round', 'line-cap': 'round' },
-            paint: { 'line-color': '#ffffff', 'line-width': 6, 'line-opacity': 0.55 },
-        });
+        if (!map.getLayer(casingLyr)) {
+            map.addLayer({
+                id: casingLyr, type: 'line', source: id,
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: { 'line-color': '#ffffff', 'line-width': 6, 'line-opacity': 0.55 },
+            });
+        }
 
-        map.addLayer({
-            id: lyr, type: 'line', source: id,
-            layout: { 'line-join': 'round', 'line-cap': 'round' },
-            paint: {
-                'line-color': color,
-                'line-width': 3,
-                ...(dashed ? { 'line-dasharray': [2, 2] } : {}),
-                'line-opacity': 0.9,
-            },
-        });
+        if (!map.getLayer(lyr)) {
+            map.addLayer({
+                id: lyr, type: 'line', source: id,
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: {
+                    'line-color': color,
+                    'line-width': 3,
+                    ...(dashed ? { 'line-dasharray': [2, 2] } : {}),
+                    'line-opacity': 0.9,
+                },
+            });
+        }
     }
 
     private _drawRoute(coordinates: [number, number][]) {
@@ -590,14 +631,9 @@ export class MapView extends LitElement {
     private _clearRoute() {
         const map = this._map;
         if (!map) return;
-        const ids = [
-            '2b-route-you-casing-layer', '2b-route-you-layer',
-            '2b-route-partner-casing-layer', '2b-route-partner-layer',
-            '2b-route-casing-layer', '2b-route-layer',
-        ];
-        ids.forEach(l => { if (map.getLayer(l)) map.removeLayer(l); });
-        ['2b-route-you', '2b-route-partner', '2b-route'].forEach(s => {
-            if (map.getSource(s)) map.removeSource(s);
+
+        [SOURCE_ROUTE_OWN, SOURCE_ROUTE_PARTNER, SOURCE_ROUTE_SINGLE].forEach(s => {
+            this._removeLineSource(s);
         });
     }
 
@@ -605,46 +641,114 @@ export class MapView extends LitElement {
     // Event handlers
     // ---------------------------------------------------------------------------
 
-    private _onMoveTo(e: CustomEvent<{ coords: Coordinates; zoom?: number }>) {
+    private _onMoveTo = (e: CustomEvent<{ coords: Coordinates; zoom?: number }>) => {
         this._flyTo(e.detail.coords, e.detail.zoom ?? 15);
-    }
+    };
 
-    private _onAddPin(e: CustomEvent<{ id: string; coords: Coordinates; color?: string; label?: string; pulse?: boolean }>) {
-        this._upsertPin(e.detail.id, e.detail.coords, e.detail.color ?? '#4D7298', e.detail.label, e.detail.pulse);
-    }
-
-    private _onRemovePin(e: CustomEvent<{ id: string }>) {
-        this._removePin(e.detail.id);
-    }
-
-    private _onShowRoute(e: CustomEvent<{ coordinates: [number, number][] }>) {
+    private _onShowRoute = (e: CustomEvent<{ coordinates: [number, number][] }>) => {
         this._drawRoute(e.detail.coordinates);
-    }
+    };
 
-    private _onClearRoute() { this._clearRoute(); }
+    private _onClearRoute = () => { this._clearRoute(); };
 
-    private _onShowMidpoint(e: CustomEvent<{ coords: Coordinates }>) {
+    private _onShowMidpoint = (e: CustomEvent<{ coords: Coordinates }>) => {
         this._showMidpoint(e.detail.coords);
-    }
+    };
 
-    private _onClearMidpoint() { this._clearMidpoint(); }
+    private _onClearMidpoint = () => { this._clearMidpoint(); };
 
-    private _onDrawTracking() {
+    private _onDrawTracking = () => {
         const { own, partner, destination } = locationStore;
-        if (own && partner && destination) {
-            this._drawTrackingRoutes(own, partner, destination);
+        if (own && destination) {
+            this._drawTrackingRoutes(own, partner || undefined, destination);
         }
-    }
+    };
 
-    private _onFitTracking() {
+    private _onFitTracking = () => {
         const { own, partner, destination } = locationStore;
         if (own && destination) {
             this.fitBounds(own, destination, 100, partner ?? undefined);
         }
-    }
+    };
 
     override render() {
-        return html`<div id="map-container" style="width:100%;height:100%;"></div>`;
+        const acc = locationStore.accuracy;
+        const watching = locationStore.isWatching;
+        const screen = uiStore.screen;
+
+        const showStatus = [
+            'select-rendezvous',
+            'partner-agree-refuse',
+            'live-tracking',
+            'partner-notified'
+        ].includes(screen);
+
+        return html`
+            <div id="map-container" style="width:100%;height:100%;"></div>
+            
+            ${showStatus ? html`
+                <div class="map-overlay-top">
+                    ${watching ? html`
+                        <div class="gps-status ${!acc ? 'locating' : acc > 50 ? 'poor' : 'good'}">
+                            <span class="gps-dot"></span>
+                            ${acc ? `GPS ±${Math.round(acc)}m` : 'Locating...'}
+                        </div>
+                    ` : locationStore.isCoolingOff ? html`
+                        <div class="gps-status error retry">
+                            <span class="gps-dot"></span> Signal Lost. Retrying soon...
+                        </div>
+                    ` : locationStore.lastErrorCode ? html`
+                        <div class="gps-status error">
+                            <span class="gps-dot"></span> GPS: ${locationStore.getErrorExplanation()}
+                        </div>
+                    ` : html`
+                        <div class="gps-status offline">
+                            <span class="gps-dot"></span> GPS Offline
+                        </div>
+                    `}
+                </div>
+            ` : ''}
+
+            <style>
+                .map-overlay-top {
+                    position: absolute; top: var(--space-2); left: var(--space-4);
+                    z-index: var(--z-topbar); pointer-events: none;
+                }
+                .gps-status {
+                    display: flex; align-items: center; gap: var(--space-2);
+                    background: rgba(255,255,255,0.9); padding: 4px 12px;
+                    border-radius: var(--border-radius-pill); font-size: 11px;
+                    font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                    color: var(--color-text-primary);
+                    border: 1px solid rgba(0,0,0,0.05);
+                }
+                .gps-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+                .gps-status.good .gps-dot { background: #34a853; }
+                .gps-status.poor .gps-dot { background: #fbbc04; }
+                .gps-status.offline .gps-dot { background: #5f6368; }
+                .gps-status.error .gps-dot { background: #ea4335; }
+                .gps-status.retry .gps-dot { 
+                    background: #fbbc04;
+                    animation: pulse-signal 1.5s ease-in-out infinite;
+                }
+
+                @keyframes pulse-ring-premium {
+                    0% { transform: scale(0.6); opacity: 0; }
+                    50% { opacity: 0.4; }
+                    100% { transform: scale(1.6); opacity: 0; }
+                }
+
+                @keyframes pulse-signal {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.4; }
+                }
+
+                @keyframes spin-slow {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            </style>
+        `;
     }
 }
 

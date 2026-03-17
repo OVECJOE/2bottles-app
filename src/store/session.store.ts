@@ -36,42 +36,48 @@ class SessionStore {
     // -----------------------------------------------------------
 
     async init() {
-        const saved = await get(DB_KEY);
-        if (saved) {
-            // Bug 4: Check if session is stale (> 24h)
-            const isStale = saved.session?.createdAt && (Date.now() - saved.session.createdAt > 24 * 60 * 60 * 1000);
-            
-            if (isStale) {
-                console.log('[SessionStore] Clearing stale session.');
-                await this.endSession();
-                return;
-            }
+        try {
+            const saved = await get(DB_KEY);
+            if (saved) {
+                const isStale = saved.session?.createdAt && (Date.now() - saved.session.createdAt > 24 * 60 * 60 * 1000);
+                
+                if (isStale) {
+                    await this.endSession();
+                    return;
+                }
 
-            this.session = saved.session;
-            this.partner = saved.partner;
-            this.selectedVenue = saved.selectedVenue;
-            this.isHost = saved.isHost || false;
-            this.ownName = saved.ownName || '';
-            this.partnerName = saved.partnerName || '';
-            this.ownAgreed = saved.ownAgreed || false;
-            this.partnerAgreed = saved.partnerAgreed || false;
-            this.chatMessages = saved.chatMessages || [];
-            this._notify();
+                this.session = saved.session;
+                this.partner = saved.partner;
+                this.selectedVenue = saved.selectedVenue;
+                this.isHost = saved.isHost || false;
+                this.ownName = saved.ownName || '';
+                this.partnerName = saved.partnerName || '';
+                this.ownAgreed = saved.ownAgreed || false;
+                this.partnerAgreed = saved.partnerAgreed || false;
+                this.chatMessages = saved.chatMessages || [];
+                this._notify();
+            }
+        } catch (err) {
+            console.error('[SessionStore] IDB Init Error:', err);
         }
     }
 
     private async _save() {
-        await set(DB_KEY, {
-            session: this.session,
-            partner: this.partner,
-            selectedVenue: this.selectedVenue,
-            isHost: this.isHost,
-            ownName: this.ownName,
-            partnerName: this.partnerName,
-            ownAgreed: this.ownAgreed,
-            partnerAgreed: this.partnerAgreed,
-            chatMessages: this.chatMessages,
-        });
+        try {
+            await set(DB_KEY, {
+                session: this.session,
+                partner: this.partner,
+                selectedVenue: this.selectedVenue,
+                isHost: this.isHost,
+                ownName: this.ownName,
+                partnerName: this.partnerName,
+                ownAgreed: this.ownAgreed,
+                partnerAgreed: this.partnerAgreed,
+                chatMessages: this.chatMessages,
+            });
+        } catch (err) {
+            console.error('[SessionStore] IDB Save Error:', err);
+        }
     }
 
     // -----------------------------------------------------------
@@ -132,8 +138,7 @@ class SessionStore {
     }
 
     async endSession() {
-        // Bug 3: Stop GPS tracking immediately
-        locationStore.stopWatching();
+        locationStore.reset();
         
         this.session = null;
         this.partner = null;
@@ -160,8 +165,21 @@ class SessionStore {
     }
 
     async setPartnerStatus(status: PartnerStatus) {
-        if (!this.partner) return;
-        this.partner = { ...this.partner, status };
+        if (!this.partner) {
+            const inferredName = this.partnerName || 'Partner';
+            this.partner = {
+                id: this.session?.id || 'partner',
+                name: inferredName,
+                initials: inferredName.slice(0, 2).toUpperCase(),
+                avatarBg: '#fbbc04',
+                avatarColor: '#1a1f29',
+                status,
+                location: locationStore.partner,
+                etaMinutes: locationStore.partnerEtaMinutes,
+            };
+        } else {
+            this.partner = { ...this.partner, status };
+        }
         this._notify();
         await this._save();
     }
@@ -236,7 +254,7 @@ class SessionStore {
     clearChat() {
         this.chatMessages = [];
         this._notify();
-        this._save(); // Bug 21: Persist chat clearance
+        this._save();
     }
 
     // -----------------------------------------------------------
@@ -254,7 +272,7 @@ class SessionStore {
     }
 
     get isVenueConfirmed(): boolean {
-        return this.ownAgreed && this.partnerAgreed;
+        return !!this.selectedVenue && this.ownAgreed && this.partnerAgreed;
     }
 
     get midpoint(): { lat: number, lng: number } | null {

@@ -44,6 +44,7 @@ export class AppShell extends LitElement {
             { path: '/', component: 'create-session', action: async () => { await import('./session/create-session.js'); } },
             { path: '/invite', component: 'invite-partner', action: async () => { await import('./session/invite-partner.js'); } },
             { path: '/join/:peerId', component: 'partner-invite-received', action: async () => { await import('./partner/partner-invite-received.js'); } },
+            { path: '/rejected', component: 'partner-ended', action: async () => { await import('./partner/partner-ended.js'); } },
             { path: '/select-venue', component: 'select-rendezvous', action: async () => { await import('./rendezvous/select-rendezvous.js'); } },
             { path: '/coordinate', component: 'partner-agree-refuse', action: async () => { await import('./partner/partner-agree-refuse.js'); } },
             { path: '/tracking', component: 'live-tracking', action: async () => { await import('./tracking/live-tracking.js'); } },

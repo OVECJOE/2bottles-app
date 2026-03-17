@@ -29,19 +29,8 @@ export class PartnerAgreeRefuse extends LitElement {
     .venue-pill-text { font-size: var(--text-sm); font-weight: var(--weight-medium); color: #fff; }
     .venue-pill-sub  { font-size: var(--text-xs); color: var(--color-text-on-dark-muted); }
 
-    .sheet {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      background: var(--color-sheet-bg);
-      border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
-      padding: var(--space-3) var(--space-5) calc(env(safe-area-inset-bottom, var(--space-6)));
-      z-index: var(--z-sheet);
-      max-height: 68vh;
-      display: flex; flex-direction: column;
-      animation: slide-up var(--duration-sheet) var(--ease-out) both;
-    }
+    /* Local overrides rely on sharedStyles for .sheet and .handle */
 
-    .handle { width: 36px; height: 4px; background: rgba(0,0,0,0.12); border-radius: var(--border-radius-pill); margin: 0 auto var(--space-3); flex-shrink: 0; }
 
     .partner-header {
       display: flex; align-items: center; gap: var(--space-3);
@@ -102,7 +91,9 @@ export class PartnerAgreeRefuse extends LitElement {
   `];
 
   @state() private _draft = '';
+  @state() private _loading = false;
   @query('.chat-messages') private _chatEl!: HTMLElement;
+
 
   private _unsub?: () => void;
 
@@ -133,7 +124,9 @@ export class PartnerAgreeRefuse extends LitElement {
 
     sessionStore.addMessage(msg);
     this._draft = '';
-    (this.renderRoot.querySelector('.chat-input') as HTMLInputElement).value = ''; // Bug 43: Clear physical input
+    
+    const input = this.renderRoot.querySelector('.chat-input') as HTMLInputElement;
+    if (input) input.value = ''; 
 
     // Broadcast via P2P
     p2pService.send({ type: 'chat:message', text, timestamp });
@@ -148,7 +141,8 @@ export class PartnerAgreeRefuse extends LitElement {
   }
 
   private _agree() {
-    if (sessionStore.ownAgreed) return; // Bug 44: Guard against double-tap
+    if (sessionStore.ownAgreed || this._loading) return; 
+    
     sessionStore.setOwnAgreed(true);
     p2pService.broadcastAgreement();
 
@@ -183,7 +177,7 @@ export class PartnerAgreeRefuse extends LitElement {
     const messages = sessionStore.chatMessages;
 
     return html`
-      <screen-shell screen='partner-notified'>
+      <screen-shell screen='partner-agree-refuse'>
         ${v ? html`
             <div class="venue-pill">
             <span>${v.emoji}</span>

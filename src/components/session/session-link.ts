@@ -5,6 +5,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
+import { copyText } from '../../services/clipboard.service.js';
 import { sharedStyles } from '../../styles/shared-styles.js';
 import '../ui/screen-shell.js';
 
@@ -70,9 +71,13 @@ export class SessionLink extends LitElement {
 
   private async _copyLink() {
     const link = sessionStore.session?.link ?? '';
-    await navigator.clipboard.writeText(`https://${link}`);
-    this._copied = true;
-    setTimeout(() => { this._copied = false; }, 2000);
+    const ok = await copyText(`https://${link}`);
+    if (ok) {
+      this._copied = true;
+      setTimeout(() => { this._copied = false; }, 2000);
+      return;
+    }
+    uiStore.showToast('Unable to copy automatically. Please copy the link manually.');
   }
 
   private async _shareLink() {

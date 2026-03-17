@@ -60,13 +60,14 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
 
   private async _handleAutoJoin(peerId: string) {
     // If already in THIS session, don't re-join
-    if (sessionStore.session?.id === peerId) return;
+    if (sessionStore.session?.id === peerId && p2pService.isConnected) return;
 
     this._connecting = true;
     uiStore.setLoading(true);
     try {
       if (sessionStore.session) {
         console.log('[PartnerInviteReceived] Clearing old session.');
+        p2pService.disconnect();
         await sessionStore.endSession();
       }
       await sessionStore.joinSession(peerId);

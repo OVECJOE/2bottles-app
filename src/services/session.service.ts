@@ -16,7 +16,6 @@ export const sessionService = {
         try {
             const { session } = await sessionsApi.create({ lat: coords.lat, lng: coords.lng });
             sessionStore.createSession(session.id);
-            sessionStore.setSessionLink(session.link);
         } finally {
             uiStore.setLoading(false);
         }

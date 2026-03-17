@@ -1,10 +1,3 @@
-// =============================================================
-// 2bottles — Location Store
-//
-// Owns GPS watching, own coordinates, partner coordinates
-// (received over WebSocket), destination, and ETA values.
-// =============================================================
-
 import { get, set } from 'idb-keyval';
 import { p2pService } from '../services/p2p.service.js';
 import { uiStore } from './index.js';
@@ -15,10 +8,6 @@ const DB_KEY = '2b:location_store';
 type Listener = () => void;
 
 class LocationStore implements LocationState {
-    // -----------------------------------------------------------
-    // State
-    // -----------------------------------------------------------
-
     own: Coordinates | null = null;
     partner: Coordinates | null = null;
     destination: Coordinates | null = null;
@@ -28,47 +17,54 @@ class LocationStore implements LocationState {
     partnerDistanceM: number | null = null;
     isWatching = false;
     accuracy: number | null = null;
+    lastErrorCode: number | null = null;
+    isCoolingOff = false;
 
     private _watchId: number | null = null;
     private _listeners = new Set<Listener>();
     private _errorCount = 0;
-    private _coolingOff = false;
+    private _lastErrorLogTime = 0;
+    private _lastPermissionToastAt = 0;
 
-    // -----------------------------------------------------------
-    // Init (load from IndexedDB)
-    // -----------------------------------------------------------
+    private _canUseGeolocation(): boolean {
+        return typeof window !== 'undefined' && !!navigator.geolocation && window.isSecureContext;
+    }
 
     async init() {
-        const saved = await get(DB_KEY);
-        if (saved) {
-            this.partner = saved.partner || null;
-            this.own = saved.own || null;
-            this.accuracy = saved.accuracy || null;
-            this.destination = saved.destination || null;
-            this.ownEtaMinutes = saved.ownEtaMinutes || null;
-            this.partnerEtaMinutes = saved.partnerEtaMinutes || null;
-            this.ownDistanceM = saved.ownDistanceM || null;
-            this.partnerDistanceM = saved.partnerDistanceM || null;
-            this._notify();
+        try {
+            const saved = await get(DB_KEY);
+            if (saved) {
+                this.partner = saved.partner || null;
+                this.own = saved.own || null;
+                this.accuracy = saved.accuracy || null;
+                this.destination = saved.destination || null;
+                this.ownEtaMinutes = saved.ownEtaMinutes || null;
+                this.partnerEtaMinutes = saved.partnerEtaMinutes || null;
+                this.ownDistanceM = saved.ownDistanceM || null;
+                this.partnerDistanceM = saved.partnerDistanceM || null;
+                this._notify();
+            }
+        } catch (err) {
+            console.error('[LocationStore] IDB Init Error:', err);
         }
     }
 
     private async _save() {
-        await set(DB_KEY, {
-            own: this.own,
-            accuracy: this.accuracy,
-            partner: this.partner,
-            destination: this.destination,
-            ownEtaMinutes: this.ownEtaMinutes,
-            partnerEtaMinutes: this.partnerEtaMinutes,
-            ownDistanceM: this.ownDistanceM,
-            partnerDistanceM: this.partnerDistanceM,
-        });
+        try {
+            await set(DB_KEY, {
+                own: this.own,
+                accuracy: this.accuracy,
+                partner: this.partner,
+                destination: this.destination,
+                ownEtaMinutes: this.ownEtaMinutes,
+                partnerEtaMinutes: this.partnerEtaMinutes,
+                ownDistanceM: this.ownDistanceM,
+                partnerDistanceM: this.partnerDistanceM,
+            });
+        } catch (err) {
+            console.error('[LocationStore] IDB Save Error:', err);
+        }
     }
-
-    // -----------------------------------------------------------
-    // Subscribe / notify
-    // -----------------------------------------------------------
 
     subscribe(fn: Listener): () => void {
         this._listeners.add(fn);
@@ -79,46 +75,51 @@ class LocationStore implements LocationState {
         this._listeners.forEach((fn) => fn());
     }
 
-    // -----------------------------------------------------------
-    // Own location
-    // -----------------------------------------------------------
-
     setOwnLocation(coords: Coordinates, accuracy?: number) {
         if (!coords || isNaN(coords.lat) || isNaN(coords.lng)) return;
         this.own = coords;
         this.accuracy = accuracy ?? null;
         this._notify();
-        this._save(); 
+        this._save();
         p2pService.broadcastLocation(coords);
     }
-
-    // -----------------------------------------------------------
-    // GPS watching
-    // -----------------------------------------------------------
 
     startWatching() {
         if (this.isWatching) return;
 
         if (!navigator.geolocation) {
-            console.error('Geolocation not supported');
+            this.lastErrorCode = 2;
+            console.error('[LocationStore] Geolocation not supported');
+            uiStore.showToast('Geolocation is not supported on this device. Use manual location search.');
+            this._notify();
             return;
         }
+
+        if (!window.isSecureContext) {
+            this.lastErrorCode = 3;
+            console.warn('[LocationStore] Geolocation requires HTTPS or localhost secure context');
+            uiStore.showToast('GPS requires HTTPS (or localhost). Use manual location search for now.');
+            this._notify();
+            return;
+        }
+
+        this.isWatching = true;
+        this._notify();
 
         const options: PositionOptions = {
             enableHighAccuracy: true,
             maximumAge: 5000,
-            timeout: 20000, // Increased timeout for slower locks
+            timeout: 20000,
         };
 
         if (this._watchId !== null) {
             navigator.geolocation.clearWatch(this._watchId);
         }
 
-
         const success = (pos: GeolocationPosition) => {
-            this.isWatching = true; 
-            this._errorCount = 0; // Reset on success
-            this._coolingOff = false;
+            this._errorCount = 0;
+            this.isCoolingOff = false;
+            this.lastErrorCode = null;
             this.setOwnLocation(
                 { lat: pos.coords.latitude, lng: pos.coords.longitude },
                 pos.coords.accuracy
@@ -126,36 +127,54 @@ class LocationStore implements LocationState {
         };
 
         const error = (err: GeolocationPositionError) => {
+            this.lastErrorCode = err.code;
             this._errorCount++;
 
-            console.warn(`[LocationStore] Watch error (${err.code}):`, err.message);
-            
-            if (err.code === 1) { // PERMISSION_DENIED
-                uiStore.showToast('Location permission denied. Please enable GPS.');
+            const now = Date.now();
+            if (now - this._lastErrorLogTime > 2000) {
+                console.warn(`[LocationStore] Watch error (${err.code}):`, err.message);
+                this._lastErrorLogTime = now;
+            }
+
+            if (err.code === 1) {
+                const nowToast = Date.now();
+                if (nowToast - this._lastPermissionToastAt > 5000) {
+                    uiStore.showToast('Location permission denied. Please enable GPS or use manual location search.');
+                    this._lastPermissionToastAt = nowToast;
+                }
                 this.stopWatching();
                 return;
             }
 
-            // Cooling off logic: If we get many errors quickly, stop for a bit
-            if (this._errorCount > 3 && !this._coolingOff) {
-                console.error('[LocationStore] Too many GPS errors. Cooling off for 15s...');
-                this._coolingOff = true;
+            if (this._errorCount > 3 && !this.isCoolingOff) {
+                console.error('[LocationStore] Too many GPS errors. Cooling off...');
+                this.isCoolingOff = true;
                 this.stopWatching();
+                this._notify();
+
+                if (err.code === 2) {
+                    uiStore.showToast('GPS signal is unstable. You can continue with manual location search.');
+                    this.isCoolingOff = false;
+                    return;
+                }
+
                 setTimeout(() => {
-                    this._coolingOff = false;
+                    this.isCoolingOff = false;
                     this._errorCount = 0;
-                    this.startWatching();
+                    if (this._canUseGeolocation()) {
+                        this.startWatching();
+                    }
                 }, 15000);
                 return;
             }
 
-            // Fallback: If High Accuracy fails, try without it
             if (options.enableHighAccuracy) {
-                console.info('[LocationStore] Retrying with High Accuracy disabled...');
+                console.info('[LocationStore] Retrying without High Accuracy...');
                 options.enableHighAccuracy = false;
                 if (this._watchId !== null) navigator.geolocation.clearWatch(this._watchId);
                 this._watchId = navigator.geolocation.watchPosition(success, error, options);
             }
+            this._notify();
         };
 
         this._watchId = navigator.geolocation.watchPosition(success, error, options);
@@ -171,11 +190,25 @@ class LocationStore implements LocationState {
         this._notify();
     }
 
-    // -----------------------------------------------------------
-    // One-shot location fetch (for session create)
-    // -----------------------------------------------------------
+    getErrorExplanation(): string {
+        switch (this.lastErrorCode) {
+            case 1: return 'Permission Denied';
+            case 2: return 'Geolocation Unavailable';
+            case 3: return 'HTTPS Required For GPS';
+            default: return 'Search Failed';
+        }
+    }
 
     async fetchOnce(): Promise<Coordinates> {
+        if (!navigator.geolocation) {
+            this.lastErrorCode = 2;
+            throw new Error('Geolocation not supported');
+        }
+        if (!window.isSecureContext) {
+            this.lastErrorCode = 3;
+            throw new Error('Geolocation requires secure context (HTTPS or localhost)');
+        }
+
         return new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
@@ -194,10 +227,6 @@ class LocationStore implements LocationState {
         });
     }
 
-    // -----------------------------------------------------------
-    // Partner location (pushed via WebSocket)
-    // -----------------------------------------------------------
-
     setPartnerLocation(coords: Coordinates) {
         if (!coords || isNaN(coords.lat) || isNaN(coords.lng)) return;
         this.partner = coords;
@@ -208,11 +237,8 @@ class LocationStore implements LocationState {
     clearPartnerLocation() {
         this.partner = null;
         this._notify();
+        this._save();
     }
-
-    // -----------------------------------------------------------
-    // Destination
-    // -----------------------------------------------------------
 
     setDestination(coords: Coordinates) {
         this.destination = coords;
@@ -223,11 +249,8 @@ class LocationStore implements LocationState {
     clearDestination() {
         this.destination = null;
         this._notify();
+        this._save();
     }
-
-    // -----------------------------------------------------------
-    // ETA
-    // -----------------------------------------------------------
 
     setEtas(own: number | null, partner: number | null) {
         if (this.ownEtaMinutes === own && this.partnerEtaMinutes === partner) return;
@@ -238,22 +261,18 @@ class LocationStore implements LocationState {
     }
 
     setDistances(own: number | null, partner: number | null) {
-        if (own === null && partner === null) return; // Bug 18
-        // Only update if change is > 1 meter (prevents micro-update loops)
+        if (own === null && partner === null) return;
+
         const dOwn = Math.abs((this.ownDistanceM || 0) - (own || 0));
         const dPart = Math.abs((this.partnerDistanceM || 0) - (partner || 0));
-        
-        if (dOwn < 1 && dPart < 1 && this.ownDistanceM !== null && own !== null) return;
+
+        if (this.ownDistanceM !== null && this.partnerDistanceM !== null && dOwn < 5 && dPart < 5) return;
 
         this.ownDistanceM = own;
         this.partnerDistanceM = partner;
         this._notify();
         this._save();
     }
-
-    // -----------------------------------------------------------
-    // Snapshot (for passing to API / WebSocket)
-    // -----------------------------------------------------------
 
     snapshot(): LocationState {
         return {
@@ -279,7 +298,11 @@ class LocationStore implements LocationState {
         this.ownDistanceM = null;
         this.partnerDistanceM = null;
         this.accuracy = null;
+        this.lastErrorCode = null;
+        this.isCoolingOff = false;
+        this._errorCount = 0;
         this._notify();
+        this._save();
     }
 }
 

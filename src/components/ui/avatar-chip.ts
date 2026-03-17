@@ -43,8 +43,8 @@ export class AvatarChip extends LitElement {
     }
     :host([size='lg']) .status-dot { width: 12px; height: 12px; }
 
-    .status-dot.online  { background: #22c55e; }
-    .status-dot.offline { background: #94a3b8; }
+    .status-dot.online  { background: var(--color-online); }
+    .status-dot.offline { background: var(--color-offline); }
     .status-dot.pending {
       background: var(--color-partner);
       animation: pulse-ring 1.8s ease-in-out infinite;

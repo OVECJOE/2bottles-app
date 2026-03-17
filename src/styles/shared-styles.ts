@@ -10,10 +10,11 @@ export const sharedStyles = css`
     position: absolute; bottom: 0; left: 0; right: 0;
     background: var(--color-sheet-bg);
     border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
-    padding: var(--space-3) var(--space-5) calc(env(safe-area-inset-bottom, 0px) + var(--space-8));
+    padding: var(--space-3) var(--space-5) calc(env(safe-area-inset-bottom, 0px) + var(--space-6));
     z-index: var(--z-sheet);
     animation: slide-up var(--duration-sheet) var(--ease-out) both;
     display: flex; flex-direction: column;
+    gap: var(--space-4);
   }
 
   .handle {
@@ -82,4 +83,17 @@ export const sharedStyles = css`
   /* Utilities */
   .animate-slide-up { animation: slide-up var(--duration-sheet) var(--ease-out) both; }
   .divider { height: var(--border-width); background: var(--border-color); margin: var(--space-3) 0; }
+
+  /* Semantic Status Strips */
+  .status-strip {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--border-radius-md);
+    font-size: var(--text-xs); font-weight: var(--weight-medium);
+  }
+  .status-strip.success { background: var(--color-success-bg); color: var(--color-success-text); }
+  .status-strip.warning { background: var(--color-warning-bg); color: var(--color-warning-text); }
+  .status-strip.danger  { background: var(--color-danger-bg);  color: var(--color-danger-text); }
+  .status-strip.info    { background: var(--color-blue-light); color: var(--color-blue-dark); }
+
 `;

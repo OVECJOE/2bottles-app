@@ -112,6 +112,14 @@ class WebSocketService {
                 break;
 
             case 'session:venue':
+                {
+                    const selected = sessionStore.venueSuggestions.find((v) => v.id === msg.venueId);
+                    if (selected) {
+                        void sessionStore.selectVenue(selected);
+                    } else {
+                        void sessionStore.setSessionVenue(msg.venueId);
+                    }
+                }
                 // Partner selected a venue — navigate to agree/refuse
                 if (uiStore.screen !== 'partner-agree-refuse') {
                     uiStore.goToAgreeRefuse();

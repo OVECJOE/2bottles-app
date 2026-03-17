@@ -55,7 +55,7 @@ export class LocationInput extends LitElement {
 
     .dropdown {
       position: absolute;
-      bottom: calc(3 * var(--space-4));
+      bottom: calc(4 * var(--space-2));
       left: 0; right: 0;
       background: rgba(255,255,255,0.98);
       border: 1px solid rgba(0,0,0,0.1);
@@ -102,16 +102,43 @@ export class LocationInput extends LitElement {
       padding: var(--space-4) var(--space-4);
       font-size: var(--text-sm); color: var(--color-text-muted); text-align: center;
     }
+
+    .scope-row {
+      display: flex;
+      gap: var(--space-2);
+      margin-top: var(--space-2);
+    }
+
+    .scope-btn {
+      border: 1px solid rgba(0,0,0,0.12);
+      background: #fff;
+      color: var(--color-text-primary);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: var(--text-xs);
+      cursor: pointer;
+      transition: all var(--duration-fast);
+    }
+
+    .scope-btn.active {
+      border-color: var(--color-blue);
+      background: var(--color-blue-light);
+      color: var(--color-blue);
+      font-weight: var(--weight-medium);
+    }
   `;
 
   @property() country?: string;
   @property() placeholder = 'Search for a place…';
   @property() value = '';
+  @property({ type: Boolean }) showScopeToggle = true;
 
   @state() private _suggestions: GeocodeSuggestion[] = [];
   @state() private _loading = false;
   @state() private _open = false;
   @state() private _selectedIndex = -1;
+  @state() private _scope: 'nearby' | 'global' = 'nearby';
+  @state() private _nearbyCenter: { lat: number; lng: number } | null = null;
 
   private _debounceTimer: any = null;
   private _lastQuery = '';
@@ -121,6 +148,10 @@ export class LocationInput extends LitElement {
     this.value = val;
     this._selectedIndex = -1;
 
+    await this._search(val);
+  }
+
+  private async _search(val: string) {
     if (!val.trim() || val.trim().length < 3) {
       this._suggestions = [];
       this._open = false;
@@ -134,9 +165,15 @@ export class LocationInput extends LitElement {
         this._open = true;
 
         try {
+            if (this._scope === 'nearby' && !this._nearbyCenter) {
+              this._nearbyCenter = await this._resolveNearbyCenter();
+            }
+
             const results = await geocodeAutocomplete(val, {
                 immediate: true,
-                countrycodes: this.country
+                countrycodes: this.country,
+                biasCenter: this._scope === 'nearby' ? this._nearbyCenter ?? undefined : undefined,
+                biasRadiusKm: this._scope === 'nearby' ? 30 : undefined,
             });
             // Bug 39: Race condition check
             if (this._lastQuery === val) {
@@ -148,6 +185,27 @@ export class LocationInput extends LitElement {
             if (this._lastQuery === val) this._loading = false;
         }
     }, 400);
+  }
+
+  private async _resolveNearbyCenter(): Promise<{ lat: number; lng: number } | null> {
+    if (!navigator.geolocation || !window.isSecureContext) return null;
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60_000 }
+      );
+    });
+  }
+
+  private async _setScope(scope: 'nearby' | 'global') {
+    this._scope = scope;
+    if (scope === 'nearby' && !this._nearbyCenter) {
+      this._nearbyCenter = await this._resolveNearbyCenter();
+    }
+    // Re-run query in the new scope if user already typed text.
+    const current = this.value.trim();
+    if (current.length >= 2) await this._search(current);
   }
 
   private _onKeyDown(e: KeyboardEvent) {
@@ -212,6 +270,21 @@ export class LocationInput extends LitElement {
         />
         ${this._loading ? html`<div class="spinner"></div>` : ''}
       </div>
+
+      ${this.showScopeToggle ? html`
+        <div class="scope-row" aria-label="Search scope">
+          <button
+            type="button"
+            class="scope-btn ${this._scope === 'nearby' ? 'active' : ''}"
+            @click=${() => this._setScope('nearby')}
+          >Nearby</button>
+          <button
+            type="button"
+            class="scope-btn ${this._scope === 'global' ? 'active' : ''}"
+            @click=${() => this._setScope('global')}
+          >Global</button>
+        </div>
+      ` : ''}
 
       ${this._open ? html`
         <div class="dropdown">

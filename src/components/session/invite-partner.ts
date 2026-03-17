@@ -1,6 +1,8 @@
 import { LitElement, html, css } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore } from '../../store/index.js';
+import { p2pService } from '../../services/p2p.service.js';
+import { copyText } from '../../services/clipboard.service.js';
 import { sharedStyles } from '../../styles/shared-styles.js';
 import '../ui/screen-shell.js';
 
@@ -11,42 +13,129 @@ export class InvitePartner extends LitElement {
     css`
     :host { display: block; }
 
-    /* Local overrides */
-    .btn-primary { margin-top: var(--space-6); }
-    .waiting {
+    .sheet {
+        background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+        border-top: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .invite-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: var(--space-4) 0;
+    }
+
+    .radar-container {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        margin-bottom: var(--space-6);
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: var(--space-2);
-        font-size: var(--text-sm);
-        color: var(--color-text-muted);
-        margin-top: var(--space-4);
-    }
-    .dot {
-        width: 8px; height: 8px;
-        background: var(--color-blue);
-        border-radius: 50%;
-        animation: pulse 1.5s infinite;
-    }
-    @keyframes pulse {
-        0% { transform: scale(0.8); opacity: 0.5; }
-        50% { transform: scale(1.2); opacity: 1; }
-        100% { transform: scale(0.8); opacity: 0.5; }
     }
 
-    .link-box {
-        background: rgba(0,0,0,0.04);
-        padding: var(--space-4);
-        border-radius: var(--border-radius-md);
-        margin-bottom: var(--space-4);
+    .radar-circle {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: var(--color-blue);
+        opacity: 0.15;
+        animation: radar-pulse 2.5s infinite var(--ease-out);
     }
-    .link-text {
-        display: block;
-        font-family: monospace;
+
+    .radar-circle:nth-child(2) { animation-delay: 0.8s; }
+    .radar-circle:nth-child(3) { animation-delay: 1.6s; }
+
+    .radar-core {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        z-index: 1;
+    }
+
+    @keyframes radar-pulse {
+        0% { transform: scale(0.5); opacity: 0.8; }
+        100% { transform: scale(2); opacity: 0; }
+    }
+
+    .link-card {
+        width: 100%;
+        background: white;
+        border-radius: var(--border-radius-lg);
+        padding: var(--space-4);
+        border: 1px solid rgba(0,0,0,0.06);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+        margin: var(--space-4) 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .link-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
         font-size: var(--text-xs);
+        font-weight: var(--weight-bold);
         color: var(--color-text-muted);
-        margin-bottom: var(--space-3);
-        word-break: break-all;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .link-value-container {
+        background: var(--color-blue-light);
+        padding: var(--space-3) var(--space-4);
+        border-radius: var(--border-radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2);
+        border: 1px solid rgba(0,0,0,0.04);
+    }
+
+    .link-value {
+        font-family: var(--font-mono);
+        font-size: var(--text-sm);
+        color: var(--color-blue-dark);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+        text-align: left;
+    }
+
+    .waiting-indicator {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-top: var(--space-6);
+        color: var(--color-text-muted);
+        font-size: var(--text-sm);
+        font-weight: var(--weight-medium);
+    }
+
+    .waiting-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--color-blue);
+        border-radius: 50%;
+        animation: dot-blink 1.4s infinite;
+    }
+    .waiting-dot:nth-child(2) { animation-delay: 0.2s; }
+    .waiting-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes dot-blink {
+        0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+        40% { opacity: 1; transform: scale(1.1); }
     }
   `];
 
@@ -63,8 +152,8 @@ export class InvitePartner extends LitElement {
         console.log('Share canceled or failed', err);
       }
     } else {
-      await navigator.clipboard.writeText(link);
-      uiStore.showToast('Link copied to clipboard');
+      const ok = await copyText(link);
+      uiStore.showToast(ok ? 'Link copied to clipboard' : 'Unable to copy automatically. Please copy the link manually.');
     }
   }
 
@@ -75,19 +164,36 @@ export class InvitePartner extends LitElement {
       <screen-shell screen='invite-partner'>
         <div class="sheet">
           <div class="handle"></div>
-          <div class="title">Invite your partner</div>
-          <div class="subtitle">Share this link with whoever you're meeting up with.</div>
+          
+          <div class="invite-container">
+              <div class="radar-container">
+                  <div class="radar-circle"></div>
+                  <div class="radar-circle"></div>
+                  <div class="radar-circle"></div>
+                  <div class="radar-core">🤝</div>
+              </div>
 
-          <div class="link-box">
-            <span class="link-text">${link}</span>
-            <button class="btn btn-primary" @click=${this._shareLink}>
-              <span>Copy & Share Link</span>
-            </button>
-          </div>
+              <div class="title">Invite your partner</div>
+              <div class="subtitle">Share this link with whoever you're meeting up with to start tracking in real-time.</div>
 
-          <div class="waiting">
-            <div class="dot"></div>
-            <span>Waiting for partner to join...</span>
+              <div class="link-card">
+                  <div class="link-header">
+                      <span>🔗 Meeting Link</span>
+                  </div>
+                  <div class="link-value-container">
+                      <span class="link-value">${link}</span>
+                  </div>
+                  <button class="btn btn-primary" @click=${this._shareLink}>
+                      Copy & Share Link
+                  </button>
+              </div>
+
+              <div class="waiting-indicator">
+                  <div class="waiting-dot"></div>
+                  <div class="waiting-dot"></div>
+                  <div class="waiting-dot"></div>
+                  <span>Waiting for partner to join...</span>
+              </div>
           </div>
 
           <button class="btn btn-ghost" @click=${this._cancel}>
@@ -107,6 +213,7 @@ export class InvitePartner extends LitElement {
     });
 
     if (confirmed) {
+      p2pService.endSessionForAll();
       sessionStore.endSession();
       uiStore.goHome();
     }
