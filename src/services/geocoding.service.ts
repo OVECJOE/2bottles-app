@@ -685,7 +685,7 @@ async function fetchGeoapifyCandidates(
             'commercial.shopping_mall',
             'accommodation.hotel',
         ].join(','),
-        filter: `rect:${center.lng},${center.lat},${radius}`,
+        filter: `circle:${center.lng},${center.lat},${radius}`,
         limit: '60',
         lang: getGeoapifyLanguage(),
         apiKey: GEOAPIFY_API_KEY,
