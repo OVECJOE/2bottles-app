@@ -42,6 +42,7 @@ let _venueQueryCooldownUntil = 0;
 let _nominatimHardCooldownUntil = 0;
 const _venueSuggestionCache = new Map<string, { expiry: number; data: Venue[] }>();
 const _routeMetricsCache = new Map<string, { expiry: number; data: RouteMetrics }>();
+let _lastNonEmptySuggestions: Venue[] = [];
 
 interface RouteMetrics {
     minutes: number;
@@ -443,7 +444,15 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
 
     const candidateRadiiM = [1500, 3000, 6000, 10000];
     const candidates = await collectVenueCandidatesProgressive(midpoint, candidateRadiiM);
-    if (candidates.length === 0) return [];
+    if (candidates.length === 0) {
+        const cachedFallback = _lastNonEmptySuggestions
+            .map((v) => hydrateVenueForPair(v, own, partner))
+            .slice(0, maxResults);
+        if (cachedFallback.length > 0) return cachedFallback;
+
+        const synthetic = buildSyntheticFallbackVenues(midpoint, own, partner).slice(0, maxResults);
+        return synthetic;
+    }
 
     const coarse = candidates
         .map((venue) => {
@@ -545,8 +554,67 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
         expiry: Date.now() + VENUE_SUGGESTION_CACHE_TTL_MS,
         data: finalList,
     });
+    if (finalList.length > 0) {
+        _lastNonEmptySuggestions = finalList;
+    }
 
     return finalList;
+}
+
+function hydrateVenueForPair(venue: Venue, own: Coordinates, partner: Coordinates): Venue {
+    const dYouKm = getDistance(own.lat, own.lng, venue.coordinates.lat, venue.coordinates.lng);
+    const dPartnerKm = getDistance(partner.lat, partner.lng, venue.coordinates.lat, venue.coordinates.lng);
+    return {
+        ...venue,
+        distanceKm: parseFloat(dYouKm.toFixed(1)),
+        etaMinutesFromYou: etaFromDistanceKm(dYouKm),
+        etaMinutesFromPartner: etaFromDistanceKm(dPartnerKm),
+    };
+}
+
+function buildSyntheticFallbackVenues(midpoint: Coordinates, own: Coordinates, partner: Coordinates): Venue[] {
+    const points: Array<{ name: string; coordinates: Coordinates; category: string; address: string }> = [
+        {
+            name: 'Midpoint Meeting Area',
+            coordinates: midpoint,
+            category: 'place',
+            address: 'Near your shared midpoint',
+        },
+        {
+            name: 'Balanced Meetup Point',
+            coordinates: {
+                lat: midpoint.lat + (own.lat - partner.lat) * 0.05,
+                lng: midpoint.lng + (own.lng - partner.lng) * 0.05,
+            },
+            category: 'place',
+            address: 'Alternative nearby meetup area',
+        },
+        {
+            name: 'Nearby Public Spot',
+            coordinates: {
+                lat: midpoint.lat - (own.lat - partner.lat) * 0.05,
+                lng: midpoint.lng - (own.lng - partner.lng) * 0.05,
+            },
+            category: 'place',
+            address: 'Backup option when places are unavailable',
+        },
+    ];
+
+    return points.map((p, i) => {
+        const dYouKm = getDistance(own.lat, own.lng, p.coordinates.lat, p.coordinates.lng);
+        const dPartnerKm = getDistance(partner.lat, partner.lng, p.coordinates.lat, p.coordinates.lng);
+        return {
+            id: `fallback_${i}`,
+            name: p.name,
+            category: p.category,
+            emoji: '📍',
+            address: p.address,
+            coordinates: p.coordinates,
+            distanceKm: parseFloat(dYouKm.toFixed(1)),
+            etaMinutesFromYou: etaFromDistanceKm(dYouKm),
+            etaMinutesFromPartner: etaFromDistanceKm(dPartnerKm),
+        };
+    });
 }
 
 function quantizeCoord(value: number, precision = 3): string {
@@ -786,7 +854,7 @@ async function fetchPhotonCandidates(center: { lat: number; lng: number }, radiu
             if (!Number.isFinite(venueLat) || !Number.isFinite(venueLng)) continue;
 
             const dMidKm = getDistance(center.lat, center.lng, venueLat, venueLng);
-            if (dMidKm > Math.max(1.4, radiusKm * 1.5)) continue;
+            if (dMidKm > Math.max(8, radiusKm * 4.0)) continue;
 
             const parts = r.display_name.split(', ');
             const fallbackCategory = q === 'food' ? 'restaurant' : q;
@@ -835,7 +903,7 @@ async function collectVenueCandidatesProgressive(
                 if (seen.has(key)) continue;
 
                 const dMidKm = getDistance(center.lat, center.lng, venue.coordinates.lat, venue.coordinates.lng);
-                if (dMidKm > Math.max(2.5, (radiusM / 1000) * 1.7)) continue;
+                if (dMidKm > Math.max(10, (radiusM / 1000) * 4.0)) continue;
 
                 seen.add(key);
                 merged.push(venue);
