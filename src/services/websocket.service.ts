@@ -16,9 +16,13 @@ import type { PartnerStatus, SessionStatus } from '../types/index.js';
 
 type WSMessage =
     | { type: 'partner:location'; lat: number; lng: number }
+    | { type: 'partner:location'; userId: string; lat: number; lng: number; ts?: number }
     | { type: 'partner:status'; status: PartnerStatus }
     | { type: 'session:status'; status: SessionStatus }
-    | { type: 'session:venue'; venueId: string };
+    | { type: 'session:venue'; venueId: string }
+    | { type: 'presence:update'; sessionId: string; participants: Array<{ userId: string; name?: string; online: boolean }> }
+    | { type: 'chat:message'; userId: string; text: string; ts: number; id: string }
+    | { type: 'pong'; ts: number };
 
 class WebSocketService {
     private _ws: WebSocket | null = null;
@@ -26,6 +30,14 @@ class WebSocketService {
     private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private _reconnectAttempts = 0;
     private _locationInterval: ReturnType<typeof setInterval> | null = null;
+    private _pingInterval: ReturnType<typeof setInterval> | null = null;
+
+    private _wsBaseUrl() {
+        const explicit = import.meta.env.VITE_WS_URL as string | undefined;
+        if (explicit) return explicit;
+        const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+        return `${protocol}://${location.host}`;
+    }
 
     connect(sessionId: string) {
         if (this._ws?.readyState === WebSocket.OPEN) return;
@@ -38,24 +50,40 @@ class WebSocketService {
     disconnect() {
         if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
         if (this._locationInterval) clearInterval(this._locationInterval);
+        if (this._pingInterval) clearInterval(this._pingInterval);
         this._ws?.close(1000, 'session ended');
         this._ws = null;
         this._sessionId = null;
     }
 
     sendLocation(lat: number, lng: number) {
-        this._send({ type: 'location:update', lat, lng, sessionId: this._sessionId });
+        this._send({
+            type: 'location:update',
+            lat,
+            lng,
+            sessionId: this._sessionId,
+            userId: sessionStore.session?.id || 'anonymous',
+            ts: Date.now(),
+        });
     }
 
     private _open() {
-        const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-        const url = `${protocol}://${location.host}/ws/${this._sessionId}`;
+        const base = this._wsBaseUrl().replace(/\/$/, '');
+        const userId = sessionStore.session?.id || 'anonymous';
+        const name = encodeURIComponent(sessionStore.ownName || 'Guest');
+
+        // New backend endpoint format.
+        const nextUrl = `${base}/ws?sessionId=${encodeURIComponent(String(this._sessionId || ''))}&userId=${encodeURIComponent(userId)}&name=${name}`;
+        // Legacy endpoint fallback for older servers.
+        const legacyUrl = `${base}/ws/${this._sessionId}`;
+        const url = import.meta.env.VITE_WS_LEGACY === 'true' ? legacyUrl : nextUrl;
 
         this._ws = new WebSocket(url);
 
         this._ws.onopen = () => {
             this._reconnectAttempts = 0;
             this._startLocationBroadcast();
+            this._startPing();
         };
 
         this._ws.onmessage = (e) => {
@@ -68,6 +96,7 @@ class WebSocketService {
 
         this._ws.onclose = (e) => {
             if (this._locationInterval) clearInterval(this._locationInterval);
+            if (this._pingInterval) clearInterval(this._pingInterval);
             if (e.code !== 1000) this._scheduleReconnect();
         };
 
@@ -85,16 +114,39 @@ class WebSocketService {
         }, 4_000);
     }
 
+    private _startPing() {
+        if (this._pingInterval) clearInterval(this._pingInterval);
+        this._pingInterval = setInterval(() => {
+            this._send({ type: 'ping', ts: Date.now() });
+        }, 20_000);
+    }
+
     private _handle(msg: WSMessage) {
         switch (msg.type) {
             case 'partner:location':
                 locationStore.setPartnerLocation({ lat: msg.lat, lng: msg.lng });
                 if (sessionStore.partner) {
-                    sessionStore.setPartner({
+                    void sessionStore.setPartner({
                         ...sessionStore.partner,
                         location: { lat: msg.lat, lng: msg.lng },
                     });
                 }
+                break;
+
+            case 'presence:update':
+                // Presence surface can be wired to UI store later.
+                break;
+
+            case 'chat:message':
+                sessionStore.addMessage({
+                    id: msg.id,
+                    senderId: 'partner',
+                    text: msg.text,
+                    timestamp: msg.ts,
+                });
+                break;
+
+            case 'pong':
                 break;
 
             case 'partner:status':
@@ -108,7 +160,7 @@ class WebSocketService {
                 break;
 
             case 'session:status':
-                sessionStore.setSessionStatus(msg.status);
+                void sessionStore.setSessionStatus(msg.status);
                 break;
 
             case 'session:venue':
