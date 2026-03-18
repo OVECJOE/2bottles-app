@@ -13,6 +13,8 @@ export const sharedStyles = css`
     padding: var(--space-3) var(--space-5) calc(env(safe-area-inset-bottom, 0px) + var(--space-6));
     z-index: var(--z-sheet);
     animation: slide-up var(--duration-sheet) var(--ease-out) both;
+    transition: transform var(--duration-base) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+    will-change: transform, opacity;
     display: flex; flex-direction: column;
     gap: var(--space-4);
   }

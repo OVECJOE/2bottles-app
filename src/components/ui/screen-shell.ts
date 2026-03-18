@@ -15,12 +15,24 @@
 import { LitElement, html, css } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import './app-menu.js';
+import { uiStore } from '../../store/index.js';
 import type { AppScreen } from '../../types/index.js';
 
 // @customElement('screen-shell')
 export class ScreenShell extends LitElement {
   static override styles = css`
     :host { display: block; }
+
+    ::slotted(.sheet) {
+      transition: transform var(--duration-base) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+      will-change: transform, opacity;
+    }
+
+    :host([sheet-collapsed]) ::slotted(.sheet) {
+      transform: translateY(110%);
+      opacity: 0;
+      pointer-events: none;
+    }
 
     .status-bar {
       position: absolute; top: 0; left: 0; right: 0;
@@ -61,25 +73,90 @@ export class ScreenShell extends LitElement {
     }
     :host([dark-bar]) .time { color: rgba(255,255,255,0.85); }
     :host(:not([dark-bar])) .time { color: rgba(30,30,30,0.72); }
+
+    .sheet-toggle-btn {
+      pointer-events: all;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.88);
+      color: var(--color-text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-sm);
+      transition: transform var(--duration-fast), background var(--duration-fast);
+      -webkit-tap-highlight-color: transparent;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .sheet-toggle-btn:hover { background: rgba(255,255,255,0.98); }
+    .sheet-toggle-btn:active { transform: scale(0.94); }
+
+    :host([dark-bar]) .sheet-toggle-btn {
+      background: rgba(26,37,48,0.7);
+      color: rgba(255,255,255,0.9);
+      box-shadow: none;
+    }
+
+    .status-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      pointer-events: all;
+    }
+
+    .sheet-fab {
+      position: absolute;
+      right: var(--space-4);
+      bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
+      z-index: var(--z-fabs);
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: none;
+      background: var(--color-blue);
+      color: #fff;
+      font-size: 18px;
+      font-weight: var(--weight-bold);
+      cursor: pointer;
+      box-shadow: var(--shadow-lg);
+      transition: transform var(--duration-fast), opacity var(--duration-fast);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .sheet-fab:active { transform: scale(0.94); }
   `;
 
   @property() screen: AppScreen = 'create-session';
   @property({ type: Boolean, reflect: true, attribute: 'dark-bar' }) darkBar = false;
+  @property({ type: Boolean, reflect: true, attribute: 'sheet-collapsed' }) sheetCollapsed = false;
 
   @state() private _menuOpen = false;
   @state() private _time = '';
 
   private _clockInterval?: ReturnType<typeof setInterval>;
+  private _unsubUI?: () => void;
 
   override connectedCallback() {
     super.connectedCallback();
     this._updateClock();
     this._clockInterval = setInterval(() => this._updateClock(), 10_000);
+    this.sheetCollapsed = !uiStore.sheetOpen;
+    this._unsubUI = uiStore.subscribe(() => {
+      this.sheetCollapsed = !uiStore.sheetOpen;
+      this.requestUpdate();
+    });
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback();
     clearInterval(this._clockInterval);
+    this._unsubUI?.();
   }
 
   private _updateClock() {
@@ -90,16 +167,28 @@ export class ScreenShell extends LitElement {
     this._menuOpen = !this._menuOpen;
   }
 
+  private _toggleSheet() {
+    uiStore.toggleSheet();
+  }
+
   override render() {
     return html`
       <div class="status-bar">
         <span class="time">${this._time}</span>
-        <button
-          class="menu-btn"
-          @click=${this._toggleMenu}
-          aria-label="Menu"
-          aria-expanded=${this._menuOpen}
-        >●●●</button>
+        <div class="status-actions">
+          <button
+            class="sheet-toggle-btn"
+            @click=${this._toggleSheet}
+            aria-label=${this.sheetCollapsed ? 'Show panel' : 'Hide panel'}
+            title=${this.sheetCollapsed ? 'Show panel' : 'Hide panel'}
+          >${this.sheetCollapsed ? '↑' : '↓'}</button>
+          <button
+            class="menu-btn"
+            @click=${this._toggleMenu}
+            aria-label="Menu"
+            aria-expanded=${this._menuOpen}
+          >●●●</button>
+        </div>
       </div>
 
       ${this._menuOpen ? html`
@@ -107,6 +196,15 @@ export class ScreenShell extends LitElement {
           .screen=${this.screen}
           @menu-closed=${() => { this._menuOpen = false; }}
         ></app-menu>
+      ` : ''}
+
+      ${this.sheetCollapsed ? html`
+        <button
+          class="sheet-fab"
+          @click=${this._toggleSheet}
+          aria-label="Show panel"
+          title="Show panel"
+        >⌃</button>
       ` : ''}
 
       <slot></slot>
