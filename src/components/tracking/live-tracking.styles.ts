@@ -115,6 +115,7 @@ export const liveTrackingStyles = css`
     .chat-icon { font-size: 18px; }
 
     .chat-toggle {
+        position: relative;
         width: 32px; height: 32px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         transition: background var(--duration-fast), transform var(--duration-base);
@@ -122,6 +123,24 @@ export const liveTrackingStyles = css`
     }
     .chat-toggle:hover { background: rgba(0,0,0,0.05); }
     .expanded .chat-toggle { transform: rotate(180deg); }
+
+    .chat-unread-badge {
+        position: absolute;
+        top: -6px;
+        right: -8px;
+        min-width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: #ea4335;
+        color: #fff;
+        font-size: 10px;
+        font-weight: var(--weight-bold);
+        line-height: 18px;
+        text-align: center;
+        padding: 0 5px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.22);
+        border: 1px solid #fff;
+    }
 
     .chat-view { flex: 1; display: flex; flex-direction: column; min-height: 0; padding-top: var(--space-2); }
     .chat-body {

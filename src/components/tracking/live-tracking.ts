@@ -18,19 +18,23 @@ export class LiveTracking extends LitElement {
   @state() private _lastProgressSecond = 0;
   @state() private _arrivalNotified = false;
   @state() private _lastProximityTier = -1;
+  @state() private _unreadMessages = 0;
   
   private _ticker?: any;
   private _unsubLocation?: () => void;
   private _unsubSession?: () => void;
   private _lastOwnSample: { lat: number; lng: number; t: number } | null = null;
+  private _lastChatMessageCount = 0;
 
   override connectedCallback() {
     super.connectedCallback();
+    this._lastChatMessageCount = sessionStore.chatMessages.length;
     this._unsubLocation = locationStore.subscribe(() => {
       this._onLocationUpdate();
       this.requestUpdate();
     });
     this._unsubSession = sessionStore.subscribe(() => {
+      this._onChatUpdate();
       if (sessionStore.session?.status === 'ended') {
         uiStore.goToEndSession();
       }
@@ -42,6 +46,25 @@ export class LiveTracking extends LitElement {
     this._fireMapEvent('map-view:fit-tracking', {});
 
     this._startTimer();
+  }
+
+  private _onChatUpdate() {
+    const nextCount = sessionStore.chatMessages.length;
+    if (nextCount < this._lastChatMessageCount) {
+      this._lastChatMessageCount = nextCount;
+      this._unreadMessages = 0;
+      return;
+    }
+
+    if (nextCount > this._lastChatMessageCount) {
+      const incoming = sessionStore.chatMessages
+        .slice(this._lastChatMessageCount)
+        .filter((m) => m.senderId !== 'me').length;
+      if (incoming > 0 && !this._showChat) {
+        this._unreadMessages += incoming;
+      }
+      this._lastChatMessageCount = nextCount;
+    }
   }
 
   private _startTimer() {
@@ -159,6 +182,9 @@ export class LiveTracking extends LitElement {
 
   private _toggleView() {
     this._showChat = !this._showChat;
+    if (this._showChat) {
+      this._unreadMessages = 0;
+    }
   }
 
   private _sendMessage(e: Event) {
@@ -283,6 +309,9 @@ export class LiveTracking extends LitElement {
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="m18 15-6-6-6 6"/>
                                 </svg>
+                              ${!this._showChat && this._unreadMessages > 0 ? html`
+                                <span class="chat-unread-badge">${this._unreadMessages > 99 ? '99+' : this._unreadMessages}</span>
+                              ` : null}
                             </span>
                         </div>
 
