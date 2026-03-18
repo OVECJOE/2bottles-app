@@ -57,6 +57,11 @@ export default defineConfig({
                 changeOrigin: true,
                 rewrite: (path) => path.replace(/^\/api\/photon/, ''),
             },
+            '/api/route': {
+                target: 'https://router.project-osrm.org',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api\/route/, ''),
+            },
             '/api': {
                 target: 'http://localhost:8080',
                 changeOrigin: true,

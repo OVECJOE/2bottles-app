@@ -9,6 +9,10 @@
       "destination": "https://photon.komoot.io/:path*"
     },
     {
+      "source": "/api/route/:path*",
+      "destination": "https://router.project-osrm.org/:path*"
+    },
+    {
       "source": "/((?!.*\\.).*)",
       "destination": "/index.html"
     }

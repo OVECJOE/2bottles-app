@@ -14,6 +14,7 @@ export const PIN_DESTINATION = 'pin-destination';
 const DEFAULT_CENTER: [number, number] = [3.3792, 6.5244];
 const DEFAULT_ZOOM = 13;
 const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+const ROUTING_ENDPOINT = (import.meta.env.VITE_ROUTING_ENDPOINT as string | undefined) || '/api/route';
 
 // Layer IDs
 const LAYER_YOU = 'layer-you';
@@ -162,6 +163,28 @@ function makeMidpointEl(): HTMLElement {
     return wrap;
 }
 
+function makeEtaChipEl(tone: 'you' | 'partner', minutes: number): HTMLElement {
+    const el = document.createElement('div');
+    const bg = tone === 'you' ? '#4285f4' : '#fbbc04';
+    const fg = tone === 'you' ? '#ffffff' : '#1a1f29';
+    el.style.cssText = [
+        'display:flex',
+        'align-items:center',
+        'gap:6px',
+        'padding:6px 10px',
+        'border-radius:999px',
+        `background:${bg}`,
+        `color:${fg}`,
+        'font:700 11px "DM Sans", sans-serif',
+        'box-shadow:0 4px 12px rgba(0,0,0,0.2)',
+        'border:1px solid rgba(255,255,255,0.55)',
+        'pointer-events:none',
+        'white-space:nowrap',
+    ].join(';');
+    el.textContent = `${minutes} min`;
+    return el;
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -181,6 +204,10 @@ export class MapView extends LitElement {
     private _hadPartner = false;
     private _hadDestination = false;
     private _handlers: Record<string, (e: any) => void> = {};
+    private _routeCache = new Map<string, [number, number][]>();
+    private _routeInflight = new Map<string, Promise<[number, number][]>>();
+    private _ownEtaMarker: maplibregl.Marker | null = null;
+    private _partnerEtaMarker: maplibregl.Marker | null = null;
 
     override connectedCallback() {
         super.connectedCallback();
@@ -212,6 +239,7 @@ export class MapView extends LitElement {
         }
 
         if (this._animId) cancelAnimationFrame(this._animId);
+        this._clearEtaMarkers();
         this._map?.remove();
         this._map = null;
     }
@@ -267,7 +295,7 @@ export class MapView extends LitElement {
         this._unsubSession = sessionStore.subscribe(() => this._syncDestinationLabel());
         this._unsubUI = uiStore.subscribe(() => {
             this._syncFromStore();
-            if (uiStore.screen !== 'live-tracking' && uiStore.screen !== 'select-rendezvous' && uiStore.screen !== 'partner-notified') {
+            if (uiStore.screen !== 'live-tracking' && uiStore.screen !== 'select-rendezvous' && uiStore.screen !== 'partner-agree-refuse' && uiStore.screen !== 'partner-notified') {
                 this._clearRoute();
             }
         });
@@ -332,8 +360,8 @@ export class MapView extends LitElement {
             this._onFitTracking();
         }
 
-        if (screen === 'live-tracking' && own && destination) {
-            this._drawTrackingRoutes(own, partner || undefined, destination);
+        if ((screen === 'live-tracking' || screen === 'select-rendezvous' || screen === 'partner-agree-refuse') && own && destination) {
+            void this._drawTrackingRoutes(own, partner || undefined, destination);
         }
     }
 
@@ -557,19 +585,118 @@ export class MapView extends LitElement {
     // Route lines
     // ---------------------------------------------------------------------------
 
-    private _drawTrackingRoutes(you: Coordinates, partner: Coordinates | undefined, dest: Coordinates) {
+    private _routeKey(a: Coordinates, b: Coordinates): string {
+        return `${a.lat.toFixed(3)},${a.lng.toFixed(3)}->${b.lat.toFixed(3)},${b.lng.toFixed(3)}`;
+    }
+
+    private _routeMidpoint(coords: [number, number][]): [number, number] | null {
+        if (!coords.length) return null;
+        return coords[Math.floor(coords.length / 2)] ?? null;
+    }
+
+    private _updateEtaMarker(
+        marker: maplibregl.Marker | null,
+        tone: 'you' | 'partner',
+        minutes: number | null,
+        point: [number, number] | null,
+    ): maplibregl.Marker | null {
+        if (!this._map || minutes === null || minutes < 0 || !point) {
+            marker?.remove();
+            return null;
+        }
+
+        if (!marker) {
+            marker = new maplibregl.Marker({
+                element: makeEtaChipEl(tone, minutes),
+                anchor: 'center',
+            })
+                .setLngLat(point)
+                .addTo(this._map);
+            return marker;
+        }
+
+        marker.setLngLat(point);
+        marker.getElement().textContent = `${minutes} min`;
+        return marker;
+    }
+
+    private _clearEtaMarkers() {
+        this._ownEtaMarker?.remove();
+        this._partnerEtaMarker?.remove();
+        this._ownEtaMarker = null;
+        this._partnerEtaMarker = null;
+    }
+
+    private async _fetchRoute(a: Coordinates, b: Coordinates): Promise<[number, number][]> {
+        const key = this._routeKey(a, b);
+        const cached = this._routeCache.get(key);
+        if (cached && cached.length > 1) return cached;
+
+        if (this._routeInflight.has(key)) {
+            return this._routeInflight.get(key)!;
+        }
+
+        const promise = (async () => {
+            const params = new URLSearchParams({
+                overview: 'full',
+                geometries: 'geojson',
+                steps: 'false',
+            });
+            const from = `${a.lng},${a.lat}`;
+            const to = `${b.lng},${b.lat}`;
+            const url = `${ROUTING_ENDPOINT}/route/v1/driving/${from};${to}?${params}`;
+
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`route ${res.status}`);
+            const data = await res.json() as {
+                routes?: Array<{ geometry?: { coordinates?: [number, number][] } }>;
+            };
+            const coords = data.routes?.[0]?.geometry?.coordinates;
+            if (!coords || coords.length < 2) throw new Error('route-missing-geometry');
+
+            this._routeCache.set(key, coords);
+            return coords;
+        })().finally(() => {
+            this._routeInflight.delete(key);
+        });
+
+        this._routeInflight.set(key, promise);
+        return promise;
+    }
+
+    private async _drawTrackingRoutes(you: Coordinates, partner: Coordinates | undefined, dest: Coordinates) {
         const map = this._map;
         if (!map) return;
 
-        const youLine: [number, number][] = [[you.lng, you.lat], [dest.lng, dest.lat]];
+        let youLine: [number, number][] = [[you.lng, you.lat], [dest.lng, dest.lat]];
+        try {
+            youLine = await this._fetchRoute(you, dest);
+        } catch {
+        }
         this._setLineSource(SOURCE_ROUTE_OWN, youLine, '#4285f4', true);
+        this._ownEtaMarker = this._updateEtaMarker(
+            this._ownEtaMarker,
+            'you',
+            locationStore.ownEtaMinutes,
+            this._routeMidpoint(youLine),
+        );
 
         if (partner) {
-            const partnerLine: [number, number][] = [[partner.lng, partner.lat], [dest.lng, dest.lat]];
+            let partnerLine: [number, number][] = [[partner.lng, partner.lat], [dest.lng, dest.lat]];
+            try {
+                partnerLine = await this._fetchRoute(partner, dest);
+            } catch {
+            }
             this._setLineSource(SOURCE_ROUTE_PARTNER, partnerLine, '#fbbc04', true);
+            this._partnerEtaMarker = this._updateEtaMarker(
+                this._partnerEtaMarker,
+                'partner',
+                locationStore.partnerEtaMinutes,
+                this._routeMidpoint(partnerLine),
+            );
         } else {
-            // Keep source clean if partner coordinates aren't available yet
             this._removeLineSource(SOURCE_ROUTE_PARTNER);
+            this._partnerEtaMarker = this._updateEtaMarker(this._partnerEtaMarker, 'partner', null, null);
         }
     }
 
@@ -635,6 +762,7 @@ export class MapView extends LitElement {
         [SOURCE_ROUTE_OWN, SOURCE_ROUTE_PARTNER, SOURCE_ROUTE_SINGLE].forEach(s => {
             this._removeLineSource(s);
         });
+        this._clearEtaMarkers();
     }
 
     // ---------------------------------------------------------------------------
@@ -660,7 +788,7 @@ export class MapView extends LitElement {
     private _onDrawTracking = () => {
         const { own, partner, destination } = locationStore;
         if (own && destination) {
-            this._drawTrackingRoutes(own, partner || undefined, destination);
+            void this._drawTrackingRoutes(own, partner || undefined, destination);
         }
     };
 

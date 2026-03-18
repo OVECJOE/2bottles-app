@@ -152,7 +152,7 @@ interface PhotonResult {
     display_name: string;
     lat: number;
     lon: number;
-    type?: string;
+    type: string;
 }
 
 function getPreferredLanguage() {
@@ -207,15 +207,15 @@ async function fetchPhotonJson(pathAndQuery: string): Promise<PhotonResult[]> {
 
     const res = await fetchOrThrow(url, { headers: { 'Accept-Language': getPreferredLanguage() } });
     const body = (await res.json()) as PhotonResponse;
-    const mapped: PhotonResult[] = (body.features ?? [])
-        .map((f) => {
+    const mapped: PhotonResult[] = [];
+    for (const f of (body.features ?? [])) {
             const coords = f.geometry?.coordinates;
             const props = f.properties;
-            if (!coords || coords.length < 2 || !props) return null;
+            if (!coords || coords.length < 2 || !props) continue;
 
             const lon = Number(coords[0]);
             const lat = Number(coords[1]);
-            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
 
             const title = props.name || props.street || props.city || props.county || props.state || props.country || 'Place';
             const addressParts = [
@@ -226,15 +226,14 @@ async function fetchPhotonJson(pathAndQuery: string): Promise<PhotonResult[]> {
             ].filter(Boolean);
             const displayName = [title, ...addressParts].filter(Boolean).join(', ');
 
-            return {
+            mapped.push({
                 place_id: String(props.osm_id ?? `${lat.toFixed(5)}_${lon.toFixed(5)}`),
                 display_name: displayName,
                 lat,
                 lon,
                 type: props.osm_value || props.type || 'place',
-            };
-        })
-        .filter((x): x is PhotonResult => !!x);
+            });
+    }
 
     _photonCache.set(url, { expiry: now + PHOTON_CACHE_TTL_MS, data: mapped });
     return mapped;
