@@ -390,8 +390,6 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
  */
 export async function fetchVenues(lat: number, lng: number, radius = 3000): Promise<Venue[]> {
     try {
-        if (Date.now() < _venueQueryCooldownUntil) return [];
-
         const center = { lat, lng };
         const radiusKm = Math.max(1, Math.round(radius / 1000));
         const viewbox = buildViewBox(center, radiusKm);
@@ -411,6 +409,7 @@ export async function fetchVenues(lat: number, lng: number, radius = 3000): Prom
         const mapped: Venue[] = [];
         const seen = new Set<string>();
         let hadQueryFailure = false;
+        const canQueryNominatim = Date.now() >= _venueQueryCooldownUntil;
 
         const collectFromTerm = async (term: { q: string; category: string }, limit: string) => {
             const params = new URLSearchParams({
@@ -424,6 +423,7 @@ export async function fetchVenues(lat: number, lng: number, radius = 3000): Prom
             });
 
             let rows: NominatimResult[] = [];
+            if (!canQueryNominatim) return;
             try {
                 rows = await fetchNominatimJson(`/search?${params}`);
             } catch {
@@ -467,6 +467,67 @@ export async function fetchVenues(lat: number, lng: number, radius = 3000): Prom
             for (const term of searchTermsSecondary) {
                 if (hadQueryFailure) break;
                 await collectFromTerm(term, '4');
+            }
+        }
+
+        // Fallback: when public Nominatim returns empty/throttled, use Photon with location bias
+        // so users still get nearby suggestions instead of a hard empty state.
+        if (mapped.length === 0) {
+            const photonQueries = ['cafe', 'restaurant', 'park', 'bar', 'food', 'mall'];
+            const categoryTypeMap: Record<string, string> = {
+                cafe: 'cafe',
+                restaurant: 'restaurant',
+                bar: 'bar',
+                pub: 'pub',
+                park: 'park',
+                garden: 'garden',
+                playground: 'playground',
+                supermarket: 'supermarket',
+                hotel: 'hotel',
+                pharmacy: 'pharmacy',
+            };
+
+            for (const q of photonQueries) {
+                let rows: PhotonResult[] = [];
+                try {
+                    rows = await runPhotonSearch(q, 10, { center });
+                } catch {
+                    continue;
+                }
+
+                for (const r of rows) {
+                    const venueLat = Number(r.lat);
+                    const venueLng = Number(r.lon);
+                    if (!Number.isFinite(venueLat) || !Number.isFinite(venueLng)) continue;
+
+                    const dMid = getDistance(center.lat, center.lng, venueLat, venueLng);
+                    if (dMid > Math.max(0.9, radiusKm * 1.25)) continue;
+
+                    const parts = r.display_name.split(', ');
+                    const name = (parts[0] || '').trim();
+                    if (!name) continue;
+
+                    const category = categoryTypeMap[r.type] || categoryTypeMap[q] || 'place';
+                    const dedupeKey = `${name.toLowerCase()}_${venueLat.toFixed(5)}_${venueLng.toFixed(5)}`;
+                    if (seen.has(dedupeKey)) continue;
+                    seen.add(dedupeKey);
+
+                    mapped.push({
+                        id: `photon_${r.place_id}`,
+                        name,
+                        category,
+                        emoji: _getEmojiForAmenity(category),
+                        address: parts.slice(1, 4).join(', ') || 'Nearby Spot',
+                        coordinates: { lat: venueLat, lng: venueLng },
+                        distanceKm: 0,
+                        etaMinutesFromYou: 0,
+                        etaMinutesFromPartner: 0,
+                    });
+
+                    if (mapped.length >= 14) break;
+                }
+
+                if (mapped.length >= 14) break;
             }
         }
 

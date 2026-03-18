@@ -55,7 +55,7 @@ export class LocationInput extends LitElement {
 
     .dropdown {
       position: absolute;
-      top: calc(100% + var(--space-2));
+      bottom: calc(30% + var(--space-2));
       left: 0; right: 0;
       background: rgba(255,255,255,0.98);
       border: 1px solid rgba(0,0,0,0.1);

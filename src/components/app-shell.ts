@@ -36,6 +36,11 @@ export class AppShell extends LitElement {
             locationStore.init()
         ]);
 
+        // Force early GPS permission request when the app has no known user location yet.
+        if (!locationStore.own && !locationStore.isWatching) {
+            locationStore.startWatching();
+        }
+
         // 2. Setup Router
         const outlet = this.renderRoot.querySelector('#outlet');
         this._router = new Router(outlet);
