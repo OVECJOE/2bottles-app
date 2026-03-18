@@ -258,30 +258,30 @@ async function fetchPhotonJson(pathAndQuery: string): Promise<PhotonResult[]> {
     const body = (await res.json()) as PhotonResponse;
     const mapped: PhotonResult[] = [];
     for (const f of (body.features ?? [])) {
-        const coords = f.geometry?.coordinates;
-        const props = f.properties;
-        if (!coords || coords.length < 2 || !props) continue;
+            const coords = f.geometry?.coordinates;
+            const props = f.properties;
+            if (!coords || coords.length < 2 || !props) continue;
 
-        const lon = Number(coords[0]);
-        const lat = Number(coords[1]);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+            const lon = Number(coords[0]);
+            const lat = Number(coords[1]);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
 
-        const title = props.name || props.street || props.city || props.county || props.state || props.country || 'Place';
-        const addressParts = [
-            [props.street, props.housenumber].filter(Boolean).join(' ').trim(),
-            props.city || props.district || props.county,
-            props.state,
-            props.country,
-        ].filter(Boolean);
-        const displayName = [title, ...addressParts].filter(Boolean).join(', ');
+            const title = props.name || props.street || props.city || props.county || props.state || props.country || 'Place';
+            const addressParts = [
+                [props.street, props.housenumber].filter(Boolean).join(' ').trim(),
+                props.city || props.district || props.county,
+                props.state,
+                props.country,
+            ].filter(Boolean);
+            const displayName = [title, ...addressParts].filter(Boolean).join(', ');
 
-        mapped.push({
-            place_id: String(props.osm_id ?? `${lat.toFixed(5)}_${lon.toFixed(5)}`),
-            display_name: displayName,
-            lat,
-            lon,
-            type: props.osm_value || props.type || 'place',
-        });
+            mapped.push({
+                place_id: String(props.osm_id ?? `${lat.toFixed(5)}_${lon.toFixed(5)}`),
+                display_name: displayName,
+                lat,
+                lon,
+                type: props.osm_value || props.type || 'place',
+            });
     }
 
     _photonCache.set(url, { expiry: now + PHOTON_CACHE_TTL_MS, data: mapped });
@@ -418,10 +418,10 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     }
 
     const run = async () => {
-        const params = new URLSearchParams({
-            lat: qLat, lon: qLng,
-            format: 'json', zoom: '16',
-        });
+    const params = new URLSearchParams({
+        lat: qLat, lon: qLng,
+        format: 'json', zoom: '16',
+    });
 
         try {
             const res = await scheduleNominatim(() =>
@@ -677,14 +677,15 @@ async function fetchGeoapifyCandidates(
 
     const params = new URLSearchParams({
         categories: [
-            'catering',
+            'catering.cafe',
+            'catering.restaurant',
+            'catering.bar',
             'leisure',
-            'commercial',
-            'commercial',
+            'commercial.supermarket',
+            'commercial.shopping_mall',
             'accommodation.hotel',
         ].join(','),
-        filter: `circle:${center.lng},${center.lat},${radius}`,
-        bias: `proximity:${center.lng},${center.lat}`,
+        filter: `rect:${center.lng},${center.lat},${radius}`,
         limit: '60',
         lang: getGeoapifyLanguage(),
         apiKey: GEOAPIFY_API_KEY,
