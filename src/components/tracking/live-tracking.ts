@@ -4,6 +4,7 @@ import { liveTrackingStyles } from './live-tracking.styles.js';
 import { locationStore, sessionStore, uiStore } from '../../store/index.js';
 import { haversineMeters } from '../../services/geocoding.service.js';
 import { p2pService } from '../../services/p2p.service.js';
+import '../ui/screen-shell.js';
 
 @customElement('live-tracking')
 export class LiveTracking extends LitElement {
@@ -270,7 +271,8 @@ export class LiveTracking extends LitElement {
     if (!session) return html`<div>Loading session...</div>`;
 
     return html`
-            <div class="tracking-overlay">
+        <screen-shell screen='live-tracking'>
+        <div class="tracking-overlay sheet">
                 <div class="status-strip ${isWatching ? 'online' : 'offline'}">
                     <div class="status-indicator">
                         <span class="pulse-dot"></span>
@@ -363,7 +365,8 @@ export class LiveTracking extends LitElement {
                         ` : null}
                     </div>
                 </div>
-            </div>
+                </div>
+                </screen-shell>
         `;
   }
 }
