@@ -681,7 +681,6 @@ async function fetchGeoapifyCandidates(
             'catering.restaurant',
             'catering.bar',
             'leisure.park',
-            'leisure.garden',
             'commercial.supermarket',
             'commercial.shopping_mall',
             'accommodation.hotel',
