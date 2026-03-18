@@ -44,7 +44,19 @@ function verifyJwtHs256(token: string, secret: string): boolean {
 
 function readBearerToken(req: Request): string | null {
   const auth = req.headers.get('authorization') ?? req.headers.get('Authorization') ?? '';
-  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (auth.startsWith('Bearer ')) return auth.slice(7);
+
+  // Browser WebSocket clients cannot set custom Authorization headers.
+  // For WS upgrades we accept token via query string.
+  try {
+    const url = new URL(req.url);
+    const queryToken = url.searchParams.get('token') ?? url.searchParams.get('access_token');
+    if (queryToken && queryToken.trim()) return queryToken.trim();
+  } catch {
+    // Ignore malformed URLs and fall through.
+  }
+
+  return null;
 }
 
 function isJwtExpired(claims: Record<string, unknown> | null): boolean {

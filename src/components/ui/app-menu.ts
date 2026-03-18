@@ -10,10 +10,12 @@
  */
 import { LitElement, html, css } from 'lit';
 import { property } from 'lit/decorators.js';
-import { sessionStore, uiStore, locationStore } from '../../store/index.js';
+import { sessionStore, uiStore, locationStore, authStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
+import { wsService } from '../../services/websocket.service.js';
 import { copyText } from '../../services/clipboard.service.js';
 import type { AppScreen } from '../../types/index.js';
+import { billingEnabled, usersApi } from '../../api/users.api.js';
 
 interface MenuItem {
   icon: string;
@@ -100,6 +102,28 @@ export class AppMenu extends LitElement {
       font-family: var(--font-mono); font-size: var(--text-xs);
       color: var(--color-blue); margin-left: auto;
     }
+
+    .account-info {
+      padding: var(--space-3) var(--space-4);
+      display: flex; align-items: center; gap: var(--space-2);
+      background: rgba(77,114,152,0.07);
+    }
+    .account-name {
+      font-size: var(--text-xs); color: var(--color-text-primary); font-weight: var(--weight-medium);
+    }
+    .account-plan {
+      margin-left: auto;
+      font-size: 10px;
+      border-radius: var(--border-radius-pill);
+      padding: 2px 8px;
+      font-weight: var(--weight-bold);
+      background: var(--color-blue-light);
+      color: var(--color-blue-dark);
+    }
+    .account-plan.paid {
+      background: var(--color-success-bg);
+      color: var(--color-success-text);
+    }
   `;
 
   @property() screen: AppScreen = 'create-session';
@@ -111,6 +135,75 @@ export class AppMenu extends LitElement {
   private _items(): { primary: MenuItem[]; danger: MenuItem[] } {
     const s = sessionStore.session;
     const p = sessionStore.partner;
+
+    const upgradePlan: MenuItem = {
+      icon: '⭐',
+      label: billingEnabled ? 'Go Premium' : 'Free self-hosted mode',
+      action: async () => {
+        if (!billingEnabled) {
+          uiStore.showToast('Billing is disabled. Your app stays in free self-hosted mode.');
+          this._dismiss();
+          return;
+        }
+
+        if (!authStore.signedIn) {
+          uiStore.showToast('Sign in first, then you can upgrade in one tap.');
+          this._dismiss();
+          return;
+        }
+
+        uiStore.setLoading(true);
+        try {
+          const entitlements = await usersApi.getEntitlements();
+          if (entitlements.membership === 'paid') {
+            uiStore.showToast('Premium is already active on your account.');
+            return;
+          }
+
+          const base = window.location.origin;
+          const { url } = await usersApi.createCheckout({
+            successUrl: `${base}/?billing=success`,
+            cancelUrl: `${base}/?billing=cancel`,
+          });
+
+          window.location.assign(url);
+        } catch {
+          uiStore.showToast('We could not start checkout right now. Please try again.');
+        } finally {
+          uiStore.setLoading(false);
+          this._dismiss();
+        }
+      },
+    };
+
+    const signInHint: MenuItem = {
+      icon: '🔐',
+      label: 'Sign in from home screen',
+      action: () => {
+        uiStore.showToast('Use the access pass card on the home screen to sign in.');
+        this._dismiss();
+      },
+    };
+
+    const signOut: MenuItem = {
+      icon: '↩',
+      label: 'Sign out',
+      action: () => {
+        authStore.signOut();
+        wsService.disconnectInviteChannel();
+        uiStore.showToast('You are signed out.');
+        this._dismiss();
+      },
+    };
+
+    const openAccount: MenuItem = {
+      icon: '👤',
+      label: 'Account',
+      action: () => {
+        uiStore.goToAccount();
+        this._dismiss();
+      },
+    };
 
     const copyLink: MenuItem = {
       icon: '🔗',
@@ -179,28 +272,31 @@ export class AppMenu extends LitElement {
 
     switch (this.screen) {
       case 'create-session':
-        return { primary: [], danger: [] };
+        return { primary: [openAccount, authStore.signedIn ? upgradePlan : signInHint], danger: [authStore.signedIn ? signOut : undefined].filter(Boolean) as MenuItem[] };
+
+      case 'account':
+        return { primary: [authStore.signedIn ? upgradePlan : signInHint], danger: [authStore.signedIn ? signOut : undefined].filter(Boolean) as MenuItem[] };
 
       case 'invite-partner':
-        return { primary: [copyLink, shareLink], danger: [endSession] };
+        return { primary: [openAccount, copyLink, shareLink, authStore.signedIn ? upgradePlan : signInHint], danger: [endSession, authStore.signedIn ? signOut : undefined].filter(Boolean) as MenuItem[] };
 
       case 'partner-notified':
-        return { primary: [copyLink], danger: [cancelInvite] };
+        return { primary: [openAccount, copyLink, authStore.signedIn ? upgradePlan : signInHint], danger: [cancelInvite, authStore.signedIn ? signOut : undefined].filter(Boolean) as MenuItem[] };
 
       case 'select-rendezvous':
-        return { primary: [copyLink, shareLink], danger: [endSession] };
+        return { primary: [openAccount, copyLink, shareLink, authStore.signedIn ? upgradePlan : signInHint], danger: [endSession, authStore.signedIn ? signOut : undefined].filter(Boolean) as MenuItem[] };
 
       case 'partner-agree-refuse':
-        return { primary: [copyLink, shareLink], danger: [endSession] };
+        return { primary: [openAccount, copyLink, shareLink, authStore.signedIn ? upgradePlan : signInHint], danger: [endSession, authStore.signedIn ? signOut : undefined].filter(Boolean) as MenuItem[] };
 
       case 'session-link':
-        return { primary: [copyLink, shareLink], danger: [endSession] };
+        return { primary: [openAccount, copyLink, shareLink, authStore.signedIn ? upgradePlan : signInHint], danger: [endSession, authStore.signedIn ? signOut : undefined].filter(Boolean) as MenuItem[] };
 
       case 'live-tracking':
-        return { primary: [messagePartner, copyLink, shareLink], danger: [endSession] };
+        return { primary: [openAccount, messagePartner, copyLink, shareLink, authStore.signedIn ? upgradePlan : signInHint], danger: [endSession, authStore.signedIn ? signOut : undefined].filter(Boolean) as MenuItem[] };
 
       case 'end-session':
-        return { primary: [copyLink], danger: [] };
+        return { primary: [openAccount, copyLink, authStore.signedIn ? upgradePlan : signInHint], danger: [authStore.signedIn ? signOut : undefined].filter(Boolean) as MenuItem[] };
 
       default:
         return { primary: [], danger: [] };
@@ -216,6 +312,13 @@ export class AppMenu extends LitElement {
     return html`
       <div class="backdrop" @click=${this._dismiss}></div>
       <div class="menu">
+        <div class="section">
+          <div class="account-info">
+            <span class="account-name">${authStore.signedIn ? `Signed in as ${authStore.displayName}` : 'Not signed in yet'}</span>
+            <span class="account-plan ${authStore.membership === 'paid' ? 'paid' : ''}">${billingEnabled ? (authStore.membership === 'paid' ? 'Premium' : 'Free') : 'Free'}</span>
+          </div>
+        </div>
+
         ${s ? html`
           <div class="section">
             <div class="session-info">

@@ -11,6 +11,18 @@ export interface InvitePayload {
     partnerId: string;
 }
 
+export interface InviteResponsePayload {
+    action: 'accept' | 'reject';
+}
+
+export interface PendingInvite {
+    sessionId: string;
+    inviterUserId: string;
+    status: 'pending';
+    createdAt: number;
+    sessionStatus: string | null;
+}
+
 export interface VenueSearchPayload {
     lat1: number; lng1: number;
     lat2: number; lng2: number;
@@ -21,7 +33,13 @@ export const sessionsApi = {
         api.post<{ session: Session }>('/sessions', payload),
 
     invite: (payload: InvitePayload) =>
-        api.post<{ ok: boolean }>('/sessions/invite', payload),
+        api.post<{ ok: boolean; deliveryTargets: number }>('/sessions/invite', payload),
+
+    listPendingInvites: () =>
+        api.get<{ invites: PendingInvite[] }>('/me/invites'),
+
+    respondToInvite: (sessionId: string, payload: InviteResponsePayload) =>
+        api.post<{ ok: boolean; status: 'accepted' | 'rejected'; sessionStatus: string }>(`/sessions/${sessionId}/invite/respond`, payload),
 
     getStatus: (sessionId: string) =>
         api.get<{ session: Session; partner: Partner | null }>(`/sessions/${sessionId}`),

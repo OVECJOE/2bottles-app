@@ -1,5 +1,15 @@
 import { defineConfig } from 'vite';
 import path from 'node:path';
+import net from 'node:net';
+
+// Bun runtime compatibility: Vite's proxy stack expects Node's destroySoon().
+// Bun's socket shim may not implement it yet, so provide a safe fallback.
+if (typeof (net.Socket.prototype as { destroySoon?: () => void }).destroySoon !== 'function') {
+    (net.Socket.prototype as { destroySoon?: () => void }).destroySoon = function destroySoon() {
+        this.end();
+        this.destroy();
+    };
+}
 
 export default defineConfig({
     resolve: {

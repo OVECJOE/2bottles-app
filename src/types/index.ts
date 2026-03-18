@@ -4,6 +4,7 @@ export * from './venue.types';
 
 export type AppScreen =
     | 'create-session'
+    | 'account'             // profile, sign-in, membership
     | 'invite-partner'
     | 'partner-notified'     // waiting for partner response
     | 'partner-rejected'     // partner said no → end session

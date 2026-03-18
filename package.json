@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "patch:vite-bun": "bun scripts/patch-vite-bun.mjs",
+    "postinstall": "bun run patch:vite-bun",
+    "dev": "bun run patch:vite-bun && vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "backend:dev": "cd backend && bun run dev",

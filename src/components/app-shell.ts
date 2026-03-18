@@ -1,9 +1,10 @@
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { uiStore, sessionStore, locationStore } from '../store/index.js';
+import { uiStore, sessionStore, locationStore, authStore } from '../store/index.js';
 import { p2pService } from '../services/p2p.service.js';
 import { Router } from '@vaadin/router';
+import { billingEnabled, usersApi } from '../api/users.api.js';
 
 import './map-view.js';
 import './ui/custom-dialog.js';
@@ -31,10 +32,13 @@ export class AppShell extends LitElement {
     override async firstUpdated() {
         // 1. Initialize stores
         await Promise.all([
+            authStore.init(),
             uiStore.init(),
             sessionStore.init(),
             locationStore.init()
         ]);
+
+        await this._handleBillingReturn();
 
         // 2. Setup Router
         const outlet = this.renderRoot.querySelector('#outlet');
@@ -42,6 +46,7 @@ export class AppShell extends LitElement {
         
         this._router.setRoutes([
             { path: '/', component: 'create-session', action: async () => { await import('./session/create-session.js'); } },
+            { path: '/account', component: 'account-screen', action: async () => { await import('./account/account-screen.js'); } },
             { path: '/invite', component: 'invite-partner', action: async () => { await import('./session/invite-partner.js'); } },
             { path: '/join/:peerId', component: 'partner-invite-received', action: async () => { await import('./partner/partner-invite-received.js'); } },
             { path: '/rejected', component: 'partner-ended', action: async () => { await import('./partner/partner-ended.js'); } },
@@ -74,6 +79,41 @@ export class AppShell extends LitElement {
                 console.warn('[AppShell] Re-connect failed:', err);
             }
         }
+    }
+
+    private async _handleBillingReturn() {
+        const url = new URL(window.location.href);
+        const billing = url.searchParams.get('billing');
+        if (!billing) return;
+
+        if (!billingEnabled) {
+            url.searchParams.delete('billing');
+            const nextNoBilling = `${url.pathname}${url.search}${url.hash}`;
+            window.history.replaceState({}, '', nextNoBilling || '/');
+            return;
+        }
+
+        if (billing === 'success') {
+            uiStore.setLoading(true);
+            try {
+                const entitlements = await usersApi.getEntitlements();
+                if (entitlements.membership === 'paid') {
+                    uiStore.showToast('Payment successful. Paid membership is now active.');
+                } else {
+                    uiStore.showToast('Payment received. Activating membership, please refresh in a moment.');
+                }
+            } catch {
+                uiStore.showToast('Payment received. We are confirming your membership.');
+            } finally {
+                uiStore.setLoading(false);
+            }
+        } else if (billing === 'cancel') {
+            uiStore.showToast('Checkout cancelled. You can try again anytime.');
+        }
+
+        url.searchParams.delete('billing');
+        const next = `${url.pathname}${url.search}${url.hash}`;
+        window.history.replaceState({}, '', next || '/');
     }
 
     override disconnectedCallback() {

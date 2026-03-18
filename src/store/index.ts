@@ -11,14 +11,17 @@ import { createContext } from '@lit/context';
 export { sessionStore } from './session.store.js';
 export { locationStore } from './location.store.js';
 export { uiStore } from './ui.store.js';
+export { authStore } from './auth.store.js';
 
 import { sessionStore } from './session.store.js';
 import { locationStore } from './location.store.js';
 import { uiStore } from './ui.store.js';
+import { authStore } from './auth.store.js';
 
 export type SessionStoreType = typeof sessionStore;
 export type LocationStoreType = typeof locationStore;
 export type UIStoreType = typeof uiStore;
+export type AuthStoreType = typeof authStore;
 
 // Provide the singleton instances as the initial (default) value
 // for each context. This means @consume fields are never null —
@@ -27,3 +30,4 @@ export type UIStoreType = typeof uiStore;
 export const sessionContext = createContext<SessionStoreType>('2b:session');
 export const locationContext = createContext<LocationStoreType>('2b:location');
 export const uiContext = createContext<UIStoreType>('2b:ui');
+export const authContext = createContext<AuthStoreType>('2b:auth');

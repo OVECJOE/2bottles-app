@@ -10,7 +10,9 @@
   "dependencies": {
     "hono": "^4.8.0",
     "postgres": "^3.4.5",
-    "redis": "^5.11.0"
+    "redis": "^5.11.0",
+    "stripe": "^18.0.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/bun": "latest",

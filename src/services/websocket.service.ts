@@ -12,6 +12,7 @@
  *   session:end        { sessionId }
  */
 import { locationStore, sessionStore, uiStore } from '../store/index.js';
+import { getAuthToken, getAuthUserIdFromToken } from '../api/client.js';
 import type { PartnerStatus, SessionStatus } from '../types/index.js';
 
 type WSMessage =
@@ -22,7 +23,10 @@ type WSMessage =
     | { type: 'session:venue'; venueId: string }
     | { type: 'presence:update'; sessionId: string; participants: Array<{ userId: string; name?: string; online: boolean }> }
     | { type: 'chat:message'; userId: string; text: string; ts: number; id: string }
+    | { type: 'invite:update'; action: 'created' | 'accepted' | 'rejected'; sessionId: string; partnerUserId: string; inviterUserId: string; ts: number }
     | { type: 'pong'; ts: number };
+
+type InviteUpdateHandler = (msg: Extract<WSMessage, { type: 'invite:update' }>) => void;
 
 class WebSocketService {
     private _ws: WebSocket | null = null;
@@ -31,6 +35,11 @@ class WebSocketService {
     private _reconnectAttempts = 0;
     private _locationInterval: ReturnType<typeof setInterval> | null = null;
     private _pingInterval: ReturnType<typeof setInterval> | null = null;
+    private _inviteWs: WebSocket | null = null;
+    private _inviteReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    private _inviteReconnectAttempts = 0;
+    private _inviteUserId: string | null = null;
+    private _inviteListeners = new Set<InviteUpdateHandler>();
 
     private _wsBaseUrl() {
         const explicit = import.meta.env.VITE_WS_URL as string | undefined;
@@ -47,6 +56,18 @@ class WebSocketService {
         this._open();
     }
 
+    connectInviteChannel(userId?: string) {
+        if (this._inviteWs?.readyState === WebSocket.OPEN) return;
+        this._inviteUserId = userId || this._resolveUserId();
+        this._inviteReconnectAttempts = 0;
+        this._openInviteChannel();
+    }
+
+    subscribeInviteUpdates(handler: InviteUpdateHandler): () => void {
+        this._inviteListeners.add(handler);
+        return () => this._inviteListeners.delete(handler);
+    }
+
     disconnect() {
         if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
         if (this._locationInterval) clearInterval(this._locationInterval);
@@ -56,24 +77,32 @@ class WebSocketService {
         this._sessionId = null;
     }
 
+    disconnectInviteChannel() {
+        if (this._inviteReconnectTimer) clearTimeout(this._inviteReconnectTimer);
+        this._inviteWs?.close(1000, 'invite channel closed');
+        this._inviteWs = null;
+    }
+
     sendLocation(lat: number, lng: number) {
         this._send({
             type: 'location:update',
             lat,
             lng,
             sessionId: this._sessionId,
-            userId: sessionStore.session?.id || 'anonymous',
+            userId: this._resolveUserId(),
             ts: Date.now(),
         });
     }
 
     private _open() {
         const base = this._wsBaseUrl().replace(/\/$/, '');
-        const userId = sessionStore.session?.id || 'anonymous';
+        const userId = this._resolveUserId();
         const name = encodeURIComponent(sessionStore.ownName || 'Guest');
+        const token = getAuthToken();
+        const tokenQuery = token ? `&token=${encodeURIComponent(token)}` : '';
 
         // New backend endpoint format.
-        const nextUrl = `${base}/ws?sessionId=${encodeURIComponent(String(this._sessionId || ''))}&userId=${encodeURIComponent(userId)}&name=${name}`;
+        const nextUrl = `${base}/ws?sessionId=${encodeURIComponent(String(this._sessionId || ''))}&userId=${encodeURIComponent(userId)}&name=${name}${tokenQuery}`;
         // Legacy endpoint fallback for older servers.
         const legacyUrl = `${base}/ws/${this._sessionId}`;
         const url = import.meta.env.VITE_WS_LEGACY === 'true' ? legacyUrl : nextUrl;
@@ -103,6 +132,52 @@ class WebSocketService {
         this._ws.onerror = () => {
             this._ws?.close();
         };
+    }
+
+    private _resolveUserId(): string {
+        return getAuthUserIdFromToken() || 'guest';
+    }
+
+    private _openInviteChannel() {
+        const base = this._wsBaseUrl().replace(/\/$/, '');
+        const token = getAuthToken();
+        const userId = this._inviteUserId || this._resolveUserId();
+        const tokenQuery = token ? `&token=${encodeURIComponent(token)}` : '';
+        const url = `${base}/ws/invites?userId=${encodeURIComponent(userId)}${tokenQuery}`;
+
+        this._inviteWs = new WebSocket(url);
+
+        this._inviteWs.onopen = () => {
+            this._inviteReconnectAttempts = 0;
+        };
+
+        this._inviteWs.onmessage = (e) => {
+            try {
+                const msg = JSON.parse(e.data) as WSMessage;
+                if (msg.type === 'invite:update') {
+                    for (const listener of this._inviteListeners.values()) {
+                        listener(msg);
+                    }
+                }
+            } catch {
+                console.warn('[WS] Invalid invite message', e.data);
+            }
+        };
+
+        this._inviteWs.onclose = (e) => {
+            if (e.code !== 1000) this._scheduleInviteReconnect();
+        };
+
+        this._inviteWs.onerror = () => {
+            this._inviteWs?.close();
+        };
+    }
+
+    private _scheduleInviteReconnect() {
+        if (this._inviteReconnectAttempts >= 5) return;
+        const delay = Math.min(1000 * 2 ** this._inviteReconnectAttempts, 30_000);
+        this._inviteReconnectAttempts++;
+        this._inviteReconnectTimer = setTimeout(() => this._openInviteChannel(), delay);
     }
 
     /** Broadcast own location every 4 seconds while connected */

@@ -1,13 +1,17 @@
 import { LitElement, html, css } from 'lit';
-import { customElement } from 'lit/decorators.js';
-import { sessionStore, uiStore } from '../../store/index.js';
+import { customElement, state } from 'lit/decorators.js';
+import { sessionStore, uiStore, authStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
 import { copyText } from '../../services/clipboard.service.js';
+import { sessionsApi } from '../../api/sessions.api.js';
 import { sharedStyles } from '../../styles/shared-styles.js';
 import '../ui/screen-shell.js';
 
 @customElement('invite-partner')
 export class InvitePartner extends LitElement {
+  @state() private _partnerId = '';
+  @state() private _inviting = false;
+
   static override styles = [
     sharedStyles,
     css`
@@ -157,6 +161,31 @@ export class InvitePartner extends LitElement {
     }
   }
 
+  private async _sendInAppInvite() {
+    if (!authStore.signedIn) {
+      uiStore.showToast('Sign in from Account before sending direct invites.');
+      return;
+    }
+
+    const sessionId = sessionStore.session?.id;
+    const partnerId = this._partnerId.trim();
+    if (!sessionId || partnerId.length < 2) {
+      uiStore.showToast('Enter a valid partner ID first.');
+      return;
+    }
+
+    this._inviting = true;
+    try {
+      const res = await sessionsApi.invite({ sessionId, partnerId });
+      uiStore.showToast(`Invite sent. ${res.deliveryTargets} notification target(s).`);
+    } catch (err) {
+      console.error('[InvitePartner] In-app invite failed:', err);
+      uiStore.showToast('Could not send invite right now.');
+    } finally {
+      this._inviting = false;
+    }
+  }
+
   override render() {
     const link = sessionStore.session?.link ?? 'Initializing...';
 
@@ -185,6 +214,17 @@ export class InvitePartner extends LitElement {
                   </div>
                   <button class="btn btn-primary" @click=${this._shareLink}>
                       Copy & Share Link
+                  </button>
+
+                  <input
+                    type="text"
+                    class="input-base name-input"
+                    placeholder="Partner User ID"
+                    .value=${this._partnerId}
+                    @input=${(e: Event) => { this._partnerId = (e.target as HTMLInputElement).value; }}
+                  />
+                  <button class="btn btn-ghost" ?disabled=${this._inviting} @click=${this._sendInAppInvite}>
+                    ${this._inviting ? 'Sending...' : 'Send In-App Invite'}
                   </button>
               </div>
 

@@ -110,13 +110,22 @@ self.addEventListener('push', (event) => {
 // ----------------------------------------------------------
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
+    const data = event.notification.data as { url?: string; type?: string } | undefined;
+    const targetPath = data?.url && data.url.startsWith(self.location.origin)
+        ? new URL(data.url).pathname
+        : '/';
+
     event.waitUntil(
         self.clients
             .matchAll({ type: 'window', includeUncontrolled: true })
             .then((clients) => {
                 const existing = clients.find((c) => c.url.startsWith(self.location.origin));
-                if (existing) return existing.focus();
-                return self.clients.openWindow('/');
+                if (existing) {
+                    const focused = existing.focus();
+                    focused.then((client) => client?.navigate(targetPath)).catch(() => undefined);
+                    return focused;
+                }
+                return self.clients.openWindow(targetPath);
             })
     );
 });

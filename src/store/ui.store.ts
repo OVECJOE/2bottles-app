@@ -70,6 +70,7 @@ class UIStore {
         let path = '/';
         switch (screen) {
             case 'create-session': path = '/'; break;
+            case 'account': path = '/account'; break;
             case 'invite-partner': path = '/invite'; break;
             case 'partner-notified': path = `/join/${params?.peerId || ''}`; break;
             case 'partner-rejected': path = '/rejected'; break;
@@ -88,6 +89,7 @@ class UIStore {
 
     // Convenience aliases
     goToInvite() { this.navigate('invite-partner'); }
+    goToAccount() { this.navigate('account'); }
     goToPartnerNotified(peerId: string) { this.navigate('partner-notified', { peerId }); }
     goToRejected() { this.navigate('partner-rejected'); }
     goToSelectVenue() { this.navigate('select-rendezvous'); }

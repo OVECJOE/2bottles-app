@@ -4,6 +4,34 @@ export type MembershipTier = 'free' | 'paid';
 export type SessionStatus = 'pending_partner' | 'selecting_venue' | 'pending_agreement' | 'agreed' | 'live' | 'ended';
 export type SessionEventType = 'session:status' | 'session:venue';
 export type SessionRole = 'owner' | 'member';
+export type InviteStatus = 'pending' | 'accepted' | 'rejected';
+
+export interface DbNotificationSubscriptionPayload {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys?: {
+    p256dh?: string;
+    auth?: string;
+  };
+}
+
+export interface DbNotificationSubscriptionRecord {
+  endpoint: string;
+  userId: string;
+  createdAt: number;
+  updatedAt: number;
+  payload: DbNotificationSubscriptionPayload;
+}
+
+export interface DbInviteRecord {
+  sessionId: string;
+  inviterUserId: string;
+  partnerUserId: string;
+  status: InviteStatus;
+  createdAt: number;
+  updatedAt: number;
+  respondedAt?: number;
+}
 
 export interface DbSessionRecord {
   id: string;
@@ -49,6 +77,323 @@ export async function readMembershipTier(userId: string): Promise<MembershipTier
   if (!sql) return null;
   const rows = await sql<{ tier: MembershipTier }[]>`SELECT tier FROM memberships WHERE user_id = ${userId} LIMIT 1`;
   return rows[0]?.tier ?? null;
+}
+
+export async function upsertDbMembershipTier(
+  userId: string,
+  tier: MembershipTier,
+  provider: string,
+  providerRef: string | null,
+): Promise<void> {
+  if (!sql) return;
+
+  await sql.begin(async (tx: any) => {
+    await tx`
+      INSERT INTO users (id, display_name)
+      VALUES (${userId}, NULL)
+      ON CONFLICT (id) DO NOTHING
+    `;
+
+    await tx`
+      INSERT INTO memberships (user_id, tier, paid_at, provider, provider_ref, updated_at)
+      VALUES (
+        ${userId},
+        ${tier},
+        ${tier === 'paid' ? tx`NOW()` : null},
+        ${provider},
+        ${providerRef},
+        NOW()
+      )
+      ON CONFLICT (user_id)
+      DO UPDATE SET
+        tier = EXCLUDED.tier,
+        paid_at = CASE
+          WHEN EXCLUDED.tier = 'paid' THEN COALESCE(memberships.paid_at, NOW())
+          ELSE NULL
+        END,
+        provider = EXCLUDED.provider,
+        provider_ref = EXCLUDED.provider_ref,
+        updated_at = NOW()
+    `;
+  });
+}
+
+export async function recordDbPaymentWebhookEvent(
+  provider: string,
+  eventId: string,
+  eventType: string,
+  userId: string | null,
+  providerRef: string | null,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  if (!sql) return true;
+
+  const rows = await sql<{ inserted: number }[]>`
+    INSERT INTO payment_webhook_events (provider, event_id, event_type, user_id, provider_ref, payload)
+    VALUES (${provider}, ${eventId}, ${eventType}, ${userId}, ${providerRef}, ${JSON.stringify(payload)}::jsonb)
+    ON CONFLICT (provider, event_id) DO NOTHING
+    RETURNING 1 as inserted
+  `;
+
+  return rows.length > 0;
+}
+
+export async function upsertDbNotificationSubscription(
+  userId: string,
+  payload: DbNotificationSubscriptionPayload,
+): Promise<DbNotificationSubscriptionRecord | null> {
+  if (!sql) return null;
+
+  await sql.begin(async (tx: any) => {
+    await tx`
+      INSERT INTO users (id, display_name)
+      VALUES (${userId}, NULL)
+      ON CONFLICT (id) DO NOTHING
+    `;
+
+    await tx`
+      INSERT INTO notification_subscriptions (
+        endpoint,
+        user_id,
+        expiration_time_ms,
+        p256dh,
+        auth,
+        payload
+      ) VALUES (
+        ${payload.endpoint},
+        ${userId},
+        ${payload.expirationTime ?? null},
+        ${payload.keys?.p256dh ?? null},
+        ${payload.keys?.auth ?? null},
+        ${JSON.stringify(payload)}::jsonb
+      )
+      ON CONFLICT (endpoint)
+      DO UPDATE SET
+        user_id = EXCLUDED.user_id,
+        expiration_time_ms = EXCLUDED.expiration_time_ms,
+        p256dh = EXCLUDED.p256dh,
+        auth = EXCLUDED.auth,
+        payload = EXCLUDED.payload,
+        updated_at = NOW()
+    `;
+  });
+
+  const rows = await sql<{
+    endpoint: string;
+    user_id: string;
+    created_at: Date;
+    updated_at: Date;
+    payload: unknown;
+  }[]>`
+    SELECT endpoint, user_id, created_at, updated_at, payload
+    FROM notification_subscriptions
+    WHERE endpoint = ${payload.endpoint}
+    LIMIT 1
+  `;
+
+  const row = rows[0];
+  if (!row) return null;
+  const parsedPayload = typeof row.payload === 'object' && row.payload && !Array.isArray(row.payload)
+    ? row.payload as Record<string, unknown>
+    : {};
+
+  return {
+    endpoint: row.endpoint,
+    userId: row.user_id,
+    createdAt: new Date(row.created_at).getTime(),
+    updatedAt: new Date(row.updated_at).getTime(),
+    payload: {
+      endpoint: String(parsedPayload.endpoint ?? row.endpoint),
+      expirationTime: typeof parsedPayload.expirationTime === 'number' ? parsedPayload.expirationTime : null,
+      keys: {
+        p256dh: typeof parsedPayload.keys === 'object' && parsedPayload.keys && !Array.isArray(parsedPayload.keys)
+          && typeof (parsedPayload.keys as Record<string, unknown>).p256dh === 'string'
+          ? (parsedPayload.keys as Record<string, string>).p256dh
+          : undefined,
+        auth: typeof parsedPayload.keys === 'object' && parsedPayload.keys && !Array.isArray(parsedPayload.keys)
+          && typeof (parsedPayload.keys as Record<string, unknown>).auth === 'string'
+          ? (parsedPayload.keys as Record<string, string>).auth
+          : undefined,
+      },
+    },
+  };
+}
+
+export async function removeDbNotificationSubscription(userId: string, endpoint: string): Promise<boolean> {
+  if (!sql) return false;
+  const rows = await sql<{ endpoint: string }[]>`
+    DELETE FROM notification_subscriptions
+    WHERE endpoint = ${endpoint} AND user_id = ${userId}
+    RETURNING endpoint
+  `;
+  return rows.length > 0;
+}
+
+export async function listDbNotificationSubscriptionsForUser(userId: string): Promise<DbNotificationSubscriptionRecord[]> {
+  if (!sql) return [];
+  const rows = await sql<{
+    endpoint: string;
+    user_id: string;
+    created_at: Date;
+    updated_at: Date;
+    payload: unknown;
+  }[]>`
+    SELECT endpoint, user_id, created_at, updated_at, payload
+    FROM notification_subscriptions
+    WHERE user_id = ${userId}
+    ORDER BY updated_at DESC
+  `;
+
+  return rows.map((row) => {
+    const parsedPayload = typeof row.payload === 'object' && row.payload && !Array.isArray(row.payload)
+      ? row.payload as Record<string, unknown>
+      : {};
+    return {
+      endpoint: row.endpoint,
+      userId: row.user_id,
+      createdAt: new Date(row.created_at).getTime(),
+      updatedAt: new Date(row.updated_at).getTime(),
+      payload: {
+        endpoint: String(parsedPayload.endpoint ?? row.endpoint),
+        expirationTime: typeof parsedPayload.expirationTime === 'number' ? parsedPayload.expirationTime : null,
+        keys: {
+          p256dh: typeof parsedPayload.keys === 'object' && parsedPayload.keys && !Array.isArray(parsedPayload.keys)
+            && typeof (parsedPayload.keys as Record<string, unknown>).p256dh === 'string'
+            ? (parsedPayload.keys as Record<string, string>).p256dh
+            : undefined,
+          auth: typeof parsedPayload.keys === 'object' && parsedPayload.keys && !Array.isArray(parsedPayload.keys)
+            && typeof (parsedPayload.keys as Record<string, unknown>).auth === 'string'
+            ? (parsedPayload.keys as Record<string, string>).auth
+            : undefined,
+        },
+      },
+    };
+  });
+}
+
+export async function upsertDbInvite(sessionId: string, inviterUserId: string, partnerUserId: string): Promise<DbInviteRecord | null> {
+  if (!sql) return null;
+
+  await sql.begin(async (tx: any) => {
+    await tx`
+      INSERT INTO users (id, display_name)
+      VALUES (${inviterUserId}, NULL)
+      ON CONFLICT (id) DO NOTHING
+    `;
+    await tx`
+      INSERT INTO users (id, display_name)
+      VALUES (${partnerUserId}, NULL)
+      ON CONFLICT (id) DO NOTHING
+    `;
+
+    await tx`
+      INSERT INTO session_invites (session_id, inviter_user_id, partner_user_id, status)
+      VALUES (${sessionId}, ${inviterUserId}, ${partnerUserId}, 'pending')
+      ON CONFLICT (session_id, partner_user_id)
+      DO UPDATE SET
+        inviter_user_id = EXCLUDED.inviter_user_id,
+        status = 'pending',
+        responded_at = NULL,
+        updated_at = NOW()
+    `;
+  });
+
+  return getDbInvite(sessionId, partnerUserId);
+}
+
+export async function getDbInvite(sessionId: string, partnerUserId: string): Promise<DbInviteRecord | null> {
+  if (!sql) return null;
+  const rows = await sql<{
+    session_id: string;
+    inviter_user_id: string;
+    partner_user_id: string;
+    status: InviteStatus;
+    created_at: Date;
+    updated_at: Date;
+    responded_at: Date | null;
+  }[]>`
+    SELECT session_id, inviter_user_id, partner_user_id, status, created_at, updated_at, responded_at
+    FROM session_invites
+    WHERE session_id = ${sessionId} AND partner_user_id = ${partnerUserId}
+    LIMIT 1
+  `;
+
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    sessionId: row.session_id,
+    inviterUserId: row.inviter_user_id,
+    partnerUserId: row.partner_user_id,
+    status: row.status,
+    createdAt: new Date(row.created_at).getTime(),
+    updatedAt: new Date(row.updated_at).getTime(),
+    respondedAt: row.responded_at ? new Date(row.responded_at).getTime() : undefined,
+  };
+}
+
+export async function listDbInvitesForPartner(partnerUserId: string, status: InviteStatus = 'pending'): Promise<DbInviteRecord[]> {
+  if (!sql) return [];
+  const rows = await sql<{
+    session_id: string;
+    inviter_user_id: string;
+    partner_user_id: string;
+    status: InviteStatus;
+    created_at: Date;
+    updated_at: Date;
+    responded_at: Date | null;
+  }[]>`
+    SELECT session_id, inviter_user_id, partner_user_id, status, created_at, updated_at, responded_at
+    FROM session_invites
+    WHERE partner_user_id = ${partnerUserId}
+      AND status = ${status}
+    ORDER BY updated_at DESC
+  `;
+
+  return rows.map((row) => ({
+    sessionId: row.session_id,
+    inviterUserId: row.inviter_user_id,
+    partnerUserId: row.partner_user_id,
+    status: row.status,
+    createdAt: new Date(row.created_at).getTime(),
+    updatedAt: new Date(row.updated_at).getTime(),
+    respondedAt: row.responded_at ? new Date(row.responded_at).getTime() : undefined,
+  }));
+}
+
+export async function respondDbInvite(
+  sessionId: string,
+  partnerUserId: string,
+  decision: Exclude<InviteStatus, 'pending'>,
+): Promise<DbInviteRecord | null> {
+  if (!sql) return null;
+  const rows = await sql<{
+    session_id: string;
+    inviter_user_id: string;
+    partner_user_id: string;
+    status: InviteStatus;
+    created_at: Date;
+    updated_at: Date;
+    responded_at: Date | null;
+  }[]>`
+    UPDATE session_invites
+    SET status = ${decision}, responded_at = NOW(), updated_at = NOW()
+    WHERE session_id = ${sessionId}
+      AND partner_user_id = ${partnerUserId}
+      AND status = 'pending'
+    RETURNING session_id, inviter_user_id, partner_user_id, status, created_at, updated_at, responded_at
+  `;
+
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    sessionId: row.session_id,
+    inviterUserId: row.inviter_user_id,
+    partnerUserId: row.partner_user_id,
+    status: row.status,
+    createdAt: new Date(row.created_at).getTime(),
+    updatedAt: new Date(row.updated_at).getTime(),
+    respondedAt: row.responded_at ? new Date(row.responded_at).getTime() : undefined,
+  };
 }
 
 export async function createDbSession(ownerUserId: string, ownerName: string | undefined, maxParticipants: number): Promise<DbSessionRecord | null> {

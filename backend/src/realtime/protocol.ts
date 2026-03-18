@@ -19,6 +19,7 @@ export type ServerToClientMessage =
 export interface SocketContext {
   socketId: string;
   requestId?: string;
+  channel?: 'session' | 'invites';
   userId: string;
   sessionId: string;
   name?: string;

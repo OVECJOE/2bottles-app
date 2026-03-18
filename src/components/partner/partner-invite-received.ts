@@ -2,6 +2,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
+import { sessionsApi } from '../../api/sessions.api.js';
 import { sharedStyles } from '../../styles/shared-styles.js';
 import type { BeforeEnterObserver, RouterLocation } from '@vaadin/router';
 import '../ui/screen-shell.js';
@@ -85,6 +86,11 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
   private async _accept() {
     this._accepting = true;
     try {
+      const sessionId = sessionStore.session?.id;
+      if (sessionId) {
+        await sessionsApi.respondToInvite(sessionId, { action: 'accept' }).catch(() => undefined);
+      }
+
       // 1. Share info
       if (this._name) {
         sessionStore.setOwnName(this._name);
@@ -112,6 +118,10 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
   }
 
   private _decline() {
+    const sessionId = sessionStore.session?.id;
+    if (sessionId) {
+      void sessionsApi.respondToInvite(sessionId, { action: 'reject' }).catch(() => undefined);
+    }
     p2pService.send({ type: 'partner:status', status: 'rejected' });
     p2pService.disconnect();
     sessionStore.endSession();

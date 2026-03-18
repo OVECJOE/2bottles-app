@@ -73,6 +73,17 @@ export class SessionStore {
     return true;
   }
 
+  setStatus(id: string, status: SessionStatus) {
+    const session = this.sessions.get(id);
+    if (!session) return false;
+    session.status = status;
+    if (status === 'ended') {
+      session.endedAt = Date.now();
+    }
+    this.sessions.set(id, session);
+    return true;
+  }
+
   getRole(id: string, userId: string): SessionRole | null {
     const session = this.sessions.get(id);
     if (!session) return null;
