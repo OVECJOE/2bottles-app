@@ -103,6 +103,32 @@ export class LocationInput extends LitElement {
       font-size: var(--text-sm); color: var(--color-text-muted); text-align: center;
     }
 
+    .loading-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      padding: var(--space-4);
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
+    }
+
+    .loading-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-blue);
+      animation: dot-blink 1.2s infinite ease-in-out;
+    }
+
+    .loading-dot:nth-child(2) { animation-delay: 0.15s; }
+    .loading-dot:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes dot-blink {
+      0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+      40% { opacity: 1; transform: scale(1); }
+    }
+
     .scope-row {
       display: flex;
       gap: var(--space-2);
@@ -154,15 +180,17 @@ export class LocationInput extends LitElement {
   private async _search(val: string) {
     if (!val.trim() || val.trim().length < 3) {
       this._suggestions = [];
+      this._loading = false;
       this._open = false;
       return;
     }
 
     if (this._debounceTimer) clearTimeout(this._debounceTimer);
+    this._loading = true;
+    this._open = true;
+
     this._debounceTimer = setTimeout(async () => {
         this._lastQuery = val;
-        this._loading = true;
-        this._open = true;
 
         try {
             if (this._scope === 'nearby' && !this._nearbyCenter) {
@@ -300,9 +328,16 @@ export class LocationInput extends LitElement {
                 <div class="sugg-full">${s.displayName}</div>
               </div>
             </div>
-          `) : !this._loading ? html`
+          `) : this._loading ? html`
+            <div class="loading-row" aria-live="polite">
+              <span>Searching</span>
+              <span class="loading-dot"></span>
+              <span class="loading-dot"></span>
+              <span class="loading-dot"></span>
+            </div>
+          ` : html`
             <div class="empty">No results found</div>
-          ` : ''}
+          `}
         </div>
       ` : ''}
     `;
