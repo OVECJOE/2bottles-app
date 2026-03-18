@@ -1,13 +1,7 @@
 const NOMINATIM_ENDPOINT = (import.meta.env.VITE_NOMINATIM_ENDPOINT as string | undefined) || '/api/nominatim';
 const PHOTON_ENDPOINT = (import.meta.env.VITE_PHOTON_ENDPOINT as string | undefined) || '/api/photon';
-const OVERPASS_ENDPOINTS = ((import.meta.env.VITE_OVERPASS_ENDPOINTS as string | undefined)
-    ?.split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)) || [
-    '/api/overpass-main/api/interpreter',
-    '/api/overpass-kumi/api/interpreter',
-    '/api/overpass-lz4/api/interpreter',
-];
+const GEOAPIFY_ENDPOINT = (import.meta.env.VITE_GEOAPIFY_ENDPOINT as string | undefined) || 'https://api.geoapify.com/v2/places';
+const GEOAPIFY_API_KEY = (import.meta.env.VITE_GEOAPIFY_API_KEY as string | undefined) || '';
 const ROUTING_ENDPOINT = (import.meta.env.VITE_ROUTING_ENDPOINT as string | undefined) || '/api/route';
 const NOMINATIM_MIN_INTERVAL_MS = Number(import.meta.env.VITE_NOMINATIM_MIN_INTERVAL_MS ?? 1200);
 const NOMINATIM_CACHE_TTL_MS = 2 * 60 * 1000;
@@ -15,7 +9,7 @@ const PHOTON_CACHE_TTL_MS = 2 * 60 * 1000;
 const REVERSE_CACHE_TTL_MS = 5 * 60 * 1000;
 const NOMINATIM_HARD_COOLDOWN_MS = 45 * 1000;
 const VENUE_SUGGESTION_CACHE_TTL_MS = 2 * 60 * 1000;
-const OVERPASS_CANDIDATE_CACHE_TTL_MS = 2 * 60 * 1000;
+const GEOAPIFY_CANDIDATE_CACHE_TTL_MS = 2 * 60 * 1000;
 const ROUTE_METRICS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 import type { Venue } from '../types/venue.types.js';
@@ -47,8 +41,8 @@ const _reverseInflight = new Map<string, Promise<string>>();
 let _reverseCooldownUntil = 0;
 let _nominatimHardCooldownUntil = 0;
 const _venueSuggestionCache = new Map<string, { expiry: number; data: Venue[] }>();
-const _overpassCandidateCache = new Map<string, { expiry: number; data: Venue[] }>();
-const _overpassEndpointCooldownUntil = new Map<string, number>();
+const _geoapifyCandidateCache = new Map<string, { expiry: number; data: Venue[] }>();
+let _geoapifyCooldownUntil = 0;
 const _routeMetricsCache = new Map<string, { expiry: number; data: RouteMetrics }>();
 
 interface RouteMetrics {
@@ -305,14 +299,18 @@ function photonToSuggestion(r: PhotonResult): GeocodeSuggestion {
     };
 }
 
-interface OverpassResponse {
-    elements?: Array<{
-        type?: string;
-        id?: number;
-        lat?: number;
-        lon?: number;
-        center?: { lat?: number; lon?: number };
-        tags?: Record<string, string>;
+interface GeoapifyResponse {
+    features?: Array<{
+        properties?: {
+            place_id?: string;
+            name?: string;
+            formatted?: string;
+            categories?: string[];
+            datasource?: { raw?: Record<string, string> };
+        };
+        geometry?: {
+            coordinates?: [number, number];
+        };
     }>;
 }
 
@@ -589,27 +587,6 @@ function makeVenueDedupeKey(name: string, lat: number, lng: number): string {
     return `${normalizeVenueName(name)}_${lat.toFixed(4)}_${lng.toFixed(4)}`;
 }
 
-function inferCategoryFromTags(tags: Record<string, string>, fallback = 'place'): string {
-    const amenity = tags.amenity;
-    if (amenity) return amenity;
-    if (tags.leisure) return tags.leisure;
-    if (tags.shop) return tags.shop;
-    if (tags.tourism) return tags.tourism;
-    if (tags.office) return tags.office;
-    return fallback;
-}
-
-function extractOverpassCoord(el: {
-    lat?: number;
-    lon?: number;
-    center?: { lat?: number; lon?: number };
-}): { lat: number; lng: number } | null {
-    const lat = Number(el.lat ?? el.center?.lat);
-    const lng = Number(el.lon ?? el.center?.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng };
-}
-
 async function fetchRouteMetrics(from: Coordinates, to: Coordinates): Promise<RouteMetrics | null> {
     const key = `${from.lat.toFixed(5)},${from.lng.toFixed(5)}|${to.lat.toFixed(5)},${to.lng.toFixed(5)}`;
     const cached = _routeMetricsCache.get(key);
@@ -646,128 +623,101 @@ async function fetchRouteMetrics(from: Coordinates, to: Coordinates): Promise<Ro
     }
 }
 
-async function fetchOverpassJson(query: string): Promise<OverpassResponse> {
-    let lastError: unknown;
-
-    const now = Date.now();
-    const endpoints = OVERPASS_ENDPOINTS
-        .map((endpoint) => ({ endpoint, cooldownUntil: _overpassEndpointCooldownUntil.get(endpoint) ?? 0 }))
-        .sort((a, b) => a.cooldownUntil - b.cooldownUntil);
-
-    for (const item of endpoints) {
-        const endpoint = item.endpoint;
-        if (item.cooldownUntil > now) continue;
-
-        try {
-            const body = new URLSearchParams({ data: query });
-            const res = await withTimeout(
-                fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-                    body,
-                }),
-                10000,
-                'overpass',
-            );
-
-            if (res.status === 429) {
-                _overpassEndpointCooldownUntil.set(endpoint, Date.now() + 35_000);
-                lastError = new Error(`overpass-rate-limited:${endpoint}`);
-                continue;
-            }
-            if (res.status === 504 || res.status === 503 || res.status === 502) {
-                _overpassEndpointCooldownUntil.set(endpoint, Date.now() + 20_000);
-                lastError = new Error(`overpass-gateway-timeout:${endpoint}`);
-                continue;
-            }
-            if (!res.ok) {
-                lastError = new Error(`overpass-http-${res.status}:${endpoint}`);
-                continue;
-            }
-
-            const payload = await res.json() as OverpassResponse;
-            if (Array.isArray(payload.elements)) {
-                _overpassEndpointCooldownUntil.set(endpoint, 0);
-                return payload;
-            }
-            lastError = new Error('overpass-invalid-payload');
-        } catch (err) {
-            _overpassEndpointCooldownUntil.set(endpoint, Date.now() + 10_000);
-            lastError = err;
-        }
-    }
-
-    throw lastError instanceof Error ? lastError : new Error('overpass-unavailable');
+function categoryFromGeoapify(categories: string[] | undefined): string {
+    if (!categories || categories.length === 0) return 'place';
+    const joined = categories.join(',');
+    if (joined.includes('catering.cafe')) return 'cafe';
+    if (joined.includes('catering.restaurant')) return 'restaurant';
+    if (joined.includes('catering.bar')) return 'bar';
+    if (joined.includes('leisure.park')) return 'park';
+    if (joined.includes('leisure.garden')) return 'garden';
+    if (joined.includes('commercial.supermarket')) return 'supermarket';
+    if (joined.includes('commercial.shopping_mall')) return 'mall';
+    if (joined.includes('accommodation.')) return 'hotel';
+    return categories[0].split('.').pop() || 'place';
 }
 
-async function fetchOverpassCandidates(center: { lat: number; lng: number }, radiusM: number): Promise<Venue[]> {
-    const radius = Math.max(900, Math.min(8000, Math.round(radiusM)));
-    const cacheKey = `${center.lat.toFixed(3)}|${center.lng.toFixed(3)}|${radius}`;
-    const cached = _overpassCandidateCache.get(cacheKey);
-    if (cached && cached.expiry > Date.now()) return cached.data;
-
-    const primaryQuery = `[out:json][timeout:12];
-(
-  nwr(around:${radius},${center.lat},${center.lng})[name]["amenity"~"cafe|restaurant|bar|pub|fast_food|food_court|ice_cream"];
-  nwr(around:${radius},${center.lat},${center.lng})[name]["leisure"~"park|garden|playground|recreation_ground"];
-);
-out center tags 160;`;
-
-    const secondaryQuery = `[out:json][timeout:12];
-(
-  nwr(around:${radius},${center.lat},${center.lng})[name]["shop"~"mall|supermarket|convenience"];
-  nwr(around:${radius},${center.lat},${center.lng})[name]["tourism"~"hotel|guest_house|hostel"];
-);
-out center tags 120;`;
-
-    const [primary, secondary] = await Promise.allSettled([
-        fetchOverpassJson(primaryQuery),
-        fetchOverpassJson(secondaryQuery),
-    ]);
-
-    const elements = [
-        ...(primary.status === 'fulfilled' ? (primary.value.elements ?? []) : []),
-        ...(secondary.status === 'fulfilled' ? (secondary.value.elements ?? []) : []),
-    ];
-
-    if (elements.length === 0) {
-        throw new Error('overpass-empty-or-unavailable');
+async function fetchGeoapifyCandidates(
+    center: { lat: number; lng: number },
+    radiusM: number,
+): Promise<Venue[]> {
+    if (!GEOAPIFY_API_KEY) {
+        throw new Error('Missing VITE_GEOAPIFY_API_KEY');
     }
 
+    if (Date.now() < _geoapifyCooldownUntil) {
+        throw new Error('geoapify-cooldown');
+    }
+
+    const radius = Math.max(800, Math.min(20000, Math.round(radiusM)));
+    const cacheKey = `${center.lat.toFixed(3)}|${center.lng.toFixed(3)}|${radius}`;
+    const cached = _geoapifyCandidateCache.get(cacheKey);
+    if (cached && cached.expiry > Date.now()) return cached.data;
+
+    const params = new URLSearchParams({
+        categories: [
+            'catering.cafe',
+            'catering.restaurant',
+            'catering.bar',
+            'leisure.park',
+            'leisure.garden',
+            'commercial.supermarket',
+            'commercial.shopping_mall',
+            'accommodation.hotel',
+        ].join(','),
+        filter: `circle:${center.lng},${center.lat},${radius}`,
+        bias: `proximity:${center.lng},${center.lat}`,
+        limit: '60',
+        lang: getPreferredLanguage(),
+        apiKey: GEOAPIFY_API_KEY,
+    });
+
+    const url = `${GEOAPIFY_ENDPOINT}?${params}`;
+    const res = await withTimeout(fetch(url), 9000, 'geoapify');
+
+    if (res.status === 429) {
+        _geoapifyCooldownUntil = Date.now() + 20_000;
+        throw new Error('geoapify-rate-limited');
+    }
+    if (res.status >= 500) {
+        _geoapifyCooldownUntil = Date.now() + 12_000;
+        throw new Error(`geoapify-${res.status}`);
+    }
+    if (!res.ok) {
+        throw new Error(`geoapify-${res.status}`);
+    }
+
+    const payload = await res.json() as GeoapifyResponse;
     const mapped: Venue[] = [];
 
-    for (const el of elements) {
-        const tags = el.tags ?? {};
-        const coords = extractOverpassCoord(el);
-        if (!coords) continue;
+    for (const feature of payload.features ?? []) {
+        const coords = feature.geometry?.coordinates;
+        const props = feature.properties;
+        if (!coords || coords.length < 2 || !props) continue;
 
-        const category = inferCategoryFromTags(tags);
-        if (!category) continue;
+        const lng = Number(coords[0]);
+        const lat = Number(coords[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
 
-        const name = (tags.name || tags.brand || tags.operator || category).trim();
+        const category = categoryFromGeoapify(props.categories);
+        const name = (props.name || props.datasource?.raw?.name || '').trim();
         if (!name) continue;
 
-        const address = [
-            tags['addr:street'],
-            tags['addr:suburb'] || tags['addr:city'] || tags['addr:district'],
-            tags['addr:state'] || tags['is_in:state'],
-        ].filter(Boolean).join(', ') || 'Nearby Spot';
-
         mapped.push({
-            id: `ov_${el.type || 'x'}_${el.id || 0}`,
+            id: `geo_${props.place_id || `${lat.toFixed(5)}_${lng.toFixed(5)}`}`,
             name,
             category,
             emoji: _getEmojiForAmenity(category),
-            address,
-            coordinates: coords,
+            address: props.formatted || 'Nearby Spot',
+            coordinates: { lat, lng },
             distanceKm: 0,
             etaMinutesFromYou: 0,
             etaMinutesFromPartner: 0,
         });
     }
 
-    _overpassCandidateCache.set(cacheKey, {
-        expiry: Date.now() + OVERPASS_CANDIDATE_CACHE_TTL_MS,
+    _geoapifyCandidateCache.set(cacheKey, {
+        expiry: Date.now() + GEOAPIFY_CANDIDATE_CACHE_TTL_MS,
         data: mapped,
     });
 
@@ -784,7 +734,7 @@ async function collectVenueCandidatesProgressive(
 
     for (const radiusM of radiiMeters) {
         try {
-            const group = await fetchOverpassCandidates(center, radiusM);
+            const group = await fetchGeoapifyCandidates(center, radiusM);
             sourceHealthy = true;
             for (const venue of group) {
                 if (!venue.name || !Number.isFinite(venue.coordinates.lat) || !Number.isFinite(venue.coordinates.lng)) continue;
@@ -798,7 +748,7 @@ async function collectVenueCandidatesProgressive(
                 merged.push(venue);
             }
         } catch {
-            // Mirror failover is handled internally by fetchOverpassJson.
+            // Progressive widening continues; source health controls hard error upstream.
         }
 
         if (merged.length >= 28) break;
