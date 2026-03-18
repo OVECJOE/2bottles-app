@@ -164,31 +164,6 @@ function makeMidpointEl(): HTMLElement {
     return wrap;
 }
 
-function makeEtaChipEl(tone: 'you' | 'partner', minutes: number): HTMLElement {
-    const el = document.createElement('div');
-    const bg = tone === 'you' ? '#4285f4' : '#fbbc04';
-    const fg = tone === 'you' ? '#ffffff' : '#1a1f29';
-    el.style.cssText = [
-        'display:flex',
-        'align-items:center',
-        'gap:6px',
-        'padding:6px 10px',
-        'border-radius:999px',
-        `background:${bg}`,
-        `color:${fg}`,
-        'font:700 11px "DM Sans", sans-serif',
-        'box-shadow:0 4px 12px rgba(0,0,0,0.2)',
-        'border:1px solid rgba(255,255,255,0.55)',
-        'pointer-events:auto',
-        'cursor:pointer',
-        'white-space:nowrap',
-    ].join(';');
-    el.textContent = `${minutes} min`;
-    el.setAttribute('role', 'button');
-    el.setAttribute('tabindex', '0');
-    return el;
-}
-
 type InfoRow = { label: string; value: string };
 type MapInfoCard = {
     title: string;
@@ -220,8 +195,6 @@ export class MapView extends LitElement {
     private _handlers: Record<string, (e: any) => void> = {};
     private _routeCache = new Map<string, [number, number][]>();
     private _routeInflight = new Map<string, Promise<[number, number][]>>();
-    private _ownEtaMarker: maplibregl.Marker | null = null;
-    private _partnerEtaMarker: maplibregl.Marker | null = null;
     private _infoRequestId = 0;
 
     override connectedCallback() {
@@ -254,7 +227,6 @@ export class MapView extends LitElement {
         }
 
         if (this._animId) cancelAnimationFrame(this._animId);
-        this._clearEtaMarkers();
         this._map?.remove();
         this._map = null;
     }
@@ -620,11 +592,6 @@ export class MapView extends LitElement {
         return `${a.lat.toFixed(3)},${a.lng.toFixed(3)}->${b.lat.toFixed(3)},${b.lng.toFixed(3)}`;
     }
 
-    private _routeMidpoint(coords: [number, number][]): [number, number] | null {
-        if (!coords.length) return null;
-        return coords[Math.floor(coords.length / 2)] ?? null;
-    }
-
     private _formatDistanceKm(meters: number | null): string {
         if (meters === null || meters < 0) return '--';
         return `${(meters / 1000).toFixed(1)} km`;
@@ -639,21 +606,6 @@ export class MapView extends LitElement {
         if (minutes === null || minutes < 0) return '--';
         const at = new Date(Date.now() + minutes * 60_000);
         return at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    }
-
-    private _openEtaInfo(tone: 'you' | 'partner', minutes: number) {
-        const isYou = tone === 'you';
-        const distanceM = isYou ? locationStore.ownDistanceM : locationStore.partnerDistanceM;
-        const label = isYou ? 'Your route' : `${sessionStore.partnerName || 'Partner'} route`;
-
-        this._infoCard = {
-            title: label,
-            subtitle: `Arrive by ${this._formatArrival(minutes)}`,
-            rows: [
-                { label: 'ETA', value: this._formatEta(minutes) },
-                { label: 'Distance', value: this._formatDistanceKm(distanceM) },
-            ],
-        };
     }
 
     private _setInfoCardWithPlace(
@@ -732,46 +684,6 @@ export class MapView extends LitElement {
         );
     }
 
-    private _updateEtaMarker(
-        marker: maplibregl.Marker | null,
-        tone: 'you' | 'partner',
-        minutes: number | null,
-        point: [number, number] | null,
-    ): maplibregl.Marker | null {
-        if (!this._map || minutes === null || minutes < 0 || !point) {
-            marker?.remove();
-            return null;
-        }
-
-        if (!marker) {
-            marker = new maplibregl.Marker({
-                element: makeEtaChipEl(tone, minutes),
-                anchor: 'center',
-            })
-                .setLngLat(point)
-                .addTo(this._map);
-        }
-
-        marker.setLngLat(point);
-        const el = marker.getElement();
-        el.textContent = `${minutes} min`;
-        el.onclick = () => this._openEtaInfo(tone, minutes);
-        el.onkeydown = (e: KeyboardEvent) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                this._openEtaInfo(tone, minutes);
-            }
-        };
-        return marker;
-    }
-
-    private _clearEtaMarkers() {
-        this._ownEtaMarker?.remove();
-        this._partnerEtaMarker?.remove();
-        this._ownEtaMarker = null;
-        this._partnerEtaMarker = null;
-    }
-
     private async _fetchRoute(a: Coordinates, b: Coordinates): Promise<[number, number][]> {
         const key = this._routeKey(a, b);
         const cached = this._routeCache.get(key);
@@ -819,12 +731,6 @@ export class MapView extends LitElement {
         } catch {
         }
         this._setLineSource(SOURCE_ROUTE_OWN, youLine, '#4285f4', true);
-        this._ownEtaMarker = this._updateEtaMarker(
-            this._ownEtaMarker,
-            'you',
-            locationStore.ownEtaMinutes,
-            this._routeMidpoint(youLine),
-        );
 
         if (partner) {
             let partnerLine: [number, number][] = [[partner.lng, partner.lat], [dest.lng, dest.lat]];
@@ -833,15 +739,8 @@ export class MapView extends LitElement {
             } catch {
             }
             this._setLineSource(SOURCE_ROUTE_PARTNER, partnerLine, '#fbbc04', true);
-            this._partnerEtaMarker = this._updateEtaMarker(
-                this._partnerEtaMarker,
-                'partner',
-                locationStore.partnerEtaMinutes,
-                this._routeMidpoint(partnerLine),
-            );
         } else {
             this._removeLineSource(SOURCE_ROUTE_PARTNER);
-            this._partnerEtaMarker = this._updateEtaMarker(this._partnerEtaMarker, 'partner', null, null);
         }
     }
 
@@ -907,7 +806,6 @@ export class MapView extends LitElement {
         [SOURCE_ROUTE_OWN, SOURCE_ROUTE_PARTNER, SOURCE_ROUTE_SINGLE].forEach(s => {
             this._removeLineSource(s);
         });
-        this._clearEtaMarkers();
     }
 
     // ---------------------------------------------------------------------------
