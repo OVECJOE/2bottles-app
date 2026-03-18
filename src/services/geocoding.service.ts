@@ -1,6 +1,8 @@
-const NOMINATIM_ENDPOINT = (import.meta.env.VITE_NOMINATIM_ENDPOINT as string | undefined) || 'https://nominatim.openstreetmap.org';
+const NOMINATIM_ENDPOINT = (import.meta.env.VITE_NOMINATIM_ENDPOINT as string | undefined) || '/api/nominatim';
+const PHOTON_ENDPOINT = (import.meta.env.VITE_PHOTON_ENDPOINT as string | undefined) || '/api/photon';
 const NOMINATIM_MIN_INTERVAL_MS = Number(import.meta.env.VITE_NOMINATIM_MIN_INTERVAL_MS ?? 1200);
 const NOMINATIM_CACHE_TTL_MS = 2 * 60 * 1000;
+const PHOTON_CACHE_TTL_MS = 2 * 60 * 1000;
 const REVERSE_CACHE_TTL_MS = 5 * 60 * 1000;
 const VENUE_QUERY_COOLDOWN_MS = 60 * 1000;
 const NOMINATIM_HARD_COOLDOWN_MS = 45 * 1000;
@@ -28,6 +30,7 @@ let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let _nextNominatimAt = 0;
 let _nominatimQueue: Promise<unknown> = Promise.resolve();
 const _nominatimCache = new Map<string, { expiry: number; data: NominatimResult[] }>();
+const _photonCache = new Map<string, { expiry: number; data: PhotonResult[] }>();
 const _reverseCache = new Map<string, { expiry: number; label: string }>();
 const _reverseInflight = new Map<string, Promise<string>>();
 let _reverseCooldownUntil = 0;
@@ -125,6 +128,33 @@ interface NominatimResult {
     class?: string;
 }
 
+interface PhotonResponse {
+    features?: Array<{
+        geometry?: { coordinates?: [number, number] };
+        properties?: {
+            osm_id?: string | number;
+            name?: string;
+            city?: string;
+            district?: string;
+            county?: string;
+            state?: string;
+            country?: string;
+            street?: string;
+            housenumber?: string;
+            type?: string;
+            osm_value?: string;
+        };
+    }>;
+}
+
+interface PhotonResult {
+    place_id: string;
+    display_name: string;
+    lat: number;
+    lon: number;
+    type?: string;
+}
+
 function getPreferredLanguage() {
     if (typeof navigator !== 'undefined' && Array.isArray(navigator.languages) && navigator.languages.length > 0) {
         return navigator.languages[0];
@@ -169,6 +199,79 @@ async function runNominatimSearch(
     return fetchNominatimJson(`/search?${params}`);
 }
 
+async function fetchPhotonJson(pathAndQuery: string): Promise<PhotonResult[]> {
+    const url = `${PHOTON_ENDPOINT}${pathAndQuery}`;
+    const now = Date.now();
+    const cached = _photonCache.get(url);
+    if (cached && cached.expiry > now) return cached.data;
+
+    const res = await fetchOrThrow(url, { headers: { 'Accept-Language': getPreferredLanguage() } });
+    const body = (await res.json()) as PhotonResponse;
+    const mapped: PhotonResult[] = (body.features ?? [])
+        .map((f) => {
+            const coords = f.geometry?.coordinates;
+            const props = f.properties;
+            if (!coords || coords.length < 2 || !props) return null;
+
+            const lon = Number(coords[0]);
+            const lat = Number(coords[1]);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+            const title = props.name || props.street || props.city || props.county || props.state || props.country || 'Place';
+            const addressParts = [
+                [props.street, props.housenumber].filter(Boolean).join(' ').trim(),
+                props.city || props.district || props.county,
+                props.state,
+                props.country,
+            ].filter(Boolean);
+            const displayName = [title, ...addressParts].filter(Boolean).join(', ');
+
+            return {
+                place_id: String(props.osm_id ?? `${lat.toFixed(5)}_${lon.toFixed(5)}`),
+                display_name: displayName,
+                lat,
+                lon,
+                type: props.osm_value || props.type || 'place',
+            };
+        })
+        .filter((x): x is PhotonResult => !!x);
+
+    _photonCache.set(url, { expiry: now + PHOTON_CACHE_TTL_MS, data: mapped });
+    return mapped;
+}
+
+async function runPhotonSearch(
+    query: string,
+    limit = 8,
+    bias?: { center: { lat: number; lng: number } }
+) {
+    const params = new URLSearchParams({
+        q: query,
+        limit: String(limit),
+        lang: getPreferredLanguage(),
+    });
+
+    if (bias?.center) {
+        params.set('lat', String(bias.center.lat));
+        params.set('lon', String(bias.center.lng));
+    }
+
+    return fetchPhotonJson(`/?${params}`);
+}
+
+function photonToSuggestion(r: PhotonResult): GeocodeSuggestion {
+    const parts = r.display_name.split(', ');
+    const shortName = parts.slice(0, 2).join(', ');
+    return {
+        placeId: r.place_id,
+        displayName: r.display_name,
+        shortName,
+        lat: r.lat,
+        lng: r.lon,
+        type: r.type ?? 'place',
+    };
+}
+
 /**
  * Autocomplete suggestions for a query string, debounced by default.
  * Pass `immediate: true` to skip debounce.
@@ -192,15 +295,35 @@ export function geocodeAutocomplete(
                 const bias = options.biasCenter ? { center: options.biasCenter, radiusKm: options.biasRadiusKm } : undefined;
                 const primary = await runNominatimSearch(q, options.countrycodes, 10, bias);
                 if (primary.length > 0 || !options.countrycodes) {
-                    resolve(primary.map(nominatimToSuggestion));
+                    if (primary.length > 0) {
+                        resolve(primary.map(nominatimToSuggestion));
+                        return;
+                    }
+
+                    const photonResults = await runPhotonSearch(q, 10, bias ? { center: bias.center } : undefined);
+                    resolve(photonResults.map(photonToSuggestion));
                     return;
                 }
 
-                // If a country-restricted search returns nothing, retry globally.
                 const fallback = await runNominatimSearch(q, undefined, 10, bias);
-                resolve(fallback.map(nominatimToSuggestion));
+                if (fallback.length > 0) {
+                    resolve(fallback.map(nominatimToSuggestion));
+                    return;
+                }
+
+                const photonResults = await runPhotonSearch(q, 10, bias ? { center: bias.center } : undefined);
+                resolve(photonResults.map(photonToSuggestion));
             } catch (err) {
-                reject(err);
+                try {
+                    const photonResults = await runPhotonSearch(
+                        q,
+                        10,
+                        options.biasCenter ? { center: options.biasCenter } : undefined,
+                    );
+                    resolve(photonResults.map(photonToSuggestion));
+                } catch {
+                    reject(err);
+                }
             }
         };
 

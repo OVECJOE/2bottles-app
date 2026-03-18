@@ -66,6 +66,30 @@ export class SelectRendezvous extends LitElement {
 
     .venues { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: var(--space-2); }
 
+    .loading-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-3);
+      text-align: center;
+      padding: var(--space-6);
+      color: var(--color-text-muted);
+    }
+
+    .loading-spinner {
+      width: 22px;
+      height: 22px;
+      border: 2px solid rgba(0, 0, 0, 0.12);
+      border-top-color: var(--color-blue);
+      border-radius: 50%;
+      animation: spin 700ms linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     .search-section { flex-shrink: 0; }
 
     .custom-selected {
@@ -300,7 +324,12 @@ export class SelectRendezvous extends LitElement {
 
         ${this._tab === 'midpoint' ? html`
           <div class="venues">
-            ${this._venues.length === 0 ? html`
+            ${this._isComputing && this._venues.length === 0 ? html`
+              <div class="loading-state" aria-live="polite">
+                <div class="loading-spinner"></div>
+                <div>Finding fair meetup spots...</div>
+              </div>
+            ` : this._venues.length === 0 ? html`
               <div style="text-align:center; padding:var(--space-6); color:var(--color-text-muted)">
                 <div style="font-size:32px; margin-bottom:var(--space-2)">☕?</div>
                 <div>${this._suggestionError || 'No spots found near the midpoint. Try searching for a specific place.'}</div>

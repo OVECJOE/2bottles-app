@@ -17,6 +17,7 @@ export class LiveTracking extends LitElement {
   @state() private _lastProgressDistance: number | null = null;
   @state() private _lastProgressSecond = 0;
   @state() private _arrivalNotified = false;
+  @state() private _lastProximityTier = -1;
   
   private _ticker?: any;
   private _unsubLocation?: () => void;
@@ -84,10 +85,49 @@ export class LiveTracking extends LitElement {
     locationStore.setEtas(etaOwn, etaPart);
     locationStore.setDistances(distOwn, distPart);
 
+    if (partner) {
+      const distBetweenUsers = haversineMeters(own, partner);
+      this._handleProximityAlert(distBetweenUsers);
+    } else {
+      this._lastProximityTier = -1;
+    }
+
     if (distOwn < 60 && (this._lastDistanceToDest === null || this._lastDistanceToDest >= 60)) {
       this._onArrived();
     }
     this._lastDistanceToDest = distOwn;
+  }
+
+  private _getProximityTier(distanceM: number): number {
+    if (distanceM <= 140) return 1;
+    if (distanceM <= 320) return 0;
+    return -1;
+  }
+
+  private _notifyProximity(message: string) {
+    uiStore.showToast(message);
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.visibilityState === 'hidden') {
+      new Notification('2bottles', { body: message });
+    }
+  }
+
+  private _handleProximityAlert(distanceM: number) {
+    const tier = this._getProximityTier(distanceM);
+    if (tier === -1) {
+      if (distanceM > 800) this._lastProximityTier = -1;
+      return;
+    }
+    if (tier <= this._lastProximityTier) return;
+
+    const partnerName = sessionStore.partnerName || 'Partner';
+
+    if (tier === 0) {
+      this._notifyProximity(`${partnerName} is about 2 blocks away.`);
+    } else if (tier === 1) {
+      this._notifyProximity(`${partnerName} is almost there.`);
+    }
+
+    this._lastProximityTier = tier;
   }
 
   private _estimateOwnSpeedKmh(own: { lat: number; lng: number }) {

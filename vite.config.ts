@@ -47,6 +47,16 @@ export default defineConfig({
         open: true,
         // Proxy API calls to your Bun/Hono backend
         proxy: {
+            '/api/nominatim': {
+                target: 'https://nominatim.openstreetmap.org',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api\/nominatim/, ''),
+            },
+            '/api/photon': {
+                target: 'https://photon.komoot.io',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api\/photon/, ''),
+            },
             '/api': {
                 target: 'http://localhost:8080',
                 changeOrigin: true,

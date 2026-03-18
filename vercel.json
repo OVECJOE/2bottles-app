@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/api/nominatim/:path*",
+      "destination": "https://nominatim.openstreetmap.org/:path*"
+    },
+    {
+      "source": "/api/photon/:path*",
+      "destination": "https://photon.komoot.io/:path*"
+    },
+    {
       "source": "/((?!.*\\.).*)",
       "destination": "/index.html"
     }

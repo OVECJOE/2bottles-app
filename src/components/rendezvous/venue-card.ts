@@ -1,18 +1,3 @@
-/**
- * <venue-card> — displays a venue with emoji icon, name, meta,
- * and ETA. Selectable with visual feedback.
- *
- * Properties:
- *   emoji      — category emoji
- *   name       — venue name
- *   address    — short address string
- *   distanceKm — distance in km (shown as "1.2 km")
- *   etaMinutes — ETA in minutes (shown as "8 min each")
- *   selected   — boolean, applies selected styles
- *
- * Dispatches:
- *   venue-select — when clicked
- */
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
