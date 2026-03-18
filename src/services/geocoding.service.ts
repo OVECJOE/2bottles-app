@@ -15,6 +15,7 @@ const PHOTON_CACHE_TTL_MS = 2 * 60 * 1000;
 const REVERSE_CACHE_TTL_MS = 5 * 60 * 1000;
 const NOMINATIM_HARD_COOLDOWN_MS = 45 * 1000;
 const VENUE_SUGGESTION_CACHE_TTL_MS = 2 * 60 * 1000;
+const OVERPASS_CANDIDATE_CACHE_TTL_MS = 2 * 60 * 1000;
 const ROUTE_METRICS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 import type { Venue } from '../types/venue.types.js';
@@ -46,6 +47,8 @@ const _reverseInflight = new Map<string, Promise<string>>();
 let _reverseCooldownUntil = 0;
 let _nominatimHardCooldownUntil = 0;
 const _venueSuggestionCache = new Map<string, { expiry: number; data: Venue[] }>();
+const _overpassCandidateCache = new Map<string, { expiry: number; data: Venue[] }>();
+const _overpassEndpointCooldownUntil = new Map<string, number>();
 const _routeMetricsCache = new Map<string, { expiry: number; data: RouteMetrics }>();
 
 interface RouteMetrics {
@@ -445,7 +448,7 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
     const cached = _venueSuggestionCache.get(cacheKey);
     if (cached && cached.expiry > now) return cached.data;
 
-    const candidateRadiiM = [2000, 5000, 10000, 15000];
+    const candidateRadiiM = [1200, 2500, 4500, 7000];
     const candidateResult = await collectVenueCandidatesProgressive(midpoint, candidateRadiiM);
     if (!candidateResult.sourceHealthy) {
         throw new Error('Venue providers are currently unavailable. Please retry.');
@@ -565,10 +568,6 @@ function makeSuggestionCacheKey(input: MeetupSuggestionInput, maxResults: number
     return [
         quantizeCoord(input.midpoint.lat),
         quantizeCoord(input.midpoint.lng),
-        quantizeCoord(input.own.lat),
-        quantizeCoord(input.own.lng),
-        quantizeCoord(input.partner.lat),
-        quantizeCoord(input.partner.lng),
         String(maxResults),
     ].join('|');
 }
@@ -650,29 +649,51 @@ async function fetchRouteMetrics(from: Coordinates, to: Coordinates): Promise<Ro
 async function fetchOverpassJson(query: string): Promise<OverpassResponse> {
     let lastError: unknown;
 
-    for (const endpoint of OVERPASS_ENDPOINTS) {
-        for (let attempt = 1; attempt <= 2; attempt++) {
-            try {
-                const body = new URLSearchParams({ data: query });
-                const res = await withTimeout(
-                    fetchOrThrow(endpoint, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-                        body,
-                    }),
-                    12000,
-                    'overpass',
-                );
+    const now = Date.now();
+    const endpoints = OVERPASS_ENDPOINTS
+        .map((endpoint) => ({ endpoint, cooldownUntil: _overpassEndpointCooldownUntil.get(endpoint) ?? 0 }))
+        .sort((a, b) => a.cooldownUntil - b.cooldownUntil);
 
-                const payload = await res.json() as OverpassResponse;
-                if (Array.isArray(payload.elements)) {
-                    return payload;
-                }
-                lastError = new Error('overpass-invalid-payload');
-            } catch (err) {
-                lastError = err;
-                await wait(attempt * 250);
+    for (const item of endpoints) {
+        const endpoint = item.endpoint;
+        if (item.cooldownUntil > now) continue;
+
+        try {
+            const body = new URLSearchParams({ data: query });
+            const res = await withTimeout(
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                    body,
+                }),
+                10000,
+                'overpass',
+            );
+
+            if (res.status === 429) {
+                _overpassEndpointCooldownUntil.set(endpoint, Date.now() + 35_000);
+                lastError = new Error(`overpass-rate-limited:${endpoint}`);
+                continue;
             }
+            if (res.status === 504 || res.status === 503 || res.status === 502) {
+                _overpassEndpointCooldownUntil.set(endpoint, Date.now() + 20_000);
+                lastError = new Error(`overpass-gateway-timeout:${endpoint}`);
+                continue;
+            }
+            if (!res.ok) {
+                lastError = new Error(`overpass-http-${res.status}:${endpoint}`);
+                continue;
+            }
+
+            const payload = await res.json() as OverpassResponse;
+            if (Array.isArray(payload.elements)) {
+                _overpassEndpointCooldownUntil.set(endpoint, 0);
+                return payload;
+            }
+            lastError = new Error('overpass-invalid-payload');
+        } catch (err) {
+            _overpassEndpointCooldownUntil.set(endpoint, Date.now() + 10_000);
+            lastError = err;
         }
     }
 
@@ -680,27 +701,42 @@ async function fetchOverpassJson(query: string): Promise<OverpassResponse> {
 }
 
 async function fetchOverpassCandidates(center: { lat: number; lng: number }, radiusM: number): Promise<Venue[]> {
-    const query = `[out:json][timeout:20];
-(
-  node(around:${radiusM},${center.lat},${center.lng})["amenity"~"cafe|restaurant|bar|pub|fast_food|food_court|ice_cream"];
-  node(around:${radiusM},${center.lat},${center.lng})["leisure"~"park|garden|playground|recreation_ground"];
-  node(around:${radiusM},${center.lat},${center.lng})["shop"~"mall|supermarket|convenience"];
-  node(around:${radiusM},${center.lat},${center.lng})["tourism"~"hotel|guest_house|hostel"];
-  way(around:${radiusM},${center.lat},${center.lng})["amenity"~"cafe|restaurant|bar|pub|fast_food|food_court|ice_cream"];
-  way(around:${radiusM},${center.lat},${center.lng})["leisure"~"park|garden|playground|recreation_ground"];
-  way(around:${radiusM},${center.lat},${center.lng})["shop"~"mall|supermarket|convenience"];
-  way(around:${radiusM},${center.lat},${center.lng})["tourism"~"hotel|guest_house|hostel"];
-  relation(around:${radiusM},${center.lat},${center.lng})["amenity"~"cafe|restaurant|bar|pub|fast_food|food_court|ice_cream"];
-  relation(around:${radiusM},${center.lat},${center.lng})["leisure"~"park|garden|playground|recreation_ground"];
-  relation(around:${radiusM},${center.lat},${center.lng})["shop"~"mall|supermarket|convenience"];
-  relation(around:${radiusM},${center.lat},${center.lng})["tourism"~"hotel|guest_house|hostel"];
-);
-out center tags 300;`;
+    const radius = Math.max(900, Math.min(8000, Math.round(radiusM)));
+    const cacheKey = `${center.lat.toFixed(3)}|${center.lng.toFixed(3)}|${radius}`;
+    const cached = _overpassCandidateCache.get(cacheKey);
+    if (cached && cached.expiry > Date.now()) return cached.data;
 
-    const payload = await fetchOverpassJson(query);
+    const primaryQuery = `[out:json][timeout:12];
+(
+  nwr(around:${radius},${center.lat},${center.lng})[name]["amenity"~"cafe|restaurant|bar|pub|fast_food|food_court|ice_cream"];
+  nwr(around:${radius},${center.lat},${center.lng})[name]["leisure"~"park|garden|playground|recreation_ground"];
+);
+out center tags 160;`;
+
+    const secondaryQuery = `[out:json][timeout:12];
+(
+  nwr(around:${radius},${center.lat},${center.lng})[name]["shop"~"mall|supermarket|convenience"];
+  nwr(around:${radius},${center.lat},${center.lng})[name]["tourism"~"hotel|guest_house|hostel"];
+);
+out center tags 120;`;
+
+    const [primary, secondary] = await Promise.allSettled([
+        fetchOverpassJson(primaryQuery),
+        fetchOverpassJson(secondaryQuery),
+    ]);
+
+    const elements = [
+        ...(primary.status === 'fulfilled' ? (primary.value.elements ?? []) : []),
+        ...(secondary.status === 'fulfilled' ? (secondary.value.elements ?? []) : []),
+    ];
+
+    if (elements.length === 0) {
+        throw new Error('overpass-empty-or-unavailable');
+    }
+
     const mapped: Venue[] = [];
 
-    for (const el of payload.elements ?? []) {
+    for (const el of elements) {
         const tags = el.tags ?? {};
         const coords = extractOverpassCoord(el);
         if (!coords) continue;
@@ -718,7 +754,7 @@ out center tags 300;`;
         ].filter(Boolean).join(', ') || 'Nearby Spot';
 
         mapped.push({
-            id: `ov_${el.type || 'x'}_${el.id || Math.random().toString(36).slice(2)}`,
+            id: `ov_${el.type || 'x'}_${el.id || 0}`,
             name,
             category,
             emoji: _getEmojiForAmenity(category),
@@ -729,6 +765,11 @@ out center tags 300;`;
             etaMinutesFromPartner: 0,
         });
     }
+
+    _overpassCandidateCache.set(cacheKey, {
+        expiry: Date.now() + OVERPASS_CANDIDATE_CACHE_TTL_MS,
+        data: mapped,
+    });
 
     return mapped;
 }

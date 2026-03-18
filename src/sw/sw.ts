@@ -8,8 +8,7 @@
 /// <reference lib="webworker" />
 declare const self: ServiceWorkerGlobalScope;
 
-const CACHE_NAME = '2bottles-v3';
-const ASSET_CACHE = '2bottles-assets-v3';
+const CACHE_NAME = '2bottles-v4';
 
 async function notifyAssetMissingReload() {
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -44,7 +43,7 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((keys) =>
             Promise.all(
                 keys
-                    .filter((k) => k !== CACHE_NAME && k !== ASSET_CACHE)
+                    .filter((k) => k !== CACHE_NAME)
                     .map((k) => caches.delete(k))
             )
         )
@@ -65,26 +64,19 @@ self.addEventListener('fetch', (event) => {
     // 2. API calls → network-only (never cache live location data)
     if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) return;
 
-    // 3. JS/CSS/image assets → network-first, fallback to cache.
-    // This avoids stale-chunk failures after deploy when dynamic imports change.
+    // 3. Hashed build assets → strictly network-only.
+    // Avoid SW asset caching for dynamic chunks to prevent stale/corrupt module payloads.
     if (url.pathname.startsWith('/assets/')) {
         event.respondWith((async () => {
-            const cache = await caches.open(ASSET_CACHE);
             try {
-                const response = await fetch(request);
-                if (response.ok) {
-                    cache.put(request, response.clone());
-                } else if (response.status === 404) {
-                    await cache.delete(request);
-                    // Deployed build changed and this hashed chunk no longer exists.
-                    // Ask clients to refresh shell so module graph matches deployed assets.
+                const response = await fetch(request, { cache: 'no-store' });
+                if (response.status === 404 || response.status === 410) {
                     event.waitUntil(notifyAssetMissingReload());
                 }
                 return response;
             } catch {
-                const cached = await cache.match(request);
-                if (cached) return cached;
-                return new Response('', { status: 504, statusText: 'Offline asset unavailable' });
+                event.waitUntil(notifyAssetMissingReload());
+                return new Response('Asset unavailable', { status: 503, statusText: 'Asset unavailable' });
             }
         })());
         return;
