@@ -63,10 +63,20 @@ export default defineConfig({
                 changeOrigin: true,
                 rewrite: (path) => path.replace(/^\/api\/route/, ''),
             },
-            '/api/overpass': {
+            '/api/overpass-main': {
                 target: 'https://overpass-api.de',
                 changeOrigin: true,
-                rewrite: (path) => path.replace(/^\/api\/overpass/, ''),
+                rewrite: (path) => path.replace(/^\/api\/overpass-main/, ''),
+            },
+            '/api/overpass-kumi': {
+                target: 'https://overpass.kumi.systems',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api\/overpass-kumi/, ''),
+            },
+            '/api/overpass-lz4': {
+                target: 'https://lz4.overpass-api.de',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api\/overpass-lz4/, ''),
             },
             '/api': {
                 target: 'http://localhost:8080',

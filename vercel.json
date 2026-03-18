@@ -13,8 +13,16 @@
       "destination": "https://router.project-osrm.org/:path*"
     },
     {
-      "source": "/api/overpass/:path*",
+      "source": "/api/overpass-main/:path*",
       "destination": "https://overpass-api.de/:path*"
+    },
+    {
+      "source": "/api/overpass-kumi/:path*",
+      "destination": "https://overpass.kumi.systems/:path*"
+    },
+    {
+      "source": "/api/overpass-lz4/:path*",
+      "destination": "https://lz4.overpass-api.de/:path*"
     },
     {
       "source": "/((?!.*\\.).*)",

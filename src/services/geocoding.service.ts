@@ -1,12 +1,18 @@
 const NOMINATIM_ENDPOINT = (import.meta.env.VITE_NOMINATIM_ENDPOINT as string | undefined) || '/api/nominatim';
 const PHOTON_ENDPOINT = (import.meta.env.VITE_PHOTON_ENDPOINT as string | undefined) || '/api/photon';
-const OVERPASS_ENDPOINT = (import.meta.env.VITE_OVERPASS_ENDPOINT as string | undefined) || '/api/overpass/api/interpreter';
+const OVERPASS_ENDPOINTS = ((import.meta.env.VITE_OVERPASS_ENDPOINTS as string | undefined)
+    ?.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)) || [
+    '/api/overpass-main/api/interpreter',
+    '/api/overpass-kumi/api/interpreter',
+    '/api/overpass-lz4/api/interpreter',
+];
 const ROUTING_ENDPOINT = (import.meta.env.VITE_ROUTING_ENDPOINT as string | undefined) || '/api/route';
 const NOMINATIM_MIN_INTERVAL_MS = Number(import.meta.env.VITE_NOMINATIM_MIN_INTERVAL_MS ?? 1200);
 const NOMINATIM_CACHE_TTL_MS = 2 * 60 * 1000;
 const PHOTON_CACHE_TTL_MS = 2 * 60 * 1000;
 const REVERSE_CACHE_TTL_MS = 5 * 60 * 1000;
-const VENUE_QUERY_COOLDOWN_MS = 60 * 1000;
 const NOMINATIM_HARD_COOLDOWN_MS = 45 * 1000;
 const VENUE_SUGGESTION_CACHE_TTL_MS = 2 * 60 * 1000;
 const ROUTE_METRICS_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -38,11 +44,9 @@ const _photonCache = new Map<string, { expiry: number; data: PhotonResult[] }>()
 const _reverseCache = new Map<string, { expiry: number; label: string }>();
 const _reverseInflight = new Map<string, Promise<string>>();
 let _reverseCooldownUntil = 0;
-let _venueQueryCooldownUntil = 0;
 let _nominatimHardCooldownUntil = 0;
 const _venueSuggestionCache = new Map<string, { expiry: number; data: Venue[] }>();
 const _routeMetricsCache = new Map<string, { expiry: number; data: RouteMetrics }>();
-let _lastNonEmptySuggestions: Venue[] = [];
 
 interface RouteMetrics {
     minutes: number;
@@ -120,7 +124,6 @@ async function fetchNominatimJson(pathAndQuery: string): Promise<NominatimResult
             if (isRateLimited) {
                 // Public endpoint is throttling: stop retry storm briefly.
                 _nominatimHardCooldownUntil = Date.now() + NOMINATIM_HARD_COOLDOWN_MS;
-                _venueQueryCooldownUntil = Math.max(_venueQueryCooldownUntil, Date.now() + NOMINATIM_HARD_COOLDOWN_MS);
                 break;
             }
 
@@ -430,8 +433,8 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 export async function fetchVenues(lat: number, lng: number, radius = 3000): Promise<Venue[]> {
     const center = { lat, lng };
     const radiusM = Math.max(900, Math.min(12000, Math.round(radius)));
-    const candidates = await collectVenueCandidatesProgressive(center, [radiusM]);
-    return candidates.filter((v) => getDistance(lat, lng, v.coordinates.lat, v.coordinates.lng) <= radiusM / 1000);
+    const result = await collectVenueCandidatesProgressive(center, [radiusM]);
+    return result.venues.filter((v) => getDistance(lat, lng, v.coordinates.lat, v.coordinates.lng) <= radiusM / 1000);
 }
 
 export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise<Venue[]> {
@@ -442,17 +445,13 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
     const cached = _venueSuggestionCache.get(cacheKey);
     if (cached && cached.expiry > now) return cached.data;
 
-    const candidateRadiiM = [1500, 3000, 6000, 10000];
-    const candidates = await collectVenueCandidatesProgressive(midpoint, candidateRadiiM);
-    if (candidates.length === 0) {
-        const cachedFallback = _lastNonEmptySuggestions
-            .map((v) => hydrateVenueForPair(v, own, partner))
-            .slice(0, maxResults);
-        if (cachedFallback.length > 0) return cachedFallback;
-
-        const synthetic = buildSyntheticFallbackVenues(midpoint, own, partner).slice(0, maxResults);
-        return synthetic;
+    const candidateRadiiM = [2000, 5000, 10000, 15000];
+    const candidateResult = await collectVenueCandidatesProgressive(midpoint, candidateRadiiM);
+    if (!candidateResult.sourceHealthy) {
+        throw new Error('Venue providers are currently unavailable. Please retry.');
     }
+    const candidates = candidateResult.venues;
+    if (candidates.length === 0) return [];
 
     const coarse = candidates
         .map((venue) => {
@@ -554,67 +553,8 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
         expiry: Date.now() + VENUE_SUGGESTION_CACHE_TTL_MS,
         data: finalList,
     });
-    if (finalList.length > 0) {
-        _lastNonEmptySuggestions = finalList;
-    }
 
     return finalList;
-}
-
-function hydrateVenueForPair(venue: Venue, own: Coordinates, partner: Coordinates): Venue {
-    const dYouKm = getDistance(own.lat, own.lng, venue.coordinates.lat, venue.coordinates.lng);
-    const dPartnerKm = getDistance(partner.lat, partner.lng, venue.coordinates.lat, venue.coordinates.lng);
-    return {
-        ...venue,
-        distanceKm: parseFloat(dYouKm.toFixed(1)),
-        etaMinutesFromYou: etaFromDistanceKm(dYouKm),
-        etaMinutesFromPartner: etaFromDistanceKm(dPartnerKm),
-    };
-}
-
-function buildSyntheticFallbackVenues(midpoint: Coordinates, own: Coordinates, partner: Coordinates): Venue[] {
-    const points: Array<{ name: string; coordinates: Coordinates; category: string; address: string }> = [
-        {
-            name: 'Midpoint Meeting Area',
-            coordinates: midpoint,
-            category: 'place',
-            address: 'Near your shared midpoint',
-        },
-        {
-            name: 'Balanced Meetup Point',
-            coordinates: {
-                lat: midpoint.lat + (own.lat - partner.lat) * 0.05,
-                lng: midpoint.lng + (own.lng - partner.lng) * 0.05,
-            },
-            category: 'place',
-            address: 'Alternative nearby meetup area',
-        },
-        {
-            name: 'Nearby Public Spot',
-            coordinates: {
-                lat: midpoint.lat - (own.lat - partner.lat) * 0.05,
-                lng: midpoint.lng - (own.lng - partner.lng) * 0.05,
-            },
-            category: 'place',
-            address: 'Backup option when places are unavailable',
-        },
-    ];
-
-    return points.map((p, i) => {
-        const dYouKm = getDistance(own.lat, own.lng, p.coordinates.lat, p.coordinates.lng);
-        const dPartnerKm = getDistance(partner.lat, partner.lng, p.coordinates.lat, p.coordinates.lng);
-        return {
-            id: `fallback_${i}`,
-            name: p.name,
-            category: p.category,
-            emoji: '📍',
-            address: p.address,
-            coordinates: p.coordinates,
-            distanceKm: parseFloat(dYouKm.toFixed(1)),
-            etaMinutesFromYou: etaFromDistanceKm(dYouKm),
-            etaMinutesFromPartner: etaFromDistanceKm(dPartnerKm),
-        };
-    });
 }
 
 function quantizeCoord(value: number, precision = 3): string {
@@ -707,6 +647,38 @@ async function fetchRouteMetrics(from: Coordinates, to: Coordinates): Promise<Ro
     }
 }
 
+async function fetchOverpassJson(query: string): Promise<OverpassResponse> {
+    let lastError: unknown;
+
+    for (const endpoint of OVERPASS_ENDPOINTS) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                const body = new URLSearchParams({ data: query });
+                const res = await withTimeout(
+                    fetchOrThrow(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                        body,
+                    }),
+                    12000,
+                    'overpass',
+                );
+
+                const payload = await res.json() as OverpassResponse;
+                if (Array.isArray(payload.elements)) {
+                    return payload;
+                }
+                lastError = new Error('overpass-invalid-payload');
+            } catch (err) {
+                lastError = err;
+                await wait(attempt * 250);
+            }
+        }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('overpass-unavailable');
+}
+
 async function fetchOverpassCandidates(center: { lat: number; lng: number }, radiusM: number): Promise<Venue[]> {
     const query = `[out:json][timeout:20];
 (
@@ -725,18 +697,7 @@ async function fetchOverpassCandidates(center: { lat: number; lng: number }, rad
 );
 out center tags 300;`;
 
-    const body = new URLSearchParams({ data: query });
-    const res = await withTimeout(
-        fetchOrThrow(OVERPASS_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-            body,
-        }),
-        9000,
-        'overpass',
-    );
-
-    const payload = await res.json() as OverpassResponse;
+    const payload = await fetchOverpassJson(query);
     const mapped: Venue[] = [];
 
     for (const el of payload.elements ?? []) {
@@ -772,148 +733,37 @@ out center tags 300;`;
     return mapped;
 }
 
-async function fetchNominatimCandidates(center: { lat: number; lng: number }, radiusM: number): Promise<Venue[]> {
-    if (Date.now() < _venueQueryCooldownUntil) return [];
-
-    const radiusKm = Math.max(2, Math.round(radiusM / 1000));
-    const viewbox = buildViewBox(center, radiusKm);
-    const terms: Array<{ q: string; category: string }> = [
-        { q: 'cafe', category: 'cafe' },
-        { q: 'restaurant', category: 'restaurant' },
-        { q: 'park', category: 'park' },
-        { q: 'bar', category: 'bar' },
-        { q: 'mall', category: 'mall' },
-        { q: 'supermarket', category: 'supermarket' },
-    ];
-
-    const tasks = terms.map(async (term) => {
-        const params = new URLSearchParams({
-            q: term.q,
-            format: 'json',
-            addressdetails: '1',
-            dedupe: '1',
-            limit: '7',
-            viewbox,
-            // Bias first, do not hard-bound so sparse areas still return candidates.
-            bounded: '0',
-        });
-
-        try {
-            const rows = await fetchNominatimJson(`/search?${params}`);
-            return rows.map((r) => ({ r, category: term.category }));
-        } catch {
-            _venueQueryCooldownUntil = Date.now() + VENUE_QUERY_COOLDOWN_MS;
-            return [] as Array<{ r: NominatimResult; category: string }>;
-        }
-    });
-
-    const settled = await Promise.all(tasks);
-    const mapped: Venue[] = [];
-    for (const group of settled) {
-        for (const { r, category } of group) {
-            const venueLat = Number(r.lat);
-            const venueLng = Number(r.lon);
-            if (!Number.isFinite(venueLat) || !Number.isFinite(venueLng)) continue;
-
-            mapped.push({
-                id: `nom_${r.place_id}`,
-                name: r.display_name.split(', ')[0]?.trim() || 'Nearby Spot',
-                category,
-                emoji: _getEmojiForAmenity(category),
-                address: r.display_name.split(', ').slice(1, 4).join(', ') || 'Nearby Spot',
-                coordinates: { lat: venueLat, lng: venueLng },
-                distanceKm: 0,
-                etaMinutesFromYou: 0,
-                etaMinutesFromPartner: 0,
-            });
-        }
-    }
-
-    return mapped;
-}
-
-async function fetchPhotonCandidates(center: { lat: number; lng: number }, radiusM: number): Promise<Venue[]> {
-    const terms = ['cafe', 'restaurant', 'park', 'bar', 'food', 'mall'];
-    const tasks = terms.map(async (q) => {
-        try {
-            return await runPhotonSearch(q, 12, { center });
-        } catch {
-            return [] as PhotonResult[];
-        }
-    });
-
-    const settled = await Promise.all(tasks);
-    const radiusKm = Math.max(1, radiusM / 1000);
-    const mapped: Venue[] = [];
-    for (let i = 0; i < settled.length; i++) {
-        const q = terms[i];
-        const group = settled[i];
-        for (const r of group) {
-            const venueLat = Number(r.lat);
-            const venueLng = Number(r.lon);
-            if (!Number.isFinite(venueLat) || !Number.isFinite(venueLng)) continue;
-
-            const dMidKm = getDistance(center.lat, center.lng, venueLat, venueLng);
-            if (dMidKm > Math.max(8, radiusKm * 4.0)) continue;
-
-            const parts = r.display_name.split(', ');
-            const fallbackCategory = q === 'food' ? 'restaurant' : q;
-
-            mapped.push({
-                id: `pho_${r.place_id}`,
-                name: parts[0]?.trim() || 'Nearby Spot',
-                category: r.type || fallbackCategory,
-                emoji: _getEmojiForAmenity(r.type || fallbackCategory),
-                address: parts.slice(1, 4).join(', ') || 'Nearby Spot',
-                coordinates: { lat: venueLat, lng: venueLng },
-                distanceKm: 0,
-                etaMinutesFromYou: 0,
-                etaMinutesFromPartner: 0,
-            });
-        }
-    }
-
-    return mapped;
-}
-
 async function collectVenueCandidatesProgressive(
     center: { lat: number; lng: number },
     radiiMeters: number[],
-): Promise<Venue[]> {
+): Promise<{ venues: Venue[]; sourceHealthy: boolean }> {
     const merged: Venue[] = [];
     const seen = new Set<string>();
+    let sourceHealthy = false;
 
     for (const radiusM of radiiMeters) {
-        const [overpass, nominatim, photon] = await Promise.allSettled([
-            fetchOverpassCandidates(center, radiusM),
-            fetchNominatimCandidates(center, radiusM),
-            fetchPhotonCandidates(center, radiusM),
-        ]);
-
-        const groups: Venue[][] = [
-            overpass.status === 'fulfilled' ? overpass.value : [],
-            nominatim.status === 'fulfilled' ? nominatim.value : [],
-            photon.status === 'fulfilled' ? photon.value : [],
-        ];
-
-        for (const group of groups) {
+        try {
+            const group = await fetchOverpassCandidates(center, radiusM);
+            sourceHealthy = true;
             for (const venue of group) {
                 if (!venue.name || !Number.isFinite(venue.coordinates.lat) || !Number.isFinite(venue.coordinates.lng)) continue;
                 const key = makeVenueDedupeKey(venue.name, venue.coordinates.lat, venue.coordinates.lng);
                 if (seen.has(key)) continue;
 
                 const dMidKm = getDistance(center.lat, center.lng, venue.coordinates.lat, venue.coordinates.lng);
-                if (dMidKm > Math.max(10, (radiusM / 1000) * 4.0)) continue;
+                if (dMidKm > Math.max(3.5, (radiusM / 1000) * 1.85)) continue;
 
                 seen.add(key);
                 merged.push(venue);
             }
+        } catch {
+            // Mirror failover is handled internally by fetchOverpassJson.
         }
 
         if (merged.length >= 28) break;
     }
 
-    return merged;
+    return { venues: merged, sourceHealthy };
 }
 
 function _getEmojiForAmenity(amenity: string): string {
