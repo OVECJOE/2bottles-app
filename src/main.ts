@@ -1,6 +1,32 @@
 import './styles/global.css';
 import './components/app-shell.js';
 
+const SW_REFRESH_KEY = '2b:sw-refresh-at';
+
+function recoverFromDynamicImportFailure(reason: unknown): boolean {
+    const msg = String(reason ?? '');
+    const isDynamicImportFailure =
+        msg.includes('dynamically imported module') ||
+        msg.includes('Failed to fetch dynamically imported module') ||
+        msg.includes('Importing a module script failed');
+
+    if (!isDynamicImportFailure) return false;
+
+    const now = Date.now();
+    const last = Number(sessionStorage.getItem(SW_REFRESH_KEY) || '0');
+    if (now - last < 15_000) return true;
+
+    sessionStorage.setItem(SW_REFRESH_KEY, String(now));
+    window.location.reload();
+    return true;
+}
+
+window.addEventListener('unhandledrejection', (event) => {
+    if (recoverFromDynamicImportFailure(event.reason)) {
+        event.preventDefault();
+    }
+});
+
 // -- Service Worker -------------------------------------------
 // Vite's ?url suffix gives us the compiled SW path at build
 // time. In dev, Vite serves /src/sw/sw.ts directly.
@@ -15,6 +41,32 @@ if ('serviceWorker' in navigator && !import.meta.env.DEV) {
         try {
             const registration = await navigator.serviceWorker.register('/sw.js', {
                 scope: '/',
+            });
+
+            // Prompt update check on each app load so stale SW is replaced quickly.
+            void registration.update();
+
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data?.type === 'ASSET_MISSING_RELOAD') {
+                    const now = Date.now();
+                    const last = Number(sessionStorage.getItem(SW_REFRESH_KEY) || '0');
+                    if (now - last > 10_000) {
+                        sessionStorage.setItem(SW_REFRESH_KEY, String(now));
+                        window.location.reload();
+                    }
+                }
+            });
+
+            let reloadedOnControllerChange = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (reloadedOnControllerChange) return;
+                reloadedOnControllerChange = true;
+                const now = Date.now();
+                const last = Number(sessionStorage.getItem(SW_REFRESH_KEY) || '0');
+                if (now - last > 10_000) {
+                    sessionStorage.setItem(SW_REFRESH_KEY, String(now));
+                    window.location.reload();
+                }
             });
 
             registration.addEventListener('updatefound', () => {

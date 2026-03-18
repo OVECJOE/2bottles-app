@@ -8,8 +8,15 @@
 /// <reference lib="webworker" />
 declare const self: ServiceWorkerGlobalScope;
 
-const CACHE_NAME = '2bottles-v2';
-const ASSET_CACHE = '2bottles-assets-v2';
+const CACHE_NAME = '2bottles-v3';
+const ASSET_CACHE = '2bottles-assets-v3';
+
+async function notifyAssetMissingReload() {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of clients) {
+        client.postMessage({ type: 'ASSET_MISSING_RELOAD' });
+    }
+}
 
 // Assets to precache on install (Vite injects the manifest
 // in production via the rollup output; list key routes here)
@@ -69,6 +76,9 @@ self.addEventListener('fetch', (event) => {
                     cache.put(request, response.clone());
                 } else if (response.status === 404) {
                     await cache.delete(request);
+                    // Deployed build changed and this hashed chunk no longer exists.
+                    // Ask clients to refresh shell so module graph matches deployed assets.
+                    event.waitUntil(notifyAssetMissingReload());
                 }
                 return response;
             } catch {

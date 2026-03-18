@@ -1,4 +1,4 @@
-import { Peer, type DataConnection } from 'peerjs';
+import { Peer, type DataConnection, type PeerJSOption } from 'peerjs';
 import { sessionStore, locationStore, uiStore } from '../store/index.js';
 import type { Coordinates, PartnerStatus, SessionStatus, Venue } from '../types/index.js';
 
@@ -23,6 +23,69 @@ class P2PService {
     private _signalingReconnectTimer: any = null;
     private _maxQueueSize = 300;
 
+    private _buildPeerOptions(): PeerJSOption {
+        const defaultStun: RTCIceServer[] = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun.cloudflare.com:3478' },
+        ];
+
+        let iceServers: RTCIceServer[] = [...defaultStun];
+
+        const iceServersJson = import.meta.env.VITE_ICE_SERVERS_JSON as string | undefined;
+        if (iceServersJson) {
+            try {
+                const parsed = JSON.parse(iceServersJson) as RTCIceServer[];
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    iceServers = parsed;
+                }
+            } catch {
+                console.warn('[P2P] Invalid VITE_ICE_SERVERS_JSON; falling back to default STUN/TURN config');
+            }
+        } else {
+            const stunUrls = (import.meta.env.VITE_STUN_URLS as string | undefined)
+                ?.split(',')
+                .map((u) => u.trim())
+                .filter(Boolean);
+            if (stunUrls && stunUrls.length > 0) {
+                iceServers = [{ urls: stunUrls }];
+            }
+
+            const turnUrl = (import.meta.env.VITE_TURN_URL as string | undefined)?.trim();
+            const turnUsername = (import.meta.env.VITE_TURN_USERNAME as string | undefined)?.trim();
+            const turnCredential = (import.meta.env.VITE_TURN_CREDENTIAL as string | undefined)?.trim();
+            if (turnUrl && turnUsername && turnCredential) {
+                iceServers.push({
+                    urls: turnUrl,
+                    username: turnUsername,
+                    credential: turnCredential,
+                });
+            }
+        }
+
+        const peerHost = (import.meta.env.VITE_PEER_HOST as string | undefined)?.trim();
+        const peerPath = (import.meta.env.VITE_PEER_PATH as string | undefined)?.trim();
+        const peerPortRaw = (import.meta.env.VITE_PEER_PORT as string | undefined)?.trim();
+        const peerSecureRaw = (import.meta.env.VITE_PEER_SECURE as string | undefined)?.trim();
+        const peerPort = peerPortRaw ? Number(peerPortRaw) : undefined;
+
+        const options: PeerJSOption = {
+            config: {
+                iceServers,
+                iceTransportPolicy: 'all',
+            },
+        };
+
+        if (peerHost) {
+            options.host = peerHost;
+            if (peerPath) options.path = peerPath;
+            if (Number.isFinite(peerPort)) options.port = peerPort;
+            if (peerSecureRaw) options.secure = peerSecureRaw === 'true' || peerSecureRaw === '1';
+        }
+
+        return options;
+    }
+
     private _newId() {
         return typeof crypto.randomUUID === 'function'
             ? crypto.randomUUID()
@@ -40,7 +103,8 @@ class P2PService {
         }
         
         return new Promise((resolve, reject) => {
-            this._peer = id ? new Peer(id) : new Peer();
+            const peerOptions = this._buildPeerOptions();
+            this._peer = id ? new Peer(id, peerOptions) : new Peer(peerOptions);
 
             const timeout = setTimeout(() => {
                 reject(new Error('Peer initialization timeout'));
