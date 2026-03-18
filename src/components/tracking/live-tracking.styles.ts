@@ -92,6 +92,13 @@ export const liveTrackingStyles = css`
     .eta-divider { width: var(--border-width); height: 32px; background: var(--border-color); }
 
     .recenter-bar { margin-top: var(--space-3); text-align: center; }
+    .recenter-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+    }
     .text-btn {
         background: none; border: none; color: var(--color-blue);
         font-size: var(--text-sm); font-weight: var(--weight-bold); cursor: pointer;
@@ -99,6 +106,35 @@ export const liveTrackingStyles = css`
         transition: background var(--duration-fast);
     }
     .text-btn:hover { background: var(--color-blue-light); }
+    .text-btn.active {
+        background: var(--color-blue);
+        color: #fff;
+    }
+
+    .route-mode-row {
+        display: flex;
+        justify-content: center;
+        gap: var(--space-2);
+        margin-top: var(--space-2);
+    }
+
+    .route-mode-btn {
+        border: 1px solid rgba(0,0,0,0.12);
+        background: #fff;
+        color: var(--color-text-primary);
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: var(--text-xs);
+        font-weight: var(--weight-medium);
+        cursor: pointer;
+        transition: all var(--duration-fast);
+    }
+
+    .route-mode-btn.active {
+        border-color: var(--color-blue);
+        background: var(--color-blue-light);
+        color: var(--color-blue);
+    }
 
     .chat-widget {
         transition: all var(--duration-slow) var(--ease-in-out);

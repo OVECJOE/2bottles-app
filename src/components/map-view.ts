@@ -196,6 +196,9 @@ export class MapView extends LitElement {
     private _routeCache = new Map<string, [number, number][]>();
     private _routeInflight = new Map<string, Promise<[number, number][]>>();
     private _infoRequestId = 0;
+    private _followUser = false;
+    private _routeMode: 'both' | 'mine' = 'both';
+    private _lastFollowAt = 0;
 
     override connectedCallback() {
         super.connectedCallback();
@@ -207,6 +210,8 @@ export class MapView extends LitElement {
             'map-view:clear-midpoint': () => this._onClearMidpoint(),
             'map-view:draw-tracking-routes': () => this._onDrawTracking(),
             'map-view:fit-tracking': () => this._onFitTracking(),
+            'map-view:follow-user': (e: any) => this._onFollowUser(e),
+            'map-view:route-mode': (e: any) => this._onRouteMode(e),
         };
 
         Object.entries(this._handlers).forEach(([evt, handler]) => {
@@ -350,6 +355,23 @@ export class MapView extends LitElement {
         if ((screen === 'live-tracking' || screen === 'select-rendezvous' || screen === 'partner-agree-refuse') && own && destination) {
             void this._drawTrackingRoutes(own, partner || undefined, destination);
         }
+
+        if (screen === 'live-tracking' && own && this._followUser) {
+            this._followOwnCamera(own);
+        }
+    }
+
+    private _followOwnCamera(own: Coordinates) {
+        if (!this._map) return;
+        const now = Date.now();
+        if (now - this._lastFollowAt < 1200) return;
+        this._lastFollowAt = now;
+        this._map.easeTo({
+            center: [own.lng, own.lat],
+            zoom: Math.max(this._map.getZoom(), 14),
+            duration: 700,
+            essential: true,
+        });
     }
 
     private _updateSource(id: string, coords: Coordinates | null) {
@@ -732,7 +754,7 @@ export class MapView extends LitElement {
         }
         this._setLineSource(SOURCE_ROUTE_OWN, youLine, '#4285f4', true);
 
-        if (partner) {
+        if (partner && this._routeMode === 'both') {
             let partnerLine: [number, number][] = [[partner.lng, partner.lat], [dest.lng, dest.lat]];
             try {
                 partnerLine = await this._fetchRoute(partner, dest);
@@ -838,7 +860,25 @@ export class MapView extends LitElement {
     private _onFitTracking = () => {
         const { own, partner, destination } = locationStore;
         if (own && destination) {
-            this.fitBounds(own, destination, 100, partner ?? undefined);
+            this.fitBounds(own, destination, 100, this._routeMode === 'both' ? (partner ?? undefined) : undefined);
+        }
+    };
+
+    private _onFollowUser = (e: CustomEvent<{ enabled: boolean }>) => {
+        this._followUser = !!e.detail?.enabled;
+        const own = locationStore.own;
+        if (this._followUser && own) {
+            this._followOwnCamera(own);
+        }
+    };
+
+    private _onRouteMode = (e: CustomEvent<{ mode: 'both' | 'mine' }>) => {
+        const mode = e.detail?.mode;
+        this._routeMode = mode === 'mine' ? 'mine' : 'both';
+        const { own, partner, destination } = locationStore;
+        if (own && destination) {
+            void this._drawTrackingRoutes(own, partner ?? undefined, destination);
+            this._onFitTracking();
         }
     };
 

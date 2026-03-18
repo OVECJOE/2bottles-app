@@ -19,6 +19,8 @@ export class LiveTracking extends LitElement {
   @state() private _arrivalNotified = false;
   @state() private _lastProximityTier = -1;
   @state() private _unreadMessages = 0;
+  @state() private _followUser = false;
+  @state() private _routeMode: 'both' | 'mine' = 'both';
   
   private _ticker?: any;
   private _unsubLocation?: () => void;
@@ -42,6 +44,8 @@ export class LiveTracking extends LitElement {
     });
 
     locationStore.startWatching();
+    this._fireMapEvent('map-view:follow-user', { enabled: this._followUser });
+    this._fireMapEvent('map-view:route-mode', { mode: this._routeMode });
     this._fireMapEvent('map-view:draw-tracking-routes', {});
     this._fireMapEvent('map-view:fit-tracking', {});
 
@@ -79,6 +83,8 @@ export class LiveTracking extends LitElement {
     this._unsubLocation?.();
     this._unsubSession?.();
     clearInterval(this._ticker);
+    this._fireMapEvent('map-view:follow-user', { enabled: false });
+    this._fireMapEvent('map-view:route-mode', { mode: 'both' });
   }
 
   private _onLocationUpdate() {
@@ -185,6 +191,17 @@ export class LiveTracking extends LitElement {
     if (this._showChat) {
       this._unreadMessages = 0;
     }
+  }
+
+  private _toggleFollowUser() {
+    this._followUser = !this._followUser;
+    this._fireMapEvent('map-view:follow-user', { enabled: this._followUser });
+  }
+
+  private _setRouteMode(mode: 'both' | 'mine') {
+    if (this._routeMode === mode) return;
+    this._routeMode = mode;
+    this._fireMapEvent('map-view:route-mode', { mode });
   }
 
   private _sendMessage(e: Event) {
@@ -296,6 +313,20 @@ export class LiveTracking extends LitElement {
                              <button class="text-btn" @click=${() => this._fireMapEvent('map-view:fit-tracking', {})}>
                                 Recenter Map
                              </button>
+                             <button class="text-btn ${this._followUser ? 'active' : ''}" @click=${this._toggleFollowUser}>
+                                ${this._followUser ? 'Following You' : 'Follow Me'}
+                             </button>
+                        </div>
+
+                        <div class="route-mode-row">
+                            <button
+                              class="route-mode-btn ${this._routeMode === 'both' ? 'active' : ''}"
+                              @click=${() => this._setRouteMode('both')}
+                            >Both Routes</button>
+                            <button
+                              class="route-mode-btn ${this._routeMode === 'mine' ? 'active' : ''}"
+                              @click=${() => this._setRouteMode('mine')}
+                            >My Route</button>
                         </div>
                     </div>
 
