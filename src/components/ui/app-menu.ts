@@ -18,7 +18,7 @@ import type { AppScreen } from '../../types/index.js';
 interface MenuItem {
   icon: string;
   label: string;
-  action: () => void;
+  action: () => void | Promise<void>;
   danger?: boolean;
 }
 
@@ -128,11 +128,14 @@ export class AppMenu extends LitElement {
       label: 'Share session',
       action: async () => {
         const link = s?.link || window.location.origin;
-        if (navigator.share) {
-          await navigator.share({ title: '2bottles', url: link });
-        } else {
-          const ok = await copyText(link);
-          uiStore.showToast(ok ? 'Link copied' : 'Unable to copy automatically. Please copy manually.');
+        try {
+          if (navigator.share) {
+            await navigator.share({ title: '2bottles', url: link });
+          } else {
+            const ok = await copyText(link);
+            uiStore.showToast(ok ? 'Link copied' : 'Unable to copy automatically. Please copy manually.');
+          }
+        } catch {
         }
         this._dismiss();
       },
@@ -155,7 +158,17 @@ export class AppMenu extends LitElement {
       icon: '✕',
       label: 'End session',
       danger: true,
-      action: () => {
+      action: async () => {
+        const confirmed = await uiStore.confirm({
+          title: 'End Session?',
+          message: 'Are you sure you want to end this session for everyone?',
+          confirmLabel: 'End Session',
+          cancelLabel: 'Keep Going',
+        });
+        if (!confirmed) {
+          this._dismiss();
+          return;
+        }
         p2pService.endSessionForAll();
         sessionStore.endSession();
         locationStore.reset();
@@ -168,7 +181,17 @@ export class AppMenu extends LitElement {
       icon: '✕',
       label: 'Cancel invite',
       danger: true,
-      action: () => {
+      action: async () => {
+        const confirmed = await uiStore.confirm({
+          title: 'Cancel Invite?',
+          message: 'This will end the current rendezvous and stop location sharing.',
+          confirmLabel: 'Yes, Cancel',
+          cancelLabel: 'Keep Session',
+        });
+        if (!confirmed) {
+          this._dismiss();
+          return;
+        }
         p2pService.endSessionForAll();
         sessionStore.endSession();
         locationStore.reset();

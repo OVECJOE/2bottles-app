@@ -1,5 +1,5 @@
 import { LitElement, html } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, query, state } from 'lit/decorators.js';
 import { liveTrackingStyles } from './live-tracking.styles.js';
 import { locationStore, sessionStore, uiStore } from '../../store/index.js';
 import { haversineMeters } from '../../services/geocoding.service.js';
@@ -28,6 +28,7 @@ export class LiveTracking extends LitElement {
   private _unsubSession?: () => void;
   private _lastOwnSample: { lat: number; lng: number; t: number } | null = null;
   private _lastChatMessageCount = 0;
+  @query('.chat-body') private _chatBodyEl?: HTMLElement;
 
   override connectedCallback() {
     super.connectedCallback();
@@ -42,6 +43,7 @@ export class LiveTracking extends LitElement {
         uiStore.goToEndSession();
       }
       this.requestUpdate();
+      if (this._showChat) this._scrollChatToBottom();
     });
 
     locationStore.startWatching();
@@ -191,7 +193,16 @@ export class LiveTracking extends LitElement {
     this._showChat = !this._showChat;
     if (this._showChat) {
       this._unreadMessages = 0;
+      this._scrollChatToBottom();
     }
+  }
+
+  private _scrollChatToBottom() {
+    requestAnimationFrame(() => {
+      if (this._chatBodyEl) {
+        this._chatBodyEl.scrollTop = this._chatBodyEl.scrollHeight;
+      }
+    });
   }
 
   private _toggleFollowUser() {

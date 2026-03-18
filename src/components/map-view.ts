@@ -921,7 +921,7 @@ export class MapView extends LitElement {
             ` : ''}
 
             ${this._infoCard ? html`
-                <div class="map-info-sheet" role="dialog" aria-live="polite">
+                <div class="map-info-sheet" role="region" aria-label="Map details" aria-live="polite">
                     <div class="map-info-head">
                         <div>
                             <div class="map-info-title">${this._infoCard.title}</div>

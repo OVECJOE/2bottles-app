@@ -219,7 +219,7 @@ export class PartnerAgreeRefuse extends LitElement {
                 @input=${(e: InputEvent) => { this._draft = (e.target as HTMLInputElement).value; }}
                 @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') this._send(); }}
             />
-            <button class="send-btn" @click=${this._send}>↑</button>
+            <button class="send-btn" @click=${this._send} aria-label="Send message">↑</button>
             </div>
 
             <div class="action-row">

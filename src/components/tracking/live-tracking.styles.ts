@@ -141,7 +141,7 @@ export const liveTrackingStyles = css`
         display: flex; flex-direction: column;
     }
     .chat-widget.collapsed { height: 56px; overflow: hidden; }
-    .chat-widget.expanded { height: 400px; }
+    .chat-widget.expanded { height: min(400px, 56vh); }
 
     .chat-header {
         height: 56px; display: flex; align-items: center; justify-content: space-between;

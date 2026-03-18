@@ -119,7 +119,7 @@ export class LiveChatScreen extends LitElement {
         <screen-shell screen='live-chat'>
         <div class="chat-container">
             <header class="header">
-                <button class="back-btn" @click=${() => uiStore.goToLiveTracking()}>←</button>
+                <button class="back-btn" @click=${() => uiStore.goToLiveTracking()} aria-label="Back to live tracking">←</button>
                 <div class="avatar">${pName[0].toUpperCase()}</div>
                 <div class="info">
                     <div class="name">${pName}</div>
