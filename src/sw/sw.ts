@@ -8,8 +8,8 @@
 /// <reference lib="webworker" />
 declare const self: ServiceWorkerGlobalScope;
 
-const CACHE_NAME = '2bottles-v1';
-const ASSET_CACHE = '2bottles-assets-v1';
+const CACHE_NAME = '2bottles-v2';
+const ASSET_CACHE = '2bottles-assets-v2';
 
 // Assets to precache on install (Vite injects the manifest
 // in production via the rollup output; list key routes here)
@@ -58,17 +58,25 @@ self.addEventListener('fetch', (event) => {
     // 2. API calls → network-only (never cache live location data)
     if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) return;
 
-    // 3. JS/CSS/image assets → cache-first (hashed filenames = safe)
+    // 3. JS/CSS/image assets → network-first, fallback to cache.
+    // This avoids stale-chunk failures after deploy when dynamic imports change.
     if (url.pathname.startsWith('/assets/')) {
-        event.respondWith(
-            caches.open(ASSET_CACHE).then(async (cache) => {
+        event.respondWith((async () => {
+            const cache = await caches.open(ASSET_CACHE);
+            try {
+                const response = await fetch(request);
+                if (response.ok) {
+                    cache.put(request, response.clone());
+                } else if (response.status === 404) {
+                    await cache.delete(request);
+                }
+                return response;
+            } catch {
                 const cached = await cache.match(request);
                 if (cached) return cached;
-                const response = await fetch(request);
-                cache.put(request, response.clone());
-                return response;
-            })
-        );
+                return new Response('', { status: 504, statusText: 'Offline asset unavailable' });
+            }
+        })());
         return;
     }
 
