@@ -1,4 +1,5 @@
 type SessionStatus = 'pending_partner' | 'selecting_venue' | 'pending_agreement' | 'agreed' | 'live' | 'ended';
+export type SessionRole = 'owner' | 'member';
 
 export interface SessionRecord {
   id: string;
@@ -70,5 +71,13 @@ export class SessionStore {
     session.venueId = venueId ?? undefined;
     this.sessions.set(id, session);
     return true;
+  }
+
+  getRole(id: string, userId: string): SessionRole | null {
+    const session = this.sessions.get(id);
+    if (!session) return null;
+    const joined = session.participants.some((p) => p.userId === userId);
+    if (!joined) return null;
+    return session.ownerUserId === userId ? 'owner' : 'member';
   }
 }

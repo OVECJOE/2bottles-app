@@ -42,6 +42,11 @@ function verifyJwtHs256(token: string, secret: string): boolean {
   return timingSafeEqual(expected, actual);
 }
 
+function readBearerToken(req: Request): string | null {
+  const auth = req.headers.get('authorization') ?? req.headers.get('Authorization') ?? '';
+  return auth.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
 function isJwtExpired(claims: Record<string, unknown> | null): boolean {
   if (!claims) return true;
   const exp = Number(claims.exp ?? 0);
@@ -67,8 +72,7 @@ export function normalizeUserId(raw: string | null | undefined): string {
 }
 
 export function resolveIdentity(req: Request): RequestIdentity {
-  const auth = req.headers.get('authorization') ?? req.headers.get('Authorization') ?? '';
-  const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  const bearer = readBearerToken(req);
   const jwtSecret = process.env.JWT_SECRET?.trim();
 
   let claims: Record<string, unknown> | null = null;
@@ -93,4 +97,14 @@ export function resolveIdentity(req: Request): RequestIdentity {
   const membership = tierRaw === 'paid' ? 'paid' : 'free';
 
   return { userId, name, membership };
+}
+
+export function isRequestAuthenticated(req: Request): boolean {
+  const jwtSecret = process.env.JWT_SECRET?.trim();
+  if (!jwtSecret) return false;
+  const bearer = readBearerToken(req);
+  if (!bearer) return false;
+  if (!verifyJwtHs256(bearer, jwtSecret)) return false;
+  const claims = readJwtPayload(bearer);
+  return !isJwtExpired(claims);
 }

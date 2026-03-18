@@ -2,6 +2,8 @@ import postgres from 'postgres';
 
 export type MembershipTier = 'free' | 'paid';
 export type SessionStatus = 'pending_partner' | 'selecting_venue' | 'pending_agreement' | 'agreed' | 'live' | 'ended';
+export type SessionEventType = 'session:status' | 'session:venue';
+export type SessionRole = 'owner' | 'member';
 
 export interface DbSessionRecord {
   id: string;
@@ -17,9 +19,17 @@ export interface SessionHistoryRecord {
   sessionId: string;
   status: SessionStatus;
   venueId?: string;
+  cursor: number;
   participants: Array<{ userId: string; name?: string; online: boolean }>;
   latestLocations: Array<{ userId: string; lat: number; lng: number; ts: number }>;
+  locationEvents: Array<{ userId: string; lat: number; lng: number; ts: number }>;
   chat: Array<{ id: string; userId: string; text: string; ts: number }>;
+  events: Array<{ id: string; type: SessionEventType; actorUserId?: string; payload: Record<string, unknown>; ts: number }>;
+}
+
+interface SessionHistoryOptions {
+  sinceMs?: number;
+  chatLimit?: number;
 }
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -138,6 +148,19 @@ export async function joinDbSession(sessionId: string, userId: string, name?: st
   });
 }
 
+export async function getDbParticipantRole(sessionId: string, userId: string): Promise<SessionRole | null> {
+  if (!sql) return null;
+  const rows = await sql<{ role: SessionRole }[]>`
+    SELECT role
+    FROM session_participants
+    WHERE session_id = ${sessionId}
+      AND user_id = ${userId}
+      AND left_at IS NULL
+    LIMIT 1
+  `;
+  return rows[0]?.role ?? null;
+}
+
 export async function endDbSession(sessionId: string): Promise<boolean> {
   if (!sql) return false;
   const rows = await sql<{ id: string }[]>`
@@ -208,8 +231,31 @@ export async function updateDbSessionVenue(sessionId: string, venueId: string | 
   return rows.length > 0;
 }
 
-export async function getSessionHistory(sessionId: string, chatLimit = 100): Promise<SessionHistoryRecord | null> {
+export async function insertSessionEvent(
+  sessionId: string,
+  actorUserId: string | null,
+  type: SessionEventType,
+  payload: Record<string, unknown>,
+): Promise<string | null> {
   if (!sql) return null;
+  const id = newId();
+  const rows = await sql<{ id: string }[]>`
+    INSERT INTO session_events (id, session_id, actor_user_id, event_type, payload)
+    VALUES (${id}, ${sessionId}, ${actorUserId}, ${type}, ${JSON.stringify(payload)}::jsonb)
+    RETURNING id
+  `;
+  return rows[0]?.id ?? null;
+}
+
+export async function getSessionHistory(sessionId: string, options: SessionHistoryOptions = {}): Promise<SessionHistoryRecord | null> {
+  if (!sql) return null;
+  const sinceMs = Number(options.sinceMs ?? 0);
+  const hasSince = Number.isFinite(sinceMs) && sinceMs > 0;
+  const chatLimit = Math.max(1, Math.min(Number(options.chatLimit ?? 100), 500));
+  const sinceDate = new Date(hasSince ? sinceMs : 0);
+
+  const cursorRows = await sql<{ cursor_ts: Date }[]>`SELECT NOW() AS cursor_ts`;
+  const cursorDate = cursorRows[0]?.cursor_ts ? new Date(cursorRows[0].cursor_ts) : new Date();
 
   const sessions = await sql<{ id: string; status: SessionStatus; venue_id: string | null }[]>`
     SELECT id, status, venue_id FROM sessions WHERE id = ${sessionId} LIMIT 1
@@ -230,23 +276,42 @@ export async function getSessionHistory(sessionId: string, chatLimit = 100): Pro
     ORDER BY sp.joined_at ASC
   `;
 
-  const latestLocations = await sql<{
+  let latestLocations: Array<{ user_id: string; lat: number; lng: number; created_at: Date }> = [];
+  if (!hasSince) {
+    latestLocations = await sql<{
+      user_id: string;
+      lat: number;
+      lng: number;
+      created_at: Date;
+    }[]>`
+      SELECT DISTINCT ON (le.user_id)
+        le.user_id,
+        ST_Y(le.geom::geometry) AS lat,
+        ST_X(le.geom::geometry) AS lng,
+        le.created_at
+      FROM location_events le
+      WHERE le.session_id = ${sessionId}
+        AND le.created_at <= ${cursorDate}
+      ORDER BY le.user_id, le.created_at DESC
+    `;
+  }
+
+  const locationEventRows = await sql<{
     user_id: string;
     lat: number;
     lng: number;
     created_at: Date;
   }[]>`
-    SELECT DISTINCT ON (le.user_id)
-      le.user_id,
-      ST_Y(le.geom::geometry) AS lat,
-      ST_X(le.geom::geometry) AS lng,
-      le.created_at
+    SELECT le.user_id, ST_Y(le.geom::geometry) AS lat, ST_X(le.geom::geometry) AS lng, le.created_at
     FROM location_events le
     WHERE le.session_id = ${sessionId}
-    ORDER BY le.user_id, le.created_at DESC
+      ${hasSince ? sql`AND le.created_at > ${sinceDate}` : sql``}
+      AND le.created_at <= ${cursorDate}
+    ORDER BY le.created_at ASC
+    LIMIT ${chatLimit}
   `;
 
-  const chatRows = await sql<{
+  const chatRowsDesc = await sql<{
     id: string;
     user_id: string;
     text: string;
@@ -255,14 +320,38 @@ export async function getSessionHistory(sessionId: string, chatLimit = 100): Pro
     SELECT id, user_id, text, created_at
     FROM chat_messages
     WHERE session_id = ${sessionId}
+      ${hasSince ? sql`AND created_at > ${sinceDate}` : sql``}
+      AND created_at <= ${cursorDate}
     ORDER BY created_at DESC
-    LIMIT ${Math.max(1, Math.min(chatLimit, 500))}
+    LIMIT ${chatLimit}
   `;
+
+  const eventRows = await sql<{
+    id: string;
+    event_type: SessionEventType;
+    actor_user_id: string | null;
+    payload: unknown;
+    created_at: Date;
+  }[]>`
+    SELECT id, event_type, actor_user_id, payload, created_at
+    FROM session_events
+    WHERE session_id = ${sessionId}
+      ${hasSince ? sql`AND created_at > ${sinceDate}` : sql``}
+      AND created_at <= ${cursorDate}
+    ORDER BY created_at DESC
+    LIMIT ${chatLimit}
+  `;
+
+  const chatRows = chatRowsDesc.reverse();
+  const eventsChronological = eventRows.reverse();
+
+  const cursor = new Date(cursorDate).getTime();
 
   return {
     sessionId: base.id,
     status: base.status,
     venueId: base.venue_id ?? undefined,
+    cursor,
     participants: participants.map((p) => ({
       userId: p.user_id,
       name: p.display_name ?? undefined,
@@ -274,8 +363,22 @@ export async function getSessionHistory(sessionId: string, chatLimit = 100): Pro
       lng: Number(l.lng),
       ts: new Date(l.created_at).getTime(),
     })),
+    locationEvents: locationEventRows.map((l) => ({
+      userId: l.user_id,
+      lat: Number(l.lat),
+      lng: Number(l.lng),
+      ts: new Date(l.created_at).getTime(),
+    })),
     chat: chatRows
-      .reverse()
       .map((m) => ({ id: m.id, userId: m.user_id, text: m.text, ts: new Date(m.created_at).getTime() })),
+    events: eventsChronological.map((e) => ({
+      id: e.id,
+      type: e.event_type,
+      actorUserId: e.actor_user_id ?? undefined,
+      payload: (typeof e.payload === 'object' && e.payload && !Array.isArray(e.payload)
+        ? (e.payload as Record<string, unknown>)
+        : {}),
+      ts: new Date(e.created_at).getTime(),
+    })),
   };
 }

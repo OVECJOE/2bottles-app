@@ -18,6 +18,7 @@ export type ServerToClientMessage =
 
 export interface SocketContext {
   socketId: string;
+  requestId?: string;
   userId: string;
   sessionId: string;
   name?: string;
