@@ -31,6 +31,10 @@ class LocationStore implements LocationState {
         return typeof window !== 'undefined' && !!navigator.geolocation && window.isSecureContext;
     }
 
+    private _isValidCoords(coords: Coordinates | null): coords is Coordinates {
+        return !!coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng);
+    }
+
     async init() {
         try {
             const saved = await get(DB_KEY);
@@ -77,7 +81,7 @@ class LocationStore implements LocationState {
     }
 
     setOwnLocation(coords: Coordinates, accuracy?: number) {
-        if (!coords || isNaN(coords.lat) || isNaN(coords.lng)) return;
+        if (!this._isValidCoords(coords)) return;
         this.own = coords;
         this.accuracy = accuracy ?? null;
         this._notify();
@@ -134,7 +138,9 @@ class LocationStore implements LocationState {
             const now = Date.now();
             const logWindow = err.code === 2 ? 15000 : 2000;
             if (now - this._lastErrorLogTime > logWindow) {
-                console.warn(`[LocationStore] Watch error (${err.code}):`, err.message);
+                if (err.code !== 2) {
+                    console.warn(`[LocationStore] Watch error (${err.code}):`, err.message);
+                }
                 this._lastErrorLogTime = now;
             }
 
@@ -239,7 +245,7 @@ class LocationStore implements LocationState {
     }
 
     setPartnerLocation(coords: Coordinates) {
-        if (!coords || isNaN(coords.lat) || isNaN(coords.lng)) return;
+        if (!this._isValidCoords(coords)) return;
         this.partner = coords;
         this._notify();
         this._save();
@@ -252,6 +258,7 @@ class LocationStore implements LocationState {
     }
 
     setDestination(coords: Coordinates) {
+        if (!this._isValidCoords(coords)) return;
         this.destination = coords;
         this._notify();
         this._save();

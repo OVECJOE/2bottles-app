@@ -1,11 +1,12 @@
 import { LitElement, html } from 'lit';
-import { customElement, query } from 'lit/decorators.js';
+import { customElement, query, state } from 'lit/decorators.js';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { locationStore, uiStore } from '../store/index.js';
 import { sessionStore } from '../store/index.js';
 import type { Coordinates } from '../types/index.js';
+import { reverseGeocode } from '../services/geocoding.service.js';
 
 export const PIN_YOU = 'pin-you';
 export const PIN_PARTNER = 'pin-partner';
@@ -178,12 +179,23 @@ function makeEtaChipEl(tone: 'you' | 'partner', minutes: number): HTMLElement {
         'font:700 11px "DM Sans", sans-serif',
         'box-shadow:0 4px 12px rgba(0,0,0,0.2)',
         'border:1px solid rgba(255,255,255,0.55)',
-        'pointer-events:none',
+        'pointer-events:auto',
+        'cursor:pointer',
         'white-space:nowrap',
     ].join(';');
     el.textContent = `${minutes} min`;
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
     return el;
 }
+
+type InfoRow = { label: string; value: string };
+type MapInfoCard = {
+    title: string;
+    subtitle?: string;
+    rows: InfoRow[];
+    loading?: boolean;
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -192,6 +204,8 @@ function makeEtaChipEl(tone: 'you' | 'partner', minutes: number): HTMLElement {
 @customElement('map-view')
 export class MapView extends LitElement {
     static createRenderRoot() { return this; }
+
+    @state() private _infoCard: MapInfoCard | null = null;
 
     @query('#map-container')
     private _mapContainer!: HTMLDivElement;
@@ -208,6 +222,7 @@ export class MapView extends LitElement {
     private _routeInflight = new Map<string, Promise<[number, number][]>>();
     private _ownEtaMarker: maplibregl.Marker | null = null;
     private _partnerEtaMarker: maplibregl.Marker | null = null;
+    private _infoRequestId = 0;
 
     override connectedCallback() {
         super.connectedCallback();
@@ -370,7 +385,7 @@ export class MapView extends LitElement {
         const source = this._map.getSource(id) as maplibregl.GeoJSONSource;
         if (!source) return;
 
-        if (!coords) {
+        if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) {
             source.setData({ type: 'FeatureCollection', features: [] });
             return;
         }
@@ -479,8 +494,24 @@ export class MapView extends LitElement {
         });
 
         // Sync again once images/layers are ready
+        this._bindPinInteractions();
         this._syncFromStore();
         this._startPulseAnimation();
+    }
+
+    private _bindPinInteractions() {
+        const map = this._map;
+        if (!map) return;
+
+        const bind = (layerId: string, onClick: () => void) => {
+            map.on('click', layerId, () => onClick());
+            map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+            map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+        };
+
+        bind(LAYER_YOU, () => this._openOwnInfo());
+        bind(LAYER_PARTNER, () => this._openPartnerInfo());
+        bind(LAYER_DESTINATION, () => this._openDestinationInfo());
     }
 
     private _startPulseAnimation() {
@@ -594,6 +625,113 @@ export class MapView extends LitElement {
         return coords[Math.floor(coords.length / 2)] ?? null;
     }
 
+    private _formatDistanceKm(meters: number | null): string {
+        if (meters === null || meters < 0) return '--';
+        return `${(meters / 1000).toFixed(1)} km`;
+    }
+
+    private _formatEta(minutes: number | null): string {
+        if (minutes === null || minutes < 0) return '--';
+        return `${Math.round(minutes)} min`;
+    }
+
+    private _formatArrival(minutes: number | null): string {
+        if (minutes === null || minutes < 0) return '--';
+        const at = new Date(Date.now() + minutes * 60_000);
+        return at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+
+    private _openEtaInfo(tone: 'you' | 'partner', minutes: number) {
+        const isYou = tone === 'you';
+        const distanceM = isYou ? locationStore.ownDistanceM : locationStore.partnerDistanceM;
+        const label = isYou ? 'Your route' : `${sessionStore.partnerName || 'Partner'} route`;
+
+        this._infoCard = {
+            title: label,
+            subtitle: `Arrive by ${this._formatArrival(minutes)}`,
+            rows: [
+                { label: 'ETA', value: this._formatEta(minutes) },
+                { label: 'Distance', value: this._formatDistanceKm(distanceM) },
+            ],
+        };
+    }
+
+    private _setInfoCardWithPlace(
+        title: string,
+        coords: Coordinates | null,
+        rows: InfoRow[],
+        subtitle?: string,
+    ) {
+        const requestId = ++this._infoRequestId;
+        this._infoCard = { title, subtitle, rows, loading: !!coords };
+
+        if (!coords) return;
+
+        reverseGeocode(coords.lat, coords.lng)
+            .then((label) => {
+                if (requestId !== this._infoRequestId || !this._infoCard) return;
+                this._infoCard = {
+                    ...this._infoCard,
+                    rows: [...this._infoCard.rows, { label: 'Area', value: label }],
+                    loading: false,
+                };
+            })
+            .catch(() => {
+                if (requestId !== this._infoRequestId || !this._infoCard) return;
+                this._infoCard = {
+                    ...this._infoCard,
+                    loading: false,
+                };
+            });
+    }
+
+    private _openOwnInfo() {
+        const own = locationStore.own;
+        if (!own) return;
+        this._setInfoCardWithPlace(
+            'You',
+            own,
+            [
+                { label: 'ETA to meetup', value: this._formatEta(locationStore.ownEtaMinutes) },
+                { label: 'Distance', value: this._formatDistanceKm(locationStore.ownDistanceM) },
+                { label: 'GPS accuracy', value: locationStore.accuracy ? `±${Math.round(locationStore.accuracy)} m` : '--' },
+            ],
+            'Live location',
+        );
+    }
+
+    private _openPartnerInfo() {
+        const partner = locationStore.partner;
+        if (!partner) return;
+        this._setInfoCardWithPlace(
+            sessionStore.partnerName || 'Partner',
+            partner,
+            [
+                { label: 'ETA to meetup', value: this._formatEta(locationStore.partnerEtaMinutes) },
+                { label: 'Distance', value: this._formatDistanceKm(locationStore.partnerDistanceM) },
+                { label: 'Status', value: sessionStore.partner?.status || 'en route' },
+            ],
+            'Shared location',
+        );
+    }
+
+    private _openDestinationInfo() {
+        const destination = locationStore.destination;
+        if (!destination) return;
+
+        const venue = sessionStore.selectedVenue;
+        this._setInfoCardWithPlace(
+            venue?.name || 'Meetup spot',
+            destination,
+            [
+                { label: 'Type', value: venue?.category || 'place' },
+                { label: 'Address', value: venue?.address || 'Loading area...' },
+                { label: 'You arrive', value: this._formatArrival(locationStore.ownEtaMinutes) },
+            ],
+            'Destination',
+        );
+    }
+
     private _updateEtaMarker(
         marker: maplibregl.Marker | null,
         tone: 'you' | 'partner',
@@ -612,11 +750,18 @@ export class MapView extends LitElement {
             })
                 .setLngLat(point)
                 .addTo(this._map);
-            return marker;
         }
 
         marker.setLngLat(point);
-        marker.getElement().textContent = `${minutes} min`;
+        const el = marker.getElement();
+        el.textContent = `${minutes} min`;
+        el.onclick = () => this._openEtaInfo(tone, minutes);
+        el.onkeydown = (e: KeyboardEvent) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this._openEtaInfo(tone, minutes);
+            }
+        };
         return marker;
     }
 
@@ -837,6 +982,27 @@ export class MapView extends LitElement {
                 </div>
             ` : ''}
 
+            ${this._infoCard ? html`
+                <div class="map-info-sheet" role="dialog" aria-live="polite">
+                    <div class="map-info-head">
+                        <div>
+                            <div class="map-info-title">${this._infoCard.title}</div>
+                            ${this._infoCard.subtitle ? html`<div class="map-info-sub">${this._infoCard.subtitle}</div>` : ''}
+                        </div>
+                        <button class="map-info-close" @click=${() => { this._infoCard = null; }} aria-label="Close">✕</button>
+                    </div>
+                    <div class="map-info-body">
+                        ${this._infoCard.rows.map((row) => html`
+                            <div class="map-info-row">
+                                <span>${row.label}</span>
+                                <strong>${row.value}</strong>
+                            </div>
+                        `)}
+                        ${this._infoCard.loading ? html`<div class="map-info-loading">Loading area details...</div>` : ''}
+                    </div>
+                </div>
+            ` : ''}
+
             <style>
                 .map-overlay-top {
                     position: absolute; top: var(--space-2); left: var(--space-4);
@@ -858,6 +1024,75 @@ export class MapView extends LitElement {
                 .gps-status.retry .gps-dot { 
                     background: #fbbc04;
                     animation: pulse-signal 1.5s ease-in-out infinite;
+                }
+
+                .map-info-sheet {
+                    position: absolute;
+                    left: var(--space-4);
+                    right: var(--space-4);
+                    bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
+                    z-index: var(--z-modal);
+                    background: rgba(255,255,255,0.97);
+                    border-radius: var(--border-radius-lg);
+                    box-shadow: var(--shadow-lg);
+                    border: 1px solid rgba(0,0,0,0.08);
+                    padding: var(--space-3) var(--space-4);
+                }
+
+                .map-info-head {
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    gap: var(--space-3);
+                }
+
+                .map-info-title {
+                    font-size: var(--text-md);
+                    font-weight: var(--weight-bold);
+                    color: var(--color-text-primary);
+                }
+
+                .map-info-sub {
+                    margin-top: 2px;
+                    font-size: var(--text-xs);
+                    color: var(--color-text-muted);
+                }
+
+                .map-info-close {
+                    border: none;
+                    background: transparent;
+                    color: var(--color-text-muted);
+                    font-size: 14px;
+                    cursor: pointer;
+                    padding: 0;
+                    line-height: 1;
+                }
+
+                .map-info-body {
+                    margin-top: var(--space-2);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--space-1);
+                }
+
+                .map-info-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: var(--space-3);
+                    font-size: var(--text-sm);
+                    color: var(--color-text-secondary);
+                }
+
+                .map-info-row strong {
+                    color: var(--color-text-primary);
+                    font-weight: var(--weight-medium);
+                }
+
+                .map-info-loading {
+                    font-size: var(--text-xs);
+                    color: var(--color-text-muted);
+                    margin-top: var(--space-1);
                 }
 
                 @keyframes pulse-ring-premium {
