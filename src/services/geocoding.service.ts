@@ -686,6 +686,7 @@ async function fetchGeoapifyCandidates(
             'accommodation.hotel',
         ].join(','),
         filter: `circle:${center.lng},${center.lat},${radius}`,
+        bias: `proximity:${center.lng},${center.lat}`,
         limit: '60',
         lang: getGeoapifyLanguage(),
         apiKey: GEOAPIFY_API_KEY,
