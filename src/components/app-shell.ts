@@ -7,7 +7,7 @@ import { Router } from '@vaadin/router';
 
 import './map-view.js';
 import './ui/custom-dialog.js';
-import './ui/location-permission-dialog.js';
+import './ui/location-permission-toast.js';
 
 type LocationPermissionState = 'prompt' | 'granted' | 'denied' | 'unknown';
 
@@ -30,6 +30,7 @@ export class AppShell extends LitElement {
 
     private _router?: Router;
     private _unsubUI?: () => void;
+    private _unsubLocation?: () => void;
     private _deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
     private _permissionStatus?: PermissionStatus;
 
@@ -39,6 +40,12 @@ export class AppShell extends LitElement {
             this._toast = uiStore.toastMessage;
             this._loading = uiStore.isLoading;
             this._dialog = uiStore.dialogConfig;
+        });
+        this._unsubLocation = locationStore.subscribe(() => {
+            if (locationStore.own) {
+                this._locationTakeoverOpen = false;
+            }
+            this.requestUpdate();
         });
     }
 
@@ -58,7 +65,7 @@ export class AppShell extends LitElement {
         this._router = new Router(outlet);
         
         this._router.setRoutes([
-            { path: '/', component: 'landing-page', action: async () => { await import('./marketing/landing-page.js'); } },
+            { path: '/', component: 'landing-page', action: async () => { await import('./marketing/landing-page.ts'); } },
             { path: '/create-session', component: 'create-session', action: async () => { await import('./session/create-session.js'); } },
             { path: '/invite', component: 'invite-partner', action: async () => { await import('./session/invite-partner.js'); } },
             { path: '/join/:peerId', component: 'partner-invite-received', action: async () => { await import('./partner/partner-invite-received.js'); } },
@@ -69,7 +76,7 @@ export class AppShell extends LitElement {
             { path: '/chat', component: 'live-chat', action: async () => { await import('./tracking/live-chat-screen.js'); } },
             { path: '/session-link', component: 'session-link', action: async () => { await import('./session/session-link.js'); } },
             { path: '/ended', component: 'end-session', action: async () => { await import('./tracking/end-session.js'); } },
-            { path: '(.*)', component: 'landing-page' }
+            { path: '(.*)', component: 'landing-page', action: async () => { await import('./marketing/landing-page.ts'); } }
         ]);
 
         // 3. Handle reconnection logic
@@ -97,6 +104,7 @@ export class AppShell extends LitElement {
     override disconnectedCallback() {
         super.disconnectedCallback();
         this._unsubUI?.();
+        this._unsubLocation?.();
         this._permissionStatus?.removeEventListener('change', this._onPermissionChange);
         window.removeEventListener('beforeinstallprompt', this._onBeforeInstallPrompt as EventListener);
         window.removeEventListener('appinstalled', this._onAppInstalled);
@@ -152,7 +160,7 @@ export class AppShell extends LitElement {
             return;
         }
 
-        const shouldPrompt = !locationStore.own && !this._locationTakeoverDismissed;
+        const shouldPrompt = !locationStore.own && !locationStore.isWatching && !this._locationTakeoverDismissed;
         this._locationTakeoverOpen = shouldPrompt;
     }
 
@@ -186,6 +194,7 @@ export class AppShell extends LitElement {
         uiStore.setLoading(true);
         try {
             await locationStore.fetchOnce();
+            this._locationPermissionState = 'granted';
             locationStore.startWatching();
             this._locationTakeoverOpen = false;
             this._locationTakeoverDismissed = true;
@@ -203,6 +212,13 @@ export class AppShell extends LitElement {
         this._locationTakeoverDismissed = true;
         this._locationTakeoverOpen = false;
         uiStore.showToast('You can use manual address search for now.');
+    }
+
+    private get _showLocationPermissionToast(): boolean {
+        if (this._locationPermissionState === 'granted') return false;
+        if (locationStore.isWatching) return false;
+        if (locationStore.own) return false;
+        return this._locationTakeoverOpen;
     }
 
     override render() {
@@ -230,20 +246,15 @@ export class AppShell extends LitElement {
         @dialog-result=${(e: CustomEvent) => uiStore.handleDialogResult(e.detail.confirmed)}
       ></custom-dialog>
 
-            <custom-dialog
-                ?open=${this._locationTakeoverOpen}
-                ?fullscreen=${true}
-                ?hide-default-actions=${true}
-                ?allow-backdrop-dismiss=${false}
-            >
-                <location-permission-dialog
+            ${this._showLocationPermissionToast ? html`
+                <location-permission-toast
                     .permissionState=${this._locationPermissionState}
                     .canInstall=${this._canInstall}
                     @request-location=${() => this._requestLocationPermission()}
                     @continue-manual=${() => this._continueWithManualSearch()}
                     @request-install=${() => this._requestInstall()}
-                ></location-permission-dialog>
-            </custom-dialog>
+                ></location-permission-toast>
+            ` : nothing}
     `;
     }
 }

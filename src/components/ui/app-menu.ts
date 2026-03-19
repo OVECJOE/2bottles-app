@@ -177,15 +177,6 @@ export class AppMenu extends LitElement {
       },
     };
 
-    const intro: MenuItem = {
-      icon: 'ℹ',
-      label: 'How 2bottles works',
-      action: () => {
-        uiStore.showToast('Invite a partner, choose a fair midpoint venue, then track progress live.');
-        this._dismiss();
-      },
-    };
-
     const startRendezvous: MenuItem = {
       icon: '→',
       label: 'Start rendezvous',
@@ -229,10 +220,10 @@ export class AppMenu extends LitElement {
 
     switch (this.screen) {
       case 'landing':
-        return { primary: [startRendezvous, intro], danger: [] };
+        return { primary: [startRendezvous], danger: [] };
 
       case 'create-session':
-        return { primary: [backToSplash, intro], danger: [] };
+        return { primary: [backToSplash], danger: [] };
 
       case 'invite-partner':
         return { primary: [copyLink, shareLink], danger: [endSession] };
