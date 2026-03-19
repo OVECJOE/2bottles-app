@@ -177,6 +177,33 @@ export class AppMenu extends LitElement {
       },
     };
 
+    const intro: MenuItem = {
+      icon: 'ℹ',
+      label: 'How 2bottles works',
+      action: () => {
+        uiStore.showToast('Invite a partner, choose a fair midpoint venue, then track progress live.');
+        this._dismiss();
+      },
+    };
+
+    const startRendezvous: MenuItem = {
+      icon: '→',
+      label: 'Start rendezvous',
+      action: () => {
+        uiStore.navigate('create-session');
+        this._dismiss();
+      },
+    };
+
+    const backToSplash: MenuItem = {
+      icon: '⌂',
+      label: 'Back to splash',
+      action: () => {
+        void uiStore.goHome();
+        this._dismiss();
+      },
+    };
+
     const cancelInvite: MenuItem = {
       icon: '✕',
       label: 'Cancel invite',
@@ -201,8 +228,11 @@ export class AppMenu extends LitElement {
     };
 
     switch (this.screen) {
+      case 'landing':
+        return { primary: [startRendezvous, intro], danger: [] };
+
       case 'create-session':
-        return { primary: [], danger: [] };
+        return { primary: [backToSplash, intro], danger: [] };
 
       case 'invite-partner':
         return { primary: [copyLink, shareLink], danger: [endSession] };

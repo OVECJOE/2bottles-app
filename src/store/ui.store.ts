@@ -69,7 +69,7 @@ class UIStore {
         
         let path = '/';
         switch (screen) {
-            case 'create-session': path = '/'; break;
+            case 'create-session': path = '/create-session'; break;
             case 'invite-partner': path = '/invite'; break;
             case 'partner-notified': path = `/join/${params?.peerId || ''}`; break;
             case 'partner-rejected': path = '/rejected'; break;
@@ -98,7 +98,10 @@ class UIStore {
     goToEndSession() { this.navigate('end-session'); }
     async goHome() { 
         await del(DB_KEY);
-        this.navigate('create-session'); 
+        Router.go('/');
+        this.screen = 'landing';
+        this.sheetOpen = true;
+        this._notify();
     }
 
     // -----------------------------------------------------------

@@ -3,6 +3,7 @@ export * from './session.types';
 export * from './venue.types';
 
 export type AppScreen =
+    | 'landing'
     | 'create-session'
     | 'invite-partner'
     | 'partner-notified'     // waiting for partner response

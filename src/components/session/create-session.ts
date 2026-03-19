@@ -128,9 +128,22 @@ export class CreateSession extends LitElement {
 
   override connectedCallback() {
     super.connectedCallback();
-    locationStore.startWatching();
+    void this._startWatchingIfGranted();
     this._unsub = locationStore.subscribe(() => this._onLocationUpdate());
     this._onLocationUpdate();
+  }
+
+  private async _startWatchingIfGranted() {
+    if (!navigator.geolocation || !window.isSecureContext) return;
+    try {
+      if (!navigator.permissions?.query) return;
+      const status = await navigator.permissions.query({ name: 'geolocation' });
+      if (status.state === 'granted') {
+        locationStore.startWatching();
+      }
+    } catch {
+      // Ignore permission API failures; manual location entry still works.
+    }
   }
 
   override disconnectedCallback() {

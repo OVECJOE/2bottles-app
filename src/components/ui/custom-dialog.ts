@@ -44,6 +44,18 @@ export class CustomDialog extends LitElement {
             box-shadow: var(--shadow-xl);
             transform: scale(0.9) translateY(10px);
             transition: transform var(--duration-base) var(--ease-spring);
+            max-height: calc(100dvh - (2 * var(--space-6)));
+            overflow: auto;
+        }
+
+        .dialog.fullscreen {
+            max-width: min(560px, calc(100vw - (2 * var(--space-4))));
+            max-height: min(780px, calc(100dvh - (2 * var(--space-4))));
+            border-radius: var(--border-radius-xl);
+            padding: 0;
+            overflow: hidden;
+            background: transparent;
+            box-shadow: var(--shadow-xl);
         }
 
         :host([open]) .dialog {
@@ -78,6 +90,9 @@ export class CustomDialog extends LitElement {
     @property() message = '';
     @property() confirmLabel = 'Confirm';
     @property() cancelLabel = 'Cancel';
+    @property({ type: Boolean, attribute: 'hide-default-actions' }) hideDefaultActions = false;
+    @property({ type: Boolean, attribute: 'allow-backdrop-dismiss' }) allowBackdropDismiss = true;
+    @property({ type: Boolean }) fullscreen = false;
 
     override connectedCallback() {
         super.connectedCallback();
@@ -114,19 +129,25 @@ export class CustomDialog extends LitElement {
     }
 
     override render() {
+        const hasCustomContent = this.childElementCount > 0;
         return html`
-            <div class="backdrop" @click=${() => this._handleAction(false)}></div>
-            <div class="dialog" role="dialog" aria-modal="true" aria-label=${this.title || 'Confirmation dialog'}>
-                ${this.title ? html`<div class="title">${this.title}</div>` : ''}
-                <div class="message">${this.message}</div>
-                <div class="actions">
-                    <button class="btn btn-primary" @click=${() => this._handleAction(true)}>
-                        ${this.confirmLabel}
-                    </button>
-                    <button class="btn btn-ghost" @click=${() => this._handleAction(false)}>
-                        ${this.cancelLabel}
-                    </button>
-                </div>
+            <div class="backdrop" @click=${() => { if (this.allowBackdropDismiss) this._handleAction(false); }}></div>
+            <div class="dialog ${this.fullscreen ? 'fullscreen' : ''}" role="dialog" aria-modal="true" aria-label=${this.title || 'Confirmation dialog'}>
+                <slot></slot>
+                ${hasCustomContent ? '' : html`
+                    ${this.title ? html`<div class="title">${this.title}</div>` : ''}
+                    <div class="message">${this.message}</div>
+                    ${this.hideDefaultActions ? '' : html`
+                        <div class="actions">
+                            <button class="btn btn-primary" @click=${() => this._handleAction(true)}>
+                                ${this.confirmLabel}
+                            </button>
+                            <button class="btn btn-ghost" @click=${() => this._handleAction(false)}>
+                                ${this.cancelLabel}
+                            </button>
+                        </div>
+                    `}
+                `}
             </div>
         `;
     }

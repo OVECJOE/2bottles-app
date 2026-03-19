@@ -22,6 +22,11 @@ async function notifyAssetMissingReload() {
 const PRECACHE_URLS = [
     '/',
     '/index.html',
+    '/manifest.json',
+    '/icons/icon-192.svg',
+    '/icons/icon-512.svg',
+    '/illustrations/landing-map-scene.svg',
+    '/illustrations/landing-duo-flow.svg',
 ];
 
 // ----------------------------------------------------------

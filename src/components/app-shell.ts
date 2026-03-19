@@ -7,6 +7,14 @@ import { Router } from '@vaadin/router';
 
 import './map-view.js';
 import './ui/custom-dialog.js';
+import './ui/location-permission-dialog.js';
+
+type LocationPermissionState = 'prompt' | 'granted' | 'denied' | 'unknown';
+
+interface BeforeInstallPromptEvent extends Event {
+    prompt(): Promise<void>;
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
 
 @customElement('app-shell')
 export class AppShell extends LitElement {
@@ -15,9 +23,15 @@ export class AppShell extends LitElement {
     @state() private _toast: string | null = null;
     @state() private _loading = false;
     @state() private _dialog: { title: string; message: string; confirmLabel?: string; cancelLabel?: string } | null = null;
+    @state() private _canInstall = false;
+    @state() private _locationTakeoverOpen = false;
+    @state() private _locationPermissionState: LocationPermissionState = 'unknown';
+    @state() private _locationTakeoverDismissed = false;
 
     private _router?: Router;
     private _unsubUI?: () => void;
+    private _deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
+    private _permissionStatus?: PermissionStatus;
 
     override connectedCallback() {
         super.connectedCallback();
@@ -36,17 +50,16 @@ export class AppShell extends LitElement {
             locationStore.init()
         ]);
 
-        // Force early GPS permission request when the app has no known user location yet.
-        if (!locationStore.own && !locationStore.isWatching) {
-            locationStore.startWatching();
-        }
+        this._setupInstallPromptHandlers();
+        await this._syncLocationPermissionState();
 
         // 2. Setup Router
         const outlet = this.renderRoot.querySelector('#outlet');
         this._router = new Router(outlet);
         
         this._router.setRoutes([
-            { path: '/', component: 'create-session', action: async () => { await import('./session/create-session.js'); } },
+            { path: '/', component: 'landing-page', action: async () => { await import('./marketing/landing-page.js'); } },
+            { path: '/create-session', component: 'create-session', action: async () => { await import('./session/create-session.js'); } },
             { path: '/invite', component: 'invite-partner', action: async () => { await import('./session/invite-partner.js'); } },
             { path: '/join/:peerId', component: 'partner-invite-received', action: async () => { await import('./partner/partner-invite-received.js'); } },
             { path: '/rejected', component: 'partner-ended', action: async () => { await import('./partner/partner-ended.js'); } },
@@ -56,7 +69,7 @@ export class AppShell extends LitElement {
             { path: '/chat', component: 'live-chat', action: async () => { await import('./tracking/live-chat-screen.js'); } },
             { path: '/session-link', component: 'session-link', action: async () => { await import('./session/session-link.js'); } },
             { path: '/ended', component: 'end-session', action: async () => { await import('./tracking/end-session.js'); } },
-            { path: '(.*)', component: 'create-session' }
+            { path: '(.*)', component: 'landing-page' }
         ]);
 
         // 3. Handle reconnection logic
@@ -84,13 +97,119 @@ export class AppShell extends LitElement {
     override disconnectedCallback() {
         super.disconnectedCallback();
         this._unsubUI?.();
+        this._permissionStatus?.removeEventListener('change', this._onPermissionChange);
+        window.removeEventListener('beforeinstallprompt', this._onBeforeInstallPrompt as EventListener);
+        window.removeEventListener('appinstalled', this._onAppInstalled);
+    }
+
+    private _setupInstallPromptHandlers() {
+        window.addEventListener('beforeinstallprompt', this._onBeforeInstallPrompt as EventListener);
+        window.addEventListener('appinstalled', this._onAppInstalled);
+    }
+
+    private _onBeforeInstallPrompt = (event: BeforeInstallPromptEvent) => {
+        event.preventDefault();
+        this._deferredInstallPrompt = event;
+        this._canInstall = true;
+    };
+
+    private _onAppInstalled = () => {
+        this._deferredInstallPrompt = null;
+        this._canInstall = false;
+        uiStore.showToast('2bottles installed successfully.');
+    };
+
+    private _onPermissionChange = async () => {
+        await this._syncLocationPermissionState();
+    };
+
+    private async _syncLocationPermissionState() {
+        if (!navigator.geolocation || !window.isSecureContext) {
+            this._locationPermissionState = 'unknown';
+            this._locationTakeoverOpen = false;
+            return;
+        }
+
+        try {
+            if (!navigator.permissions?.query) {
+                this._locationPermissionState = 'prompt';
+            } else {
+                this._permissionStatus?.removeEventListener('change', this._onPermissionChange);
+                const status = await navigator.permissions.query({ name: 'geolocation' });
+                this._permissionStatus = status;
+                this._permissionStatus.addEventListener('change', this._onPermissionChange);
+                this._locationPermissionState = (status.state as LocationPermissionState) || 'unknown';
+            }
+        } catch {
+            this._locationPermissionState = 'prompt';
+        }
+
+        if (this._locationPermissionState === 'granted') {
+            this._locationTakeoverOpen = false;
+            if (!locationStore.isWatching) {
+                locationStore.startWatching();
+            }
+            return;
+        }
+
+        const shouldPrompt = !locationStore.own && !this._locationTakeoverDismissed;
+        this._locationTakeoverOpen = shouldPrompt;
+    }
+
+    private _handleLandingAction = async (event: CustomEvent<{ action: 'start' | 'install' }>) => {
+        if (event.detail.action === 'install') {
+            await this._requestInstall();
+            return;
+        }
+
+        Router.go('/create-session');
+        if (!locationStore.own && this._locationPermissionState !== 'granted') {
+            this._locationTakeoverOpen = true;
+        }
+    };
+
+    private async _requestInstall() {
+        if (!this._deferredInstallPrompt) {
+            uiStore.showToast('Install option is unavailable on this browser right now.');
+            return;
+        }
+
+        await this._deferredInstallPrompt.prompt();
+        const choice = await this._deferredInstallPrompt.userChoice;
+        if (choice.outcome === 'accepted') {
+            this._canInstall = false;
+            this._deferredInstallPrompt = null;
+        }
+    }
+
+    private async _requestLocationPermission() {
+        uiStore.setLoading(true);
+        try {
+            await locationStore.fetchOnce();
+            locationStore.startWatching();
+            this._locationTakeoverOpen = false;
+            this._locationTakeoverDismissed = true;
+        } catch {
+            await this._syncLocationPermissionState();
+            if (this._locationPermissionState === 'denied') {
+                uiStore.showToast('Location permission blocked. You can continue with manual location search.');
+            }
+        } finally {
+            uiStore.setLoading(false);
+        }
+    }
+
+    private _continueWithManualSearch() {
+        this._locationTakeoverDismissed = true;
+        this._locationTakeoverOpen = false;
+        uiStore.showToast('You can use manual address search for now.');
     }
 
     override render() {
         return html`
       <map-view></map-view>
  
-      <main id="outlet"></main>
+    <main id="outlet" @landing-action=${this._handleLandingAction}></main>
 
       ${this._toast ? html`
         <div class="app-toast" role="status" aria-live="polite">${this._toast}</div>
@@ -110,6 +229,21 @@ export class AppShell extends LitElement {
         .cancelLabel=${this._dialog?.cancelLabel || 'Cancel'}
         @dialog-result=${(e: CustomEvent) => uiStore.handleDialogResult(e.detail.confirmed)}
       ></custom-dialog>
+
+            <custom-dialog
+                ?open=${this._locationTakeoverOpen}
+                ?fullscreen=${true}
+                ?hide-default-actions=${true}
+                ?allow-backdrop-dismiss=${false}
+            >
+                <location-permission-dialog
+                    .permissionState=${this._locationPermissionState}
+                    .canInstall=${this._canInstall}
+                    @request-location=${() => this._requestLocationPermission()}
+                    @continue-manual=${() => this._continueWithManualSearch()}
+                    @request-install=${() => this._requestInstall()}
+                ></location-permission-dialog>
+            </custom-dialog>
     `;
     }
 }

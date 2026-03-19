@@ -62,7 +62,9 @@ export class LocationInput extends LitElement {
       border-radius: var(--border-radius-md);
       box-shadow: var(--shadow-lg);
       z-index: var(--z-modal);
-      overflow: hidden;
+      max-height: min(280px, 42dvh);
+      overflow-x: hidden;
+      overflow-y: auto;
       animation: slide-down var(--duration-fast) var(--ease-out) both;
     }
 

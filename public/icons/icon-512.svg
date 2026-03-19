@@ -1,0 +1,19 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+	<title id="title">2bottles app icon</title>
+	<desc id="desc">Rounded square icon with two pin-shaped bottles and midpoint halo.</desc>
+	<defs>
+		<linearGradient id="bg" x1="58" y1="38" x2="464" y2="478" gradientUnits="userSpaceOnUse">
+			<stop stop-color="#D0EFB1"/>
+			<stop offset="0.52" stop-color="#DCEAF8"/>
+			<stop offset="1" stop-color="#A8C4DD"/>
+		</linearGradient>
+	</defs>
+	<rect width="512" height="512" rx="112" fill="url(#bg)"/>
+	<circle cx="256" cy="256" r="136" fill="#FFFFFF" fill-opacity="0.58"/>
+	<circle cx="256" cy="256" r="104" fill="#FFFFFF" fill-opacity="0.72"/>
+	<path d="M196 106C232 106 260 136 260 172C260 220 196 304 196 304C196 304 132 220 132 172C132 136 160 106 196 106Z" fill="#1A2530"/>
+	<circle cx="196" cy="172" r="24" fill="#FFFFFF"/>
+	<path d="M316 152C352 152 380 182 380 218C380 266 316 350 316 350C316 350 252 266 252 218C252 182 280 152 316 152Z" fill="#4D7298"/>
+	<circle cx="316" cy="218" r="24" fill="#FFFFFF"/>
+	<rect x="158" y="354" width="196" height="24" rx="12" fill="#2E4A63" fill-opacity="0.84"/>
+</svg>

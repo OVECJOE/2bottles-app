@@ -10,7 +10,6 @@
  *
  * Properties:
  *   screen    — current AppScreen, passed to <app-menu>
- *   darkBar   — true for dark-mode status bar text (over dark overlays)
  */
 import { LitElement, html, css } from 'lit';
 import { property, state } from 'lit/decorators.js';
@@ -66,13 +65,7 @@ export class ScreenShell extends LitElement {
     .menu-btn:hover  { background: rgba(255,255,255,0.96); }
     .menu-btn:active { transform: scale(0.94); }
 
-    :host([dark-bar]) .menu-btn {
-      background: rgba(26,37,48,0.7);
-      color: rgba(255,255,255,0.9);
-      box-shadow: none;
-    }
-    :host([dark-bar]) .time { color: rgba(255,255,255,0.85); }
-    :host(:not([dark-bar])) .time { color: rgba(30,30,30,0.72); }
+    .time { color: rgba(30,30,30,0.72); }
 
     .sheet-toggle-btn {
       pointer-events: all;
@@ -96,12 +89,6 @@ export class ScreenShell extends LitElement {
 
     .sheet-toggle-btn:hover { background: rgba(255,255,255,0.98); }
     .sheet-toggle-btn:active { transform: scale(0.94); }
-
-    :host([dark-bar]) .sheet-toggle-btn {
-      background: rgba(26,37,48,0.7);
-      color: rgba(255,255,255,0.9);
-      box-shadow: none;
-    }
 
     .status-actions {
       display: flex;
@@ -133,7 +120,6 @@ export class ScreenShell extends LitElement {
   `;
 
   @property() screen: AppScreen = 'create-session';
-  @property({ type: Boolean, reflect: true, attribute: 'dark-bar' }) darkBar = false;
   @property({ type: Boolean, reflect: true, attribute: 'sheet-collapsed' }) sheetCollapsed = false;
 
   @state() private _menuOpen = false;

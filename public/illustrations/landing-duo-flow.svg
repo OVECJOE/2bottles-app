@@ -1,0 +1,30 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">2bottles duo flow</title>
+  <desc id="desc">Two mobile cards showing invite and rendezvous confirmation flow.</desc>
+  <rect width="1200" height="760" rx="34" fill="#EAF2FB"/>
+  <rect x="130" y="96" width="418" height="568" rx="40" fill="#1A2530"/>
+  <rect x="154" y="132" width="370" height="510" rx="28" fill="#FAFCF8"/>
+  <rect x="190" y="174" width="300" height="60" rx="16" fill="#D0EFB1"/>
+  <text x="218" y="213" fill="#2D5A0E" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Session Created</text>
+  <rect x="190" y="252" width="300" height="132" rx="18" fill="#DCE9F5"/>
+  <text x="218" y="300" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="22" font-weight="700">Invite Partner</text>
+  <text x="218" y="334" fill="#555555" font-family="'DM Sans', sans-serif" font-size="18">Share link instantly</text>
+  <rect x="190" y="412" width="300" height="72" rx="16" fill="#4D7298"/>
+  <text x="243" y="457" fill="#FFFFFF" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Copy Link</text>
+
+  <rect x="652" y="96" width="418" height="568" rx="40" fill="#1A2530"/>
+  <rect x="676" y="132" width="370" height="510" rx="28" fill="#FAFCF8"/>
+  <rect x="712" y="174" width="300" height="60" rx="16" fill="#DCE9F5"/>
+  <text x="730" y="213" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Pick Spot</text>
+  <rect x="712" y="252" width="300" height="96" rx="18" fill="#F0F5FB" stroke="#D8E4EF"/>
+  <text x="732" y="292" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="20" font-weight="700">Midpoint Cafe</text>
+  <text x="732" y="322" fill="#555555" font-family="'DM Sans', sans-serif" font-size="17">7 min for both sides</text>
+  <rect x="712" y="362" width="300" height="96" rx="18" fill="#F0F5FB" stroke="#D8E4EF"/>
+  <text x="732" y="402" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="20" font-weight="700">Green Deck</text>
+  <text x="732" y="432" fill="#555555" font-family="'DM Sans', sans-serif" font-size="17">10 min for both sides</text>
+  <rect x="712" y="486" width="300" height="72" rx="16" fill="#4D7298"/>
+  <text x="780" y="531" fill="#FFFFFF" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Suggest</text>
+
+  <path d="M554 380H644" stroke="#4D7298" stroke-width="8" stroke-linecap="round" stroke-dasharray="10 14"/>
+  <circle cx="600" cy="380" r="22" fill="#D0EFB1" stroke="#2E4A63" stroke-width="6"/>
+</svg>
