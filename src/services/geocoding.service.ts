@@ -27,7 +27,6 @@ export interface GeocodeSuggestion {
 export interface MeetupSuggestionInput {
     own: Coordinates;
     partner: Coordinates;
-    midpoint: Coordinates;
     maxResults?: number;
 }
 
@@ -455,20 +454,26 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 export async function fetchVenues(lat: number, lng: number, radius = 3000): Promise<Venue[]> {
     const center = { lat, lng };
     const radiusM = Math.max(900, Math.min(12000, Math.round(radius)));
-    const result = await collectVenueCandidatesProgressive(center, [radiusM]);
+    const paddingKm = Math.max(0.9, radiusM / 1000);
+    const base = buildRectFromCoordinates(center, center, paddingKm);
+    const result = await collectVenueCandidatesProgressive(
+        [base, expandRect(base, 1.5), expandRect(base, 2.1)],
+        center,
+        center,
+    );
     return result.venues.filter((v) => getDistance(lat, lng, v.coordinates.lat, v.coordinates.lng) <= radiusM / 1000);
 }
 
 export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise<Venue[]> {
-    const { own, partner, midpoint } = input;
+    const { own, partner } = input;
     const maxResults = Math.max(3, Math.min(input.maxResults ?? 10, 10));
     const cacheKey = makeSuggestionCacheKey(input, maxResults);
     const now = Date.now();
     const cached = _venueSuggestionCache.get(cacheKey);
     if (cached && cached.expiry > now) return cached.data;
 
-    const candidateRadiiM = [1200, 2500, 4500, 7000];
-    const candidateResult = await collectVenueCandidatesProgressive(midpoint, candidateRadiiM);
+    const candidateRectangles = buildCandidateRectangles(own, partner);
+    const candidateResult = await collectVenueCandidatesProgressive(candidateRectangles, own, partner);
     if (!candidateResult.sourceHealthy) {
         throw new Error('Venue providers are currently unavailable. Please retry.');
     }
@@ -479,7 +484,6 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
         .map((venue) => {
             const dYouKm = getDistance(own.lat, own.lng, venue.coordinates.lat, venue.coordinates.lng);
             const dPartnerKm = getDistance(partner.lat, partner.lng, venue.coordinates.lat, venue.coordinates.lng);
-            const dMidKm = getDistance(midpoint.lat, midpoint.lng, venue.coordinates.lat, venue.coordinates.lng);
             const etaYou = etaFromDistanceKm(dYouKm);
             const etaPartner = etaFromDistanceKm(dPartnerKm);
             const fairnessGap = Math.abs(etaYou - etaPartner);
@@ -488,7 +492,6 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
                 120
                 - fairnessGap * 2.9
                 - (etaYou + etaPartner) * 0.35
-                - Math.min(60, dMidKm * 7)
                 + (/cafe|restaurant|park|garden|pub|bar/.test(venue.category || '') ? 6 : 0)
                 + (venue.address && venue.address !== 'Nearby Spot' ? 3 : 0);
 
@@ -496,7 +499,6 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
                 venue,
                 dYouKm,
                 dPartnerKm,
-                dMidKm,
                 etaYou,
                 etaPartner,
                 score,
@@ -523,7 +525,6 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
             135
             - fairnessGap * 3.4
             - (etaYou + etaPartner) * 0.42
-            - Math.min(65, entry.dMidKm * 7.2)
             + (/cafe|restaurant|park|garden|pub|bar/.test(entry.venue.category || '') ? 8 : 0)
             + (entry.venue.address && entry.venue.address !== 'Nearby Spot' ? 4 : 0);
 
@@ -536,7 +537,6 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
             },
             score: routeScore,
             fairnessGap,
-            dMidKm: entry.dMidKm,
         };
     }));
 
@@ -549,11 +549,10 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
         },
         score: entry.score,
         fairnessGap: Math.abs(entry.etaYou - entry.etaPartner),
-        dMidKm: entry.dMidKm,
     }));
 
     const allScored = [...refined, ...roughTail].sort((a, b) => b.score - a.score);
-    const balanced = allScored.filter((x) => x.fairnessGap <= 16 && x.dMidKm <= 12);
+    const balanced = allScored.filter((x) => x.fairnessGap <= 16);
     const pool = balanced.length >= maxResults ? balanced : allScored;
 
     const diversified: Venue[] = [];
@@ -584,11 +583,85 @@ function quantizeCoord(value: number, precision = 3): string {
 }
 
 function makeSuggestionCacheKey(input: MeetupSuggestionInput, maxResults: number): string {
+    const a = `${quantizeCoord(input.own.lat)}|${quantizeCoord(input.own.lng)}`;
+    const b = `${quantizeCoord(input.partner.lat)}|${quantizeCoord(input.partner.lng)}`;
+    const pair = a < b ? `${a}~${b}` : `${b}~${a}`;
     return [
-        quantizeCoord(input.midpoint.lat),
-        quantizeCoord(input.midpoint.lng),
+        pair,
         String(maxResults),
     ].join('|');
+}
+
+interface GeoRect {
+    west: number;
+    south: number;
+    east: number;
+    north: number;
+}
+
+function clampLat(value: number): number {
+    return Math.max(-85, Math.min(85, value));
+}
+
+function normalizeLng(value: number): number {
+    const normalized = ((value + 180) % 360 + 360) % 360 - 180;
+    return Number.isFinite(normalized) ? normalized : value;
+}
+
+function buildRectFromCoordinates(own: Coordinates, partner: Coordinates, paddingKm: number): GeoRect {
+    const ownLng = normalizeLng(own.lng);
+    const partnerLng = normalizeLng(partner.lng);
+    const latMin = Math.min(clampLat(own.lat), clampLat(partner.lat));
+    const latMax = Math.max(clampLat(own.lat), clampLat(partner.lat));
+
+    const directSpan = Math.abs(ownLng - partnerLng);
+    let west = Math.min(ownLng, partnerLng);
+    let east = Math.max(ownLng, partnerLng);
+    if (directSpan > 180) {
+        west = -180;
+        east = 180;
+    }
+
+    const midLat = (latMin + latMax) / 2;
+    const latDelta = paddingKm / 111.32;
+    const lngDelta = paddingKm / (111.32 * Math.max(0.2, Math.cos((midLat * Math.PI) / 180)));
+
+    return {
+        west: Math.max(-180, west - lngDelta),
+        south: clampLat(latMin - latDelta),
+        east: Math.min(180, east + lngDelta),
+        north: clampLat(latMax + latDelta),
+    };
+}
+
+function expandRect(rect: GeoRect, factor: number): GeoRect {
+    const latSpan = Math.max(0.0005, rect.north - rect.south);
+    const lngSpan = Math.max(0.0005, rect.east - rect.west);
+    const latPad = ((latSpan * factor) - latSpan) / 2;
+    const lngPad = ((lngSpan * factor) - lngSpan) / 2;
+
+    return {
+        west: Math.max(-180, rect.west - lngPad),
+        south: clampLat(rect.south - latPad),
+        east: Math.min(180, rect.east + lngPad),
+        north: clampLat(rect.north + latPad),
+    };
+}
+
+function rectCacheKey(rect: GeoRect): string {
+    return [rect.west, rect.south, rect.east, rect.north].map((n) => n.toFixed(4)).join('|');
+}
+
+function buildCandidateRectangles(own: Coordinates, partner: Coordinates): GeoRect[] {
+    const ownPartnerDistanceKm = getDistance(own.lat, own.lng, partner.lat, partner.lng);
+    const basePaddingKm = Math.max(1.1, Math.min(6.5, ownPartnerDistanceKm * 0.22));
+    const base = buildRectFromCoordinates(own, partner, basePaddingKm);
+    return [
+        base,
+        expandRect(base, 1.45),
+        expandRect(base, 1.95),
+        expandRect(base, 2.55),
+    ];
 }
 
 function etaFromDistanceKm(distanceKm: number): number {
@@ -659,8 +732,7 @@ function categoryFromGeoapify(categories: string[] | undefined): string {
 }
 
 async function fetchGeoapifyCandidates(
-    center: { lat: number; lng: number },
-    radiusM: number,
+    rect: GeoRect,
 ): Promise<Venue[]> {
     if (!GEOAPIFY_API_KEY) {
         throw new Error('Missing VITE_GEOAPIFY_API_KEY');
@@ -670,8 +742,7 @@ async function fetchGeoapifyCandidates(
         throw new Error('geoapify-cooldown');
     }
 
-    const radius = Math.max(800, Math.min(20000, Math.round(radiusM)));
-    const cacheKey = `${center.lat.toFixed(3)}|${center.lng.toFixed(3)}|${radius}`;
+    const cacheKey = rectCacheKey(rect);
     const cached = _geoapifyCandidateCache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) return cached.data;
 
@@ -685,8 +756,7 @@ async function fetchGeoapifyCandidates(
             'commercial.shopping_mall',
             'accommodation.hotel',
         ].join(','),
-        filter: `circle:${center.lng},${center.lat},${radius}`,
-        bias: `proximity:${center.lng},${center.lat}`,
+        filter: `rect:${rect.west},${rect.south},${rect.east},${rect.north}`,
         limit: '60',
         lang: getGeoapifyLanguage(),
         apiKey: GEOAPIFY_API_KEY,
@@ -745,24 +815,26 @@ async function fetchGeoapifyCandidates(
 }
 
 async function collectVenueCandidatesProgressive(
-    center: { lat: number; lng: number },
-    radiiMeters: number[],
+    rectangles: GeoRect[],
+    own: Coordinates,
+    partner: Coordinates,
 ): Promise<{ venues: Venue[]; sourceHealthy: boolean }> {
     const merged: Venue[] = [];
     const seen = new Set<string>();
     let sourceHealthy = false;
 
-    for (const radiusM of radiiMeters) {
+    for (const rect of rectangles) {
         try {
-            const group = await fetchGeoapifyCandidates(center, radiusM);
+            const group = await fetchGeoapifyCandidates(rect);
             sourceHealthy = true;
             for (const venue of group) {
                 if (!venue.name || !Number.isFinite(venue.coordinates.lat) || !Number.isFinite(venue.coordinates.lng)) continue;
                 const key = makeVenueDedupeKey(venue.name, venue.coordinates.lat, venue.coordinates.lng);
                 if (seen.has(key)) continue;
 
-                const dMidKm = getDistance(center.lat, center.lng, venue.coordinates.lat, venue.coordinates.lng);
-                if (dMidKm > Math.max(3.5, (radiusM / 1000) * 1.85)) continue;
+                const dYouKm = getDistance(own.lat, own.lng, venue.coordinates.lat, venue.coordinates.lng);
+                const dPartnerKm = getDistance(partner.lat, partner.lng, venue.coordinates.lat, venue.coordinates.lng);
+                if (dYouKm > 30 || dPartnerKm > 30) continue;
 
                 seen.add(key);
                 merged.push(venue);

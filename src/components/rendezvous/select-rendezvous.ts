@@ -125,14 +125,31 @@ export class SelectRendezvous extends LitElement {
   private _lastSuggestKey = '';
   private _retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-  private _midpointShiftMeters(a: string, b: string): number {
+  private _participantShiftMeters(a: string, b: string): number {
     if (!a || !b) return Infinity;
-    const [aLat, aLng] = a.split('_').map(Number);
-    const [bLat, bLng] = b.split('_').map(Number);
-    if ([aLat, aLng, bLat, bLng].some((n) => Number.isNaN(n))) return Infinity;
-    const dLat = (aLat - bLat) * 111_320;
-    const dLng = (aLng - bLng) * 111_320 * Math.cos(((aLat + bLat) / 2) * Math.PI / 180);
-    return Math.sqrt(dLat * dLat + dLng * dLng);
+    const [aOwn, aPartner] = a.split('|');
+    const [bOwn, bPartner] = b.split('|');
+    if (!aOwn || !aPartner || !bOwn || !bPartner) return Infinity;
+
+    const [aOwnLat, aOwnLng] = aOwn.split('_').map(Number);
+    const [aPartnerLat, aPartnerLng] = aPartner.split('_').map(Number);
+    const [bOwnLat, bOwnLng] = bOwn.split('_').map(Number);
+    const [bPartnerLat, bPartnerLng] = bPartner.split('_').map(Number);
+
+    if ([aOwnLat, aOwnLng, aPartnerLat, aPartnerLng, bOwnLat, bOwnLng, bPartnerLat, bPartnerLng].some((n) => Number.isNaN(n))) {
+      return Infinity;
+    }
+
+    const distance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+      const dLat = (lat1 - lat2) * 111_320;
+      const dLng = (lng1 - lng2) * 111_320 * Math.cos(((lat1 + lat2) / 2) * Math.PI / 180);
+      return Math.sqrt(dLat * dLat + dLng * dLng);
+    };
+
+    return Math.max(
+      distance(aOwnLat, aOwnLng, bOwnLat, bOwnLng),
+      distance(aPartnerLat, aPartnerLng, bPartnerLat, bPartnerLng),
+    );
   }
 
     override connectedCallback() {
@@ -178,10 +195,8 @@ export class SelectRendezvous extends LitElement {
     if (!own || !partner || this._isComputing) return;
 
     const mid = sessionStore.midpoint;
-    if (!mid) return;
-
-    const suggestKey = `${mid.lat.toFixed(4)}_${mid.lng.toFixed(4)}`;
-    const shiftedMeters = this._midpointShiftMeters(this._lastSuggestKey, suggestKey);
+    const suggestKey = `${own.lat.toFixed(4)}_${own.lng.toFixed(4)}|${partner.lat.toFixed(4)}_${partner.lng.toFixed(4)}`;
+    const shiftedMeters = this._participantShiftMeters(this._lastSuggestKey, suggestKey);
     const hasMaterialShift = shiftedMeters > 120;
 
     const now = Date.now();
@@ -197,16 +212,17 @@ export class SelectRendezvous extends LitElement {
       this._venues = await suggestMeetupVenues({
         own,
         partner,
-        midpoint: mid,
         maxResults: 10,
       });
       this._nextSuggestAt = Date.now() + (hasMaterialShift ? 8_000 : 30_000);
       sessionStore.setVenueSuggestions(this._venues);
 
-      this.dispatchEvent(new CustomEvent('map-view:show-midpoint', {
-        bubbles: true, composed: true,
-        detail: { coords: mid },
-      }));
+      if (mid) {
+        this.dispatchEvent(new CustomEvent('map-view:show-midpoint', {
+          bubbles: true, composed: true,
+          detail: { coords: mid },
+        }));
+      }
     } catch (err) {
       this._venues = [];
       this._suggestionError = 'Could not load meetup suggestions. Retrying...';
