@@ -428,7 +428,7 @@ export class SelectRendezvous extends LitElement {
     if (confirmed) {
       p2pService.endSessionForAll();
       sessionStore.endSession();
-      uiStore.goHome();
+      uiStore.goHome(true);
     }
   }
 }

@@ -96,9 +96,9 @@ class UIStore {
     goToLiveTracking() { this.navigate('live-tracking'); }
     goToLiveChat() { this.navigate('live-chat'); }
     goToEndSession() { this.navigate('end-session'); }
-    async goHome() { 
+    async goHome(beyond: boolean = false) { 
         await del(DB_KEY);
-        Router.go('/');
+        Router.go(beyond ? '/create-session' : '/');
         this.screen = 'landing';
         this.sheetOpen = true;
         this._notify();

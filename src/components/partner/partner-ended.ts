@@ -37,7 +37,7 @@ export class PartnerEnded extends LitElement {
       p2pService.disconnect();
         sessionStore.endSession();
         locationStore.reset();
-        uiStore.goHome();
+        uiStore.goHome(true);
     }
 
     override render() {

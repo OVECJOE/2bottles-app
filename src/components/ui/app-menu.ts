@@ -172,7 +172,7 @@ export class AppMenu extends LitElement {
         p2pService.endSessionForAll();
         sessionStore.endSession();
         locationStore.reset();
-        uiStore.goHome();
+        uiStore.goHome(true);
         this._dismiss();
       },
     };
@@ -213,7 +213,7 @@ export class AppMenu extends LitElement {
         p2pService.endSessionForAll();
         sessionStore.endSession();
         locationStore.reset();
-        uiStore.goHome();
+        uiStore.goHome(true);
         this._dismiss();
       },
     };

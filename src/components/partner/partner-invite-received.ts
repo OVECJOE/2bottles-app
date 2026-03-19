@@ -115,7 +115,7 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
     p2pService.send({ type: 'partner:status', status: 'rejected' });
     p2pService.disconnect();
     sessionStore.endSession();
-    uiStore.goHome();
+    uiStore.goHome(true);
   }
 
   override render() {

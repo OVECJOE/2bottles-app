@@ -129,7 +129,7 @@ export class EndSession extends LitElement {
     locationStore.reset();
     this.dispatchEvent(new CustomEvent('map-view:clear-midpoint', { bubbles: true, composed: true }));
     this.dispatchEvent(new CustomEvent('map-view:clear-route', { bubbles: true, composed: true }));
-    uiStore.goHome();
+    uiStore.goHome(true);
   }
 
   override render() {

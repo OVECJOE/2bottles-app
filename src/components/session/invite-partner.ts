@@ -215,7 +215,7 @@ export class InvitePartner extends LitElement {
     if (confirmed) {
       p2pService.endSessionForAll();
       sessionStore.endSession();
-      uiStore.goHome();
+      uiStore.goHome(true);
     }
   }
 }
