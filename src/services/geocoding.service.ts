@@ -40,7 +40,9 @@ const _reverseInflight = new Map<string, Promise<string>>();
 let _reverseCooldownUntil = 0;
 let _nominatimHardCooldownUntil = 0;
 const _venueSuggestionCache = new Map<string, { expiry: number; data: Venue[] }>();
+const _venueSuggestionInflight = new Map<string, Promise<Venue[]>>();
 const _geoapifyCandidateCache = new Map<string, { expiry: number; data: Venue[] }>();
+const _geoapifyCandidateInflight = new Map<string, Promise<Venue[]>>();
 let _geoapifyCooldownUntil = 0;
 const _routeMetricsCache = new Map<string, { expiry: number; data: RouteMetrics }>();
 
@@ -460,6 +462,7 @@ export async function fetchVenues(lat: number, lng: number, radius = 3000): Prom
         [base, expandRect(base, 1.5), expandRect(base, 2.1)],
         center,
         center,
+        24,
     );
     return result.venues.filter((v) => getDistance(lat, lng, v.coordinates.lat, v.coordinates.lng) <= radiusM / 1000);
 }
@@ -474,110 +477,127 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
     const cached = _venueSuggestionCache.get(cacheKey);
     if (cached && cached.expiry > now) return cached.data;
 
-    const candidateRectangles = buildCandidateRectangles(own, partner);
-    const candidateResult = await collectVenueCandidatesProgressive(candidateRectangles, own, partner);
-    if (!candidateResult.sourceHealthy) {
-        throw new Error('Venue providers are currently unavailable. Please retry.');
-    }
-    const candidates = candidateResult.venues;
-    if (candidates.length === 0) return [];
+    const inflight = _venueSuggestionInflight.get(cacheKey);
+    if (inflight) return inflight;
 
-    const coarse = candidates
-        .map((venue) => {
-            const dYouKm = getDistance(own.lat, own.lng, venue.coordinates.lat, venue.coordinates.lng);
-            const dPartnerKm = getDistance(partner.lat, partner.lng, venue.coordinates.lat, venue.coordinates.lng);
-            const etaYou = etaFromDistanceKm(dYouKm);
-            const etaPartner = etaFromDistanceKm(dPartnerKm);
+    const job = (async (): Promise<Venue[]> => {
+        const candidateRectangles = buildCandidateRectangles(own, partner);
+        const candidateResult = await collectVenueCandidatesProgressive(
+            candidateRectangles,
+            own,
+            partner,
+            Math.max(12, maxResults + 6),
+        );
+        if (!candidateResult.sourceHealthy) {
+            throw new Error('Venue providers are currently unavailable. Please retry.');
+        }
+        const candidates = candidateResult.venues;
+        if (candidates.length === 0) return [];
+
+        const coarse = candidates
+            .map((venue) => {
+                const dYouKm = getDistance(own.lat, own.lng, venue.coordinates.lat, venue.coordinates.lng);
+                const dPartnerKm = getDistance(partner.lat, partner.lng, venue.coordinates.lat, venue.coordinates.lng);
+                const etaYou = etaFromDistanceKm(dYouKm);
+                const etaPartner = etaFromDistanceKm(dPartnerKm);
+                const fairnessGap = Math.abs(etaYou - etaPartner);
+
+                const score =
+                    120
+                    - fairnessGap * 2.9
+                    - (etaYou + etaPartner) * 0.35
+                    + (/cafe|restaurant|park|garden|pub|bar/.test(venue.category || '') ? 6 : 0)
+                    + (venue.address && venue.address !== 'Nearby Spot' ? 3 : 0);
+
+                return {
+                    venue,
+                    dYouKm,
+                    dPartnerKm,
+                    etaYou,
+                    etaPartner,
+                    score,
+                };
+            })
+            .sort((a, b) => b.score - a.score);
+
+        const routeRefineCount = Math.min(10, Math.max(4, maxResults + 2));
+        const toRefine = coarse.slice(0, routeRefineCount);
+        const remaining = coarse.slice(routeRefineCount);
+
+        const refined = await Promise.all(toRefine.map(async (entry) => {
+            const [youRoute, partnerRoute] = await Promise.all([
+                fetchRouteMetrics(own, entry.venue.coordinates),
+                fetchRouteMetrics(partner, entry.venue.coordinates),
+            ]);
+
+            const etaYou = youRoute?.minutes ?? entry.etaYou;
+            const etaPartner = partnerRoute?.minutes ?? entry.etaPartner;
+            const dYouKm = youRoute?.distanceKm ?? entry.dYouKm;
             const fairnessGap = Math.abs(etaYou - etaPartner);
 
-            const score =
-                120
-                - fairnessGap * 2.9
-                - (etaYou + etaPartner) * 0.35
-                + (/cafe|restaurant|park|garden|pub|bar/.test(venue.category || '') ? 6 : 0)
-                + (venue.address && venue.address !== 'Nearby Spot' ? 3 : 0);
+            const routeScore =
+                135
+                - fairnessGap * 3.4
+                - (etaYou + etaPartner) * 0.42
+                + (/cafe|restaurant|park|garden|pub|bar/.test(entry.venue.category || '') ? 8 : 0)
+                + (entry.venue.address && entry.venue.address !== 'Nearby Spot' ? 4 : 0);
 
             return {
-                venue,
-                dYouKm,
-                dPartnerKm,
-                etaYou,
-                etaPartner,
-                score,
+                venue: {
+                    ...entry.venue,
+                    distanceKm: parseFloat(dYouKm.toFixed(1)),
+                    etaMinutesFromYou: Math.max(1, Math.round(etaYou)),
+                    etaMinutesFromPartner: Math.max(1, Math.round(etaPartner)),
+                },
+                score: routeScore,
+                fairnessGap,
             };
-        })
-        .sort((a, b) => b.score - a.score);
+        }));
 
-    const routeRefineCount = Math.min(10, Math.max(4, maxResults + 2));
-    const toRefine = coarse.slice(0, routeRefineCount);
-    const remaining = coarse.slice(routeRefineCount);
-
-    const refined = await Promise.all(toRefine.map(async (entry) => {
-        const [youRoute, partnerRoute] = await Promise.all([
-            fetchRouteMetrics(own, entry.venue.coordinates),
-            fetchRouteMetrics(partner, entry.venue.coordinates),
-        ]);
-
-        const etaYou = youRoute?.minutes ?? entry.etaYou;
-        const etaPartner = partnerRoute?.minutes ?? entry.etaPartner;
-        const dYouKm = youRoute?.distanceKm ?? entry.dYouKm;
-        const fairnessGap = Math.abs(etaYou - etaPartner);
-
-        const routeScore =
-            135
-            - fairnessGap * 3.4
-            - (etaYou + etaPartner) * 0.42
-            + (/cafe|restaurant|park|garden|pub|bar/.test(entry.venue.category || '') ? 8 : 0)
-            + (entry.venue.address && entry.venue.address !== 'Nearby Spot' ? 4 : 0);
-
-        return {
+        const roughTail = remaining.map((entry) => ({
             venue: {
                 ...entry.venue,
-                distanceKm: parseFloat(dYouKm.toFixed(1)),
-                etaMinutesFromYou: Math.max(1, Math.round(etaYou)),
-                etaMinutesFromPartner: Math.max(1, Math.round(etaPartner)),
+                distanceKm: parseFloat(entry.dYouKm.toFixed(1)),
+                etaMinutesFromYou: entry.etaYou,
+                etaMinutesFromPartner: entry.etaPartner,
             },
-            score: routeScore,
-            fairnessGap,
-        };
-    }));
+            score: entry.score,
+            fairnessGap: Math.abs(entry.etaYou - entry.etaPartner),
+        }));
 
-    const roughTail = remaining.map((entry) => ({
-        venue: {
-            ...entry.venue,
-            distanceKm: parseFloat(entry.dYouKm.toFixed(1)),
-            etaMinutesFromYou: entry.etaYou,
-            etaMinutesFromPartner: entry.etaPartner,
-        },
-        score: entry.score,
-        fairnessGap: Math.abs(entry.etaYou - entry.etaPartner),
-    }));
+        const allScored = [...refined, ...roughTail].sort((a, b) => b.score - a.score);
+        const balanced = allScored.filter((x) => x.fairnessGap <= 16);
+        const pool = balanced.length >= maxResults ? balanced : allScored;
 
-    const allScored = [...refined, ...roughTail].sort((a, b) => b.score - a.score);
-    const balanced = allScored.filter((x) => x.fairnessGap <= 16);
-    const pool = balanced.length >= maxResults ? balanced : allScored;
+        const diversified: Venue[] = [];
+        const categoryCount = new Map<string, number>();
+        for (const item of pool) {
+            const cat = item.venue.category || 'other';
+            const count = categoryCount.get(cat) ?? 0;
+            if (count >= 2 && diversified.length < Math.max(4, Math.floor(maxResults * 0.8))) continue;
+            diversified.push(item.venue);
+            categoryCount.set(cat, count + 1);
+            if (diversified.length >= maxResults) break;
+        }
 
-    const diversified: Venue[] = [];
-    const categoryCount = new Map<string, number>();
-    for (const item of pool) {
-        const cat = item.venue.category || 'other';
-        const count = categoryCount.get(cat) ?? 0;
-        if (count >= 2 && diversified.length < Math.max(4, Math.floor(maxResults * 0.8))) continue;
-        diversified.push(item.venue);
-        categoryCount.set(cat, count + 1);
-        if (diversified.length >= maxResults) break;
+        const finalList = diversified.length > 0
+            ? diversified
+            : pool.slice(0, maxResults).map((x) => x.venue);
+
+        _venueSuggestionCache.set(cacheKey, {
+            expiry: Date.now() + VENUE_SUGGESTION_CACHE_TTL_MS,
+            data: finalList,
+        });
+
+        return finalList;
+    })();
+
+    _venueSuggestionInflight.set(cacheKey, job);
+    try {
+        return await job;
+    } finally {
+        _venueSuggestionInflight.delete(cacheKey);
     }
-
-    const finalList = diversified.length > 0
-        ? diversified
-        : pool.slice(0, maxResults).map((x) => x.venue);
-
-    _venueSuggestionCache.set(cacheKey, {
-        expiry: Date.now() + VENUE_SUGGESTION_CACHE_TTL_MS,
-        data: finalList,
-    });
-
-    return finalList;
 }
 
 function quantizeCoord(value: number, precision = 3): string {
@@ -775,82 +795,97 @@ async function fetchGeoapifyCandidates(
     const cached = _geoapifyCandidateCache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) return cached.data;
 
-    const params = new URLSearchParams({
-        categories: [
-            'catering.cafe',
-            'catering.restaurant',
-            'catering.bar',
-            'leisure',
-            'commercial.supermarket',
-            'commercial.shopping_mall',
-            'accommodation.hotel',
-        ].join(','),
-        filter: `rect:${safeRect.west.toFixed(6)},${safeRect.south.toFixed(6)},${safeRect.east.toFixed(6)},${safeRect.north.toFixed(6)}`,
-        limit: '60',
-        lang: getGeoapifyLanguage(),
-        apiKey: GEOAPIFY_API_KEY,
-    });
+    const inflight = _geoapifyCandidateInflight.get(cacheKey);
+    if (inflight) return inflight;
 
-    const url = `${GEOAPIFY_ENDPOINT}?${params}`;
-    const res = await withTimeout(fetch(url), 9000, 'geoapify');
-
-    if (res.status === 429) {
-        _geoapifyCooldownUntil = Date.now() + 20_000;
-        throw new Error('geoapify-rate-limited');
-    }
-    if (res.status >= 500) {
-        _geoapifyCooldownUntil = Date.now() + 12_000;
-        throw new Error(`geoapify-${res.status}`);
-    }
-    if (!res.ok) {
-        throw new Error(`geoapify-${res.status}`);
-    }
-
-    const payload = await res.json() as GeoapifyResponse;
-    const mapped: Venue[] = [];
-
-    for (const feature of payload.features ?? []) {
-        const coords = feature.geometry?.coordinates;
-        const props = feature.properties;
-        if (!coords || coords.length < 2 || !props) continue;
-
-        const lng = Number(coords[0]);
-        const lat = Number(coords[1]);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-
-        const category = categoryFromGeoapify(props.categories);
-        const name = (props.name || props.datasource?.raw?.name || '').trim();
-        if (!name) continue;
-
-        mapped.push({
-            id: `geo_${props.place_id || `${lat.toFixed(5)}_${lng.toFixed(5)}`}`,
-            name,
-            category,
-            emoji: _getEmojiForAmenity(category),
-            address: props.formatted || 'Nearby Spot',
-            coordinates: { lat, lng },
-            distanceKm: 0,
-            etaMinutesFromYou: 0,
-            etaMinutesFromPartner: 0,
+    const job = (async (): Promise<Venue[]> => {
+        const params = new URLSearchParams({
+            categories: [
+                'catering.cafe',
+                'catering.restaurant',
+                'catering.bar',
+                'leisure',
+                'commercial.supermarket',
+                'commercial.shopping_mall',
+                'accommodation.hotel',
+            ].join(','),
+            filter: `rect:${safeRect.west.toFixed(6)},${safeRect.south.toFixed(6)},${safeRect.east.toFixed(6)},${safeRect.north.toFixed(6)}`,
+            limit: '60',
+            lang: getGeoapifyLanguage(),
+            apiKey: GEOAPIFY_API_KEY,
         });
+
+        const url = `${GEOAPIFY_ENDPOINT}?${params}`;
+        const res = await withTimeout(fetch(url), 9000, 'geoapify');
+
+        if (res.status === 429) {
+            _geoapifyCooldownUntil = Date.now() + 20_000;
+            throw new Error('geoapify-rate-limited');
+        }
+        if (res.status >= 500) {
+            _geoapifyCooldownUntil = Date.now() + 12_000;
+            throw new Error(`geoapify-${res.status}`);
+        }
+        if (!res.ok) {
+            throw new Error(`geoapify-${res.status}`);
+        }
+
+        const payload = await res.json() as GeoapifyResponse;
+        const mapped: Venue[] = [];
+
+        for (const feature of payload.features ?? []) {
+            const coords = feature.geometry?.coordinates;
+            const props = feature.properties;
+            if (!coords || coords.length < 2 || !props) continue;
+
+            const lng = Number(coords[0]);
+            const lat = Number(coords[1]);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+            const category = categoryFromGeoapify(props.categories);
+            const name = (props.name || props.datasource?.raw?.name || '').trim();
+            if (!name) continue;
+
+            mapped.push({
+                id: `geo_${props.place_id || `${lat.toFixed(5)}_${lng.toFixed(5)}`}`,
+                name,
+                category,
+                emoji: _getEmojiForAmenity(category),
+                address: props.formatted || 'Nearby Spot',
+                coordinates: { lat, lng },
+                distanceKm: 0,
+                etaMinutesFromYou: 0,
+                etaMinutesFromPartner: 0,
+            });
+        }
+
+        _geoapifyCandidateCache.set(cacheKey, {
+            expiry: Date.now() + GEOAPIFY_CANDIDATE_CACHE_TTL_MS,
+            data: mapped,
+        });
+
+        return mapped;
+    })();
+
+    _geoapifyCandidateInflight.set(cacheKey, job);
+    try {
+        return await job;
+    } finally {
+        _geoapifyCandidateInflight.delete(cacheKey);
     }
-
-    _geoapifyCandidateCache.set(cacheKey, {
-        expiry: Date.now() + GEOAPIFY_CANDIDATE_CACHE_TTL_MS,
-        data: mapped,
-    });
-
-    return mapped;
 }
 
 async function collectVenueCandidatesProgressive(
     rectangles: GeoRect[],
     own: Coordinates,
     partner: Coordinates,
+    targetCount = 18,
 ): Promise<{ venues: Venue[]; sourceHealthy: boolean }> {
     const merged: Venue[] = [];
     const seen = new Set<string>();
     let sourceHealthy = false;
+    const ownPartnerDistanceKm = getDistance(own.lat, own.lng, partner.lat, partner.lng);
+    const maxPerUserKm = Math.max(18, Math.min(80, ownPartnerDistanceKm * 0.9 + 10));
 
     for (const rect of rectangles) {
         try {
@@ -863,7 +898,7 @@ async function collectVenueCandidatesProgressive(
 
                 const dYouKm = getDistance(own.lat, own.lng, venue.coordinates.lat, venue.coordinates.lng);
                 const dPartnerKm = getDistance(partner.lat, partner.lng, venue.coordinates.lat, venue.coordinates.lng);
-                if (dYouKm > 30 || dPartnerKm > 30) continue;
+                if (Math.min(dYouKm, dPartnerKm) > maxPerUserKm) continue;
 
                 seen.add(key);
                 merged.push(venue);
@@ -872,7 +907,7 @@ async function collectVenueCandidatesProgressive(
             // Progressive widening continues; source health controls hard error upstream.
         }
 
-        if (merged.length >= 28) break;
+        if (merged.length >= targetCount) break;
     }
 
     return { venues: merged, sourceHealthy };
