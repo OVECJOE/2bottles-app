@@ -243,8 +243,10 @@ export class CreateSession extends LitElement {
       <screen-shell screen='create-session'>
       <div class="sheet">
         <div class="handle"></div>
-        <div class="title">Start a Rendezvous</div>
-        <div class="subtitle">Your location helps us find a fair spot for both of you</div>
+        <div>
+          <h2 class="title">Start a Rendezvous</h2>
+          <p class="subtitle">Your location helps us find a fair spot for both of you</p>
+        </div>
 
         <button
           type="button"
