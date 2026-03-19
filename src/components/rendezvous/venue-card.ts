@@ -8,10 +8,13 @@ export class VenueCard extends LitElement {
 
     .card {
       display: flex; align-items: center; gap: var(--space-3);
+      width: 100%;
       padding: var(--space-3); border-radius: var(--border-radius-md);
       border: 1.5px solid transparent;
       cursor: pointer;
       background: rgba(0,0,0,0.035);
+      text-align: left;
+      font-family: inherit;
       transition:
         background var(--duration-fast),
         border-color var(--duration-fast),
@@ -19,8 +22,17 @@ export class VenueCard extends LitElement {
       -webkit-tap-highlight-color: transparent;
     }
 
+    button.card {
+      appearance: none;
+      border: 1.5px solid transparent;
+    }
+
     .card:hover  { background: rgba(0,0,0,0.06); }
     .card:active { transform: scale(0.99); }
+    .card:focus-visible {
+      outline: 2px solid var(--color-blue);
+      outline-offset: 2px;
+    }
 
     :host([selected]) .card {
       background: var(--color-blue-light);
@@ -82,7 +94,13 @@ export class VenueCard extends LitElement {
 
     override render() {
         return html`
-      <div class="card" @click=${this._click}>
+      <button
+        class="card"
+        type="button"
+        @click=${this._click}
+        aria-pressed=${this.selected ? 'true' : 'false'}
+        aria-label=${`${this.name}, ${this.address || 'address unavailable'}${this.etaMinutes ? `, ${this.etaMinutes} minutes` : ''}`}
+      >
         <div class="icon">${this.emoji}</div>
 
         <div class="info">
@@ -98,7 +116,7 @@ export class VenueCard extends LitElement {
         ` : ''}
 
         ${this.selected ? html`<div class="selected-mark">✓</div>` : ''}
-      </div>
+      </button>
     `;
     }
 }

@@ -79,6 +79,32 @@ export class CustomDialog extends LitElement {
     @property() confirmLabel = 'Confirm';
     @property() cancelLabel = 'Cancel';
 
+    override connectedCallback() {
+        super.connectedCallback();
+        window.addEventListener('keydown', this._onKeyDown);
+    }
+
+    override disconnectedCallback() {
+        super.disconnectedCallback();
+        window.removeEventListener('keydown', this._onKeyDown);
+    }
+
+    override updated(changed: Map<string, unknown>) {
+        if (!changed.has('open') || !this.open) return;
+        queueMicrotask(() => {
+            const primary = this.renderRoot.querySelector<HTMLButtonElement>('.btn.btn-primary');
+            primary?.focus();
+        });
+    }
+
+    private _onKeyDown = (e: KeyboardEvent) => {
+        if (!this.open) return;
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            this._handleAction(false);
+        }
+    };
+
     private _handleAction(confirmed: boolean) {
         this.dispatchEvent(new CustomEvent('dialog-result', {
             detail: { confirmed },
@@ -90,7 +116,7 @@ export class CustomDialog extends LitElement {
     override render() {
         return html`
             <div class="backdrop" @click=${() => this._handleAction(false)}></div>
-            <div class="dialog">
+            <div class="dialog" role="dialog" aria-modal="true" aria-label=${this.title || 'Confirmation dialog'}>
                 ${this.title ? html`<div class="title">${this.title}</div>` : ''}
                 <div class="message">${this.message}</div>
                 <div class="actions">

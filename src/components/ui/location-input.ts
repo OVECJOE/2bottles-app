@@ -167,7 +167,21 @@ export class LocationInput extends LitElement {
   @state() private _nearbyCenter: { lat: number; lng: number } | null = null;
 
   private _debounceTimer: any = null;
+  private _blurTimer: ReturnType<typeof setTimeout> | null = null;
+  private _requestSeq = 0;
   private _lastQuery = '';
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._debounceTimer) {
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = null;
+    }
+    if (this._blurTimer) {
+      clearTimeout(this._blurTimer);
+      this._blurTimer = null;
+    }
+  }
 
   private async _onInput(e: InputEvent) {
     const val = (e.target as HTMLInputElement).value;
@@ -188,6 +202,7 @@ export class LocationInput extends LitElement {
     if (this._debounceTimer) clearTimeout(this._debounceTimer);
     this._loading = true;
     this._open = true;
+    const reqId = ++this._requestSeq;
 
     this._debounceTimer = setTimeout(async () => {
         this._lastQuery = val;
@@ -204,13 +219,13 @@ export class LocationInput extends LitElement {
                 biasRadiusKm: this._scope === 'nearby' ? 30 : undefined,
             });
             // Bug 39: Race condition check
-            if (this._lastQuery === val) {
+            if (this._lastQuery === val && this._requestSeq === reqId) {
                 this._suggestions = results;
             }
         } catch {
-            if (this._lastQuery === val) this._suggestions = [];
+            if (this._lastQuery === val && this._requestSeq === reqId) this._suggestions = [];
         } finally {
-            if (this._lastQuery === val) this._loading = false;
+            if (this._lastQuery === val && this._requestSeq === reqId) this._loading = false;
         }
     }, 400);
   }
@@ -269,7 +284,11 @@ export class LocationInput extends LitElement {
 
   private _onBlur() {
     // Small delay so clicks on suggestions register before blur closes dropdown
-    setTimeout(() => { this._open = false; }, 180);
+    if (this._blurTimer) clearTimeout(this._blurTimer);
+    this._blurTimer = setTimeout(() => {
+      this._open = false;
+      this._blurTimer = null;
+    }, 180);
   }
 
   private _typeIcon(type: string): string {
@@ -289,6 +308,11 @@ export class LocationInput extends LitElement {
         <input
           type="text"
           .value=${this.value}
+          role="combobox"
+          aria-expanded=${this._open ? 'true' : 'false'}
+          aria-controls="location-suggestions"
+          aria-autocomplete="list"
+          aria-label=${this.placeholder}
           placeholder=${this.placeholder}
           autocomplete="off"
           spellcheck="false"
@@ -315,10 +339,12 @@ export class LocationInput extends LitElement {
       ` : ''}
 
       ${this._open ? html`
-        <div class="dropdown">
+        <div class="dropdown" id="location-suggestions" role="listbox" aria-label="Location suggestions">
           ${this._suggestions.length > 0 ? this._suggestions.map((s, i) => html`
             <div
                 class="suggestion ${this._selectedIndex === i ? 'selected' : ''}"
+          role="option"
+          aria-selected=${this._selectedIndex === i ? 'true' : 'false'}
                 @mousedown=${() => this._select(s)}
                 @mouseenter=${() => { this._selectedIndex = i; }}
             >

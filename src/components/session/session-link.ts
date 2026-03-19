@@ -68,13 +68,26 @@ export class SessionLink extends LitElement {
   `  ];
 
   @state() private _copied = false;
+  private _copiedTimer: ReturnType<typeof setTimeout> | null = null;
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._copiedTimer) {
+      clearTimeout(this._copiedTimer);
+      this._copiedTimer = null;
+    }
+  }
 
   private async _copyLink() {
     const link = sessionStore.session?.link ?? window.location.origin;
     const ok = await copyText(link);
     if (ok) {
       this._copied = true;
-      setTimeout(() => { this._copied = false; }, 2000);
+      if (this._copiedTimer) clearTimeout(this._copiedTimer);
+      this._copiedTimer = setTimeout(() => {
+        this._copied = false;
+        this._copiedTimer = null;
+      }, 2000);
       return;
     }
     uiStore.showToast('Unable to copy automatically. Please copy the link manually.');
@@ -84,14 +97,18 @@ export class SessionLink extends LitElement {
     const link = sessionStore.session?.link ?? window.location.origin;
     const venue = sessionStore.selectedVenue?.name ?? 'our spot';
     if (navigator.share) {
-      await navigator.share({
-        title: '2bottles',
-        text: `Let's meet at ${venue}! Join my session:`,
-        url: link,
-      });
-    } else {
-      this._copyLink();
+      try {
+        await navigator.share({
+          title: '2bottles',
+          text: `Let's meet at ${venue}! Join my session:`,
+          url: link,
+        });
+        return;
+      } catch {
+        // User cancellation and unsupported share targets both fall back to copy.
+      }
     }
+    await this._copyLink();
   }
 
   private _startTracking() {
@@ -122,11 +139,17 @@ export class SessionLink extends LitElement {
 
         ${this._copied ? html`<div class="copied-flash">✓ Copied to clipboard</div>` : ''}
 
-        <div class="link-card" @click=${this._copyLink} title="Tap to copy">
+        <button
+          class="link-card"
+          type="button"
+          @click=${this._copyLink}
+          title="Tap to copy"
+          aria-label="Copy session link"
+        >
           <div class="link-label">Your session link</div>
           <div class="link-value">${s?.link ?? '…'}</div>
           <div class="link-hint">Tap to copy · Valid for this session only</div>
-        </div>
+        </button>
 
         ${p ? html`
           <div class="partner-row">
@@ -142,7 +165,7 @@ export class SessionLink extends LitElement {
         <button class="btn btn-primary" @click=${this._startTracking}>
           <span>▶ Start Live Tracking</span>
         </button>
-        <button class="btn btn-green" @click=${this._shareLink}>📤 Share Link</button>
+        <button type="button" class="btn btn-green" @click=${this._shareLink}>📤 Share Link</button>
       </div>
     `;
   }

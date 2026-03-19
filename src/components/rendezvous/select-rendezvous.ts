@@ -124,6 +124,8 @@ export class SelectRendezvous extends LitElement {
   private _nextSuggestAt = 0;
   private _lastSuggestKey = '';
   private _retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private _frameTimer: ReturnType<typeof setTimeout> | null = null;
+  private _fitTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _participantShiftMeters(a: string, b: string): number {
     if (!a || !b) return Infinity;
@@ -182,6 +184,14 @@ export class SelectRendezvous extends LitElement {
     if (this._retryTimer) {
       clearTimeout(this._retryTimer);
       this._retryTimer = null;
+    }
+    if (this._frameTimer) {
+      clearTimeout(this._frameTimer);
+      this._frameTimer = null;
+    }
+    if (this._fitTimer) {
+      clearTimeout(this._fitTimer);
+      this._fitTimer = null;
     }
     if (!sessionStore.selectedVenue) {
       locationStore.clearDestination();
@@ -243,8 +253,10 @@ export class SelectRendezvous extends LitElement {
     const own = locationStore.own;
     const partner = locationStore.partner;
     if (own && partner) {
-      setTimeout(() => {
+      if (this._frameTimer) clearTimeout(this._frameTimer);
+      this._frameTimer = setTimeout(() => {
         (document.querySelector('map-view') as any)?.fitBounds?.(own, partner, 80);
+        this._frameTimer = null;
       }, 300);
     }
   }
@@ -257,9 +269,11 @@ export class SelectRendezvous extends LitElement {
     const own = locationStore.own;
     const partner = locationStore.partner;
     if (own && partner) {
-      setTimeout(() => {
+      if (this._fitTimer) clearTimeout(this._fitTimer);
+      this._fitTimer = setTimeout(() => {
         const mapView = document.querySelector('map-view') as any;
         mapView?.fitBounds?.(own, partner, 80, venue.coordinates);
+        this._fitTimer = null;
       }, 100);
     } else {
       this.dispatchEvent(new CustomEvent('map-view:move-to', {
@@ -278,6 +292,8 @@ export class SelectRendezvous extends LitElement {
   }
 
   private _suggest() {
+    if (!sessionStore.isHost) return;
+
     let venue: Venue | undefined;
     if (this._tab === 'custom' && this._customSpot) {
       venue = {
@@ -316,7 +332,7 @@ export class SelectRendezvous extends LitElement {
       <div class="top-pill">
         <div class="pill-inner">
           <span>⊙</span>
-          <span class="pill-label">Midpoint calculated</span>
+          <span class="pill-label">Fair area prepared</span>
           <span class="pill-badge">${this._venues.length} spots nearby</span>
         </div>
       </div>
@@ -376,7 +392,7 @@ export class SelectRendezvous extends LitElement {
                   <div class="custom-name">${this._customSpot.shortName}</div>
                   <div class="custom-addr">${this._customSpot.displayName.split(', ').slice(1, 4).join(', ')}</div>
                 </div>
-                <button class="custom-clear" @click=${() => { this._customSpot = null; }}>✕</button>
+                <button type="button" class="custom-clear" @click=${() => { this._customSpot = null; }} aria-label="Clear selected location">✕</button>
               </div>
             ` : ''}
           </div>
@@ -392,7 +408,7 @@ export class SelectRendezvous extends LitElement {
             </div>
         `}
 
-        <button class="btn btn-ghost" @click=${this._cancel}>
+        <button type="button" class="btn btn-ghost" @click=${this._cancel}>
             Cancel Session
           </button>
       </div>

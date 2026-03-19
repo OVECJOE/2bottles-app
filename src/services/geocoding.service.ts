@@ -466,6 +466,8 @@ export async function fetchVenues(lat: number, lng: number, radius = 3000): Prom
 
 export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise<Venue[]> {
     const { own, partner } = input;
+    if (!hasFiniteCoordinates(own) || !hasFiniteCoordinates(partner)) return [];
+
     const maxResults = Math.max(3, Math.min(input.maxResults ?? 10, 10));
     const cacheKey = makeSuggestionCacheKey(input, maxResults);
     const now = Date.now();
@@ -599,6 +601,10 @@ interface GeoRect {
     north: number;
 }
 
+function hasFiniteCoordinates(coords: Coordinates | null | undefined): coords is Coordinates {
+    return !!coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng);
+}
+
 function clampLat(value: number): number {
     return Math.max(-85, Math.min(85, value));
 }
@@ -626,12 +632,12 @@ function buildRectFromCoordinates(own: Coordinates, partner: Coordinates, paddin
     const latDelta = paddingKm / 111.32;
     const lngDelta = paddingKm / (111.32 * Math.max(0.2, Math.cos((midLat * Math.PI) / 180)));
 
-    return {
+    return normalizeRect({
         west: Math.max(-180, west - lngDelta),
         south: clampLat(latMin - latDelta),
         east: Math.min(180, east + lngDelta),
         north: clampLat(latMax + latDelta),
-    };
+    });
 }
 
 function expandRect(rect: GeoRect, factor: number): GeoRect {
@@ -640,11 +646,33 @@ function expandRect(rect: GeoRect, factor: number): GeoRect {
     const latPad = ((latSpan * factor) - latSpan) / 2;
     const lngPad = ((lngSpan * factor) - lngSpan) / 2;
 
-    return {
+    return normalizeRect({
         west: Math.max(-180, rect.west - lngPad),
         south: clampLat(rect.south - latPad),
         east: Math.min(180, rect.east + lngPad),
         north: clampLat(rect.north + latPad),
+    });
+}
+
+function normalizeRect(rect: GeoRect): GeoRect {
+    const west = Math.max(-180, Math.min(180, rect.west));
+    const east = Math.max(-180, Math.min(180, rect.east));
+    const south = clampLat(rect.south);
+    const north = clampLat(rect.north);
+
+    const minLatSpan = 0.0005;
+    const minLngSpan = 0.0005;
+
+    const fixedSouth = Math.min(south, north - minLatSpan);
+    const fixedNorth = Math.max(north, fixedSouth + minLatSpan);
+    const fixedWest = Math.min(west, east - minLngSpan);
+    const fixedEast = Math.max(east, fixedWest + minLngSpan);
+
+    return {
+        west: Math.max(-180, fixedWest),
+        south: clampLat(fixedSouth),
+        east: Math.min(180, fixedEast),
+        north: clampLat(fixedNorth),
     };
 }
 
@@ -742,7 +770,8 @@ async function fetchGeoapifyCandidates(
         throw new Error('geoapify-cooldown');
     }
 
-    const cacheKey = rectCacheKey(rect);
+    const safeRect = normalizeRect(rect);
+    const cacheKey = rectCacheKey(safeRect);
     const cached = _geoapifyCandidateCache.get(cacheKey);
     if (cached && cached.expiry > Date.now()) return cached.data;
 
@@ -756,7 +785,7 @@ async function fetchGeoapifyCandidates(
             'commercial.shopping_mall',
             'accommodation.hotel',
         ].join(','),
-        filter: `rect:${rect.west},${rect.south},${rect.east},${rect.north}`,
+        filter: `rect:${safeRect.west.toFixed(6)},${safeRect.south.toFixed(6)},${safeRect.east.toFixed(6)},${safeRect.north.toFixed(6)}`,
         limit: '60',
         lang: getGeoapifyLanguage(),
         apiKey: GEOAPIFY_API_KEY,

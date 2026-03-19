@@ -68,6 +68,11 @@ export class LiveChatScreen extends LitElement {
         border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
         transition: transform 0.2s;
     }
+    .send:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+    }
     .send:active { transform: scale(0.9); }
     `;
 
@@ -114,6 +119,7 @@ export class LiveChatScreen extends LitElement {
     override render() {
         const messages = sessionStore.chatMessages;
         const pName = sessionStore.partnerName || 'Partner';
+        const canSend = this._draft.trim().length > 0;
 
         return html`
         <screen-shell screen='live-chat'>
@@ -143,10 +149,17 @@ export class LiveChatScreen extends LitElement {
                     type="text" 
                     placeholder="Type a message..." 
                     .value=${this._draft}
-                    @input=${(e: any) => this._draft = e.target.value}
-                    @keydown=${(e: any) => { if (e.key === 'Enter') this._send(); }}
+                                        maxlength="400"
+                                        @input=${(e: InputEvent) => { this._draft = (e.target as HTMLInputElement).value; }}
+                                        @keydown=${(e: KeyboardEvent) => {
+                                            if (e.isComposing) return;
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                this._send();
+                                            }
+                                        }}
                 />
-                <button class="send" @click=${this._send} aria-label="Send message">
+                                <button class="send" @click=${this._send} ?disabled=${!canSend} aria-label="Send message">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 </button>
             </div>

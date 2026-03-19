@@ -28,15 +28,23 @@ export class CreateSession extends LitElement {
 
     .gps-row {
       display: flex; align-items: center; gap: var(--space-3);
+      width: 100%;
       background: rgba(77,114,152,0.07);
       border: 1px solid rgba(77,114,152,0.15);
       border-radius: var(--border-radius-md);
       padding: var(--space-3);
       margin-bottom: var(--space-3);
       cursor: pointer;
+      font: inherit;
+      text-align: left;
       transition: background var(--duration-fast);
     }
+    button.gps-row { appearance: none; }
     .gps-row:hover { background: rgba(77,114,152,0.12); }
+    .gps-row:focus-visible {
+      outline: 2px solid var(--color-blue);
+      outline-offset: 2px;
+    }
     .gps-row.active {
       border-color: var(--color-blue);
       background: var(--color-blue-light);
@@ -179,9 +187,13 @@ export class CreateSession extends LitElement {
   }
 
   private async _handleCreate() {
-    const canProceed = (this._usingGps ? this._gpsReady : !!this._manualSelection) && this._name.trim().length >= 2;
+    const trimmedName = this._name.trim();
+    const hasLocation = this._usingGps ? this._gpsReady : !!this._manualSelection;
+    const canProceed = hasLocation && trimmedName.length >= 2;
     if (!canProceed) {
-      this._error = 'We need your location to find a fair meetup spot.';
+      this._error = !hasLocation
+        ? 'We need your location to find a fair meetup spot.'
+        : 'Please enter a name with at least 2 characters.';
       return;
     }
 
@@ -194,7 +206,7 @@ export class CreateSession extends LitElement {
         locationStore.setOwnLocation({ lat: this._manualSelection.lat, lng: this._manualSelection.lng });
       }
 
-      sessionStore.setOwnName(this._name);
+      sessionStore.setOwnName(trimmedName);
 
       const peerId = await p2pService.init();
       await sessionStore.createSession(peerId);
@@ -210,7 +222,8 @@ export class CreateSession extends LitElement {
   }
 
   override render() {
-    const canProceed = this._usingGps ? this._gpsReady : !!this._manualSelection;
+    const hasLocation = this._usingGps ? this._gpsReady : !!this._manualSelection;
+    const canProceed = hasLocation && this._name.trim().length >= 2;
     const acc = locationStore.accuracy;
 
     return html`
@@ -220,7 +233,13 @@ export class CreateSession extends LitElement {
         <div class="title">Start a Rendezvous</div>
         <div class="subtitle">Your location helps us find a fair spot for both of you</div>
 
-        <div class="gps-row ${this._usingGps && this._gpsReady ? 'active' : ''}" @click=${this._useGps}>
+        <button
+          type="button"
+          class="gps-row ${this._usingGps && this._gpsReady ? 'active' : ''}"
+          @click=${this._useGps}
+          aria-pressed=${this._usingGps ? 'true' : 'false'}
+          aria-label="Use current GPS location"
+        >
           <div class="gps-icon">📍</div>
           <div class="gps-text">
             <div class="gps-name">${this._gpsName}</div>
@@ -233,7 +252,7 @@ export class CreateSession extends LitElement {
           ${this._gpsReady
         ? html`<span class="live-badge">LIVE</span>`
         : html`<span class="pending-badge">…</span>`}
-        </div>
+        </button>
 
         <div class="or-row">or enter address manually</div>
 
@@ -247,16 +266,20 @@ export class CreateSession extends LitElement {
           class="input-base name-input"
           placeholder="Your Name (Required)"
           .value=${this._name}
-          @input=${(e: any) => { this._name = e.target.value; this._error = ''; }}
+          @input=${(e: InputEvent) => {
+            this._name = (e.target as HTMLInputElement).value;
+            this._error = '';
+          }}
           required
           minlength="2"
+          maxlength="48"
         />
 
         ${this._manualSelection && !this._usingGps ? html`
           <div class="selected-manual">
             <span>📍</span>
             <span>${this._manualSelection.shortName}</span>
-            <button @click=${this._useGps} title="Clear">✕</button>
+            <button type="button" @click=${this._useGps} title="Clear" aria-label="Clear manual location">✕</button>
           </div>
         ` : ''}
 

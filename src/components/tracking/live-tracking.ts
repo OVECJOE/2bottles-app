@@ -219,7 +219,8 @@ export class LiveTracking extends LitElement {
   private _sendMessage(e: Event) {
     e.preventDefault();
     const form = e.currentTarget as HTMLFormElement;
-    const input = form.querySelector('input') as HTMLInputElement;
+    const input = form.querySelector('input');
+    if (!(input instanceof HTMLInputElement)) return;
     const text = input.value.trim();
     if (!text) return;
 
@@ -344,7 +345,19 @@ export class LiveTracking extends LitElement {
                     </div>
 
                     <div class="chat-widget ${this._showChat ? 'expanded' : 'collapsed'} card">
-                        <div class="chat-header" @click=${this._toggleView}>
+                      <div
+                          class="chat-header"
+                          role="button"
+                          tabindex="0"
+                          aria-expanded=${this._showChat ? 'true' : 'false'}
+                          @click=${this._toggleView}
+                          @keydown=${(e: KeyboardEvent) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              this._toggleView();
+                            }
+                          }}
+                        >
                             <div class="chat-title">
                                 <span class="chat-icon">💭</span>
                                 <span>Chat with ${partnerName || 'Partner'}</span>
@@ -369,7 +382,7 @@ export class LiveTracking extends LitElement {
                                     `)}
                                 </div>
                                 <form class="chat-input" @submit=${this._sendMessage}>
-                                    <input type="text" placeholder="Type a message..." autocomplete="off">
+                                    <input type="text" placeholder="Type a message..." autocomplete="off" maxlength="400">
                                     <button type="submit">Send</button>
                                 </form>
                             </div>
