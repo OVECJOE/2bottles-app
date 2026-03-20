@@ -1,0 +1,40 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">2bottles fairness board</title>
+  <desc id="desc">A fairness board showing route balance, venue score, and confidence across candidate venues.</desc>
+
+  <rect width="1200" height="760" rx="34" fill="#F1F8ED"/>
+  <rect x="44" y="44" width="1112" height="672" rx="28" fill="#FFFFFF"/>
+
+  <rect x="88" y="88" width="1024" height="118" rx="20" fill="#EDF4FB" stroke="#D8E4EF"/>
+  <text x="126" y="146" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="38" font-weight="700">Fairness Board</text>
+  <text x="126" y="186" fill="#555555" font-family="'DM Sans', sans-serif" font-size="24">Balanced travel burden + quality-weighted venue ranking</text>
+
+  <rect x="88" y="234" width="496" height="430" rx="22" fill="#FAFCF8" stroke="#E0E9E0"/>
+  <text x="122" y="282" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="28" font-weight="700">Route Delta</text>
+
+  <rect x="122" y="312" width="428" height="88" rx="16" fill="#F7FBFF" stroke="#D8E4EF"/>
+  <text x="152" y="364" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Candidate A</text>
+  <text x="382" y="364" fill="#2D5A0E" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Delta: 1m</text>
+
+  <rect x="122" y="414" width="428" height="88" rx="16" fill="#F7FBFF" stroke="#D8E4EF"/>
+  <text x="152" y="466" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Candidate B</text>
+  <text x="382" y="466" fill="#8A5C00" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Delta: 4m</text>
+
+  <rect x="122" y="516" width="428" height="88" rx="16" fill="#F7FBFF" stroke="#D8E4EF"/>
+  <text x="152" y="568" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Candidate C</text>
+  <text x="382" y="568" fill="#B23A2B" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Delta: 9m</text>
+
+  <rect x="616" y="234" width="496" height="430" rx="22" fill="#FAFCF8" stroke="#E0E9E0"/>
+  <text x="650" y="282" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="28" font-weight="700">Venue Scorecard</text>
+
+  <rect x="650" y="312" width="428" height="116" rx="18" fill="#D0EFB1"/>
+  <text x="682" y="360" fill="#2D5A0E" font-family="'DM Sans', sans-serif" font-size="26" font-weight="700">Midpoint Cafe</text>
+  <text x="682" y="394" fill="#2D5A0E" font-family="'DM Sans', sans-serif" font-size="22">Score: 88 | Confidence: High</text>
+
+  <rect x="650" y="444" width="428" height="100" rx="18" fill="#F0F5FB" stroke="#D8E4EF"/>
+  <text x="682" y="488" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Dockside Table</text>
+  <text x="682" y="520" fill="#555555" font-family="'DM Sans', sans-serif" font-size="20">Score: 74 | Confidence: Medium</text>
+
+  <rect x="650" y="558" width="428" height="72" rx="16" fill="#4D7298"/>
+  <text x="778" y="604" fill="#FFFFFF" font-family="'DM Sans', sans-serif" font-size="26" font-weight="700">Suggest Venue</text>
+</svg>

@@ -1,0 +1,46 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">2bottles route radar</title>
+  <desc id="desc">A realtime route radar visualization showing two participants converging toward a midpoint venue.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="120" y1="60" x2="1050" y2="840" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#133147"/>
+      <stop offset="0.52" stop-color="#2E4A63"/>
+      <stop offset="1" stop-color="#4D7298"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="180" y1="140" x2="1020" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7FBFF"/>
+      <stop offset="1" stop-color="#EDF4FB"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="900" rx="40" fill="url(#bg)"/>
+  <rect x="70" y="70" width="1060" height="760" rx="30" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.28)"/>
+  <rect x="120" y="130" width="960" height="640" rx="26" fill="url(#panel)"/>
+
+  <circle cx="600" cy="450" r="270" stroke="#DCE9F5" stroke-width="2"/>
+  <circle cx="600" cy="450" r="210" stroke="#DCE9F5" stroke-width="2"/>
+  <circle cx="600" cy="450" r="150" stroke="#DCE9F5" stroke-width="2"/>
+  <circle cx="600" cy="450" r="90" stroke="#DCE9F5" stroke-width="2"/>
+
+  <path d="M270 615C360 560 420 542 505 512C558 494 585 470 600 450" stroke="#1A2530" stroke-width="14" stroke-linecap="round" stroke-dasharray="10 16"/>
+  <path d="M930 290C846 334 790 356 710 392C660 414 625 430 600 450" stroke="#4D7298" stroke-width="14" stroke-linecap="round" stroke-dasharray="10 16"/>
+
+  <circle cx="270" cy="615" r="20" fill="#1A2530"/>
+  <circle cx="270" cy="615" r="42" fill="#1A2530" fill-opacity="0.14"/>
+
+  <circle cx="930" cy="290" r="20" fill="#4D7298"/>
+  <circle cx="930" cy="290" r="42" fill="#4D7298" fill-opacity="0.18"/>
+
+  <circle cx="600" cy="450" r="28" fill="#D0EFB1" stroke="#2E4A63" stroke-width="6"/>
+  <path d="M600 394C633 394 660 421 660 454C660 497 600 560 600 560C600 560 540 497 540 454C540 421 567 394 600 394Z" fill="#2E4A63"/>
+  <circle cx="600" cy="454" r="15" fill="#FFFFFF"/>
+
+  <rect x="160" y="170" width="430" height="140" rx="18" fill="#FFFFFF" stroke="#D8E4EF"/>
+  <text x="192" y="224" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="35" font-weight="700">Route Radar Active</text>
+  <text x="192" y="266" fill="#555555" font-family="'DM Sans', sans-serif" font-size="24">Midpoint convergence in 14 min</text>
+
+  <rect x="690" y="590" width="350" height="130" rx="18" fill="#FFFFFF" stroke="#D8E4EF"/>
+  <text x="724" y="640" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="31" font-weight="700">Live ETA Sync</text>
+  <text x="724" y="680" fill="#555555" font-family="'DM Sans', sans-serif" font-size="22">You: 8m | Partner: 9m</text>
+</svg>

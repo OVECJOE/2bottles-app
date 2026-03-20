@@ -1,0 +1,45 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">2bottles live sync grid</title>
+  <desc id="desc">A live synchronization dashboard showing partner status, ETA signals, and event stream updates.</desc>
+
+  <rect width="1200" height="760" rx="34" fill="#EAF2FB"/>
+  <rect x="52" y="52" width="1096" height="656" rx="28" fill="#FFFFFF"/>
+
+  <rect x="92" y="92" width="1016" height="106" rx="18" fill="#1A2530"/>
+  <text x="132" y="154" fill="#FFFFFF" font-family="'DM Sans', sans-serif" font-size="36" font-weight="700">Live Sync Grid</text>
+
+  <rect x="92" y="226" width="488" height="438" rx="22" fill="#FAFCF8" stroke="#E0E9E0"/>
+  <text x="126" y="274" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="27" font-weight="700">Participant Telemetry</text>
+
+  <rect x="126" y="302" width="420" height="98" rx="16" fill="#F7FBFF" stroke="#D8E4EF"/>
+  <circle cx="162" cy="350" r="12" fill="#22C55E"/>
+  <text x="188" y="346" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="23" font-weight="700">You</text>
+  <text x="188" y="376" fill="#555555" font-family="'DM Sans', sans-serif" font-size="20">ETA: 11m  |  Status: En route</text>
+
+  <rect x="126" y="416" width="420" height="98" rx="16" fill="#F7FBFF" stroke="#D8E4EF"/>
+  <circle cx="162" cy="464" r="12" fill="#4D7298"/>
+  <text x="188" y="460" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="23" font-weight="700">Partner</text>
+  <text x="188" y="490" fill="#555555" font-family="'DM Sans', sans-serif" font-size="20">ETA: 13m  |  Status: En route</text>
+
+  <rect x="126" y="530" width="420" height="98" rx="16" fill="#D0EFB1"/>
+  <text x="156" y="576" fill="#2D5A0E" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Sync Confidence: 98%</text>
+  <text x="156" y="606" fill="#2D5A0E" font-family="'DM Sans', sans-serif" font-size="19">Event latency within target window</text>
+
+  <rect x="620" y="226" width="488" height="438" rx="22" fill="#FAFCF8" stroke="#E0E9E0"/>
+  <text x="654" y="274" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="27" font-weight="700">Realtime Event Stream</text>
+
+  <rect x="654" y="302" width="420" height="74" rx="14" fill="#F0F5FB" stroke="#D8E4EF"/>
+  <text x="684" y="347" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="21" font-weight="700">location:update  •  200ms ago</text>
+
+  <rect x="654" y="388" width="420" height="74" rx="14" fill="#F0F5FB" stroke="#D8E4EF"/>
+  <text x="684" y="433" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="21" font-weight="700">presence:joined   •  1s ago</text>
+
+  <rect x="654" y="474" width="420" height="74" rx="14" fill="#F0F5FB" stroke="#D8E4EF"/>
+  <text x="684" y="519" fill="#2E4A63" font-family="'DM Sans', sans-serif" font-size="21" font-weight="700">eta:recompute     •  2s ago</text>
+
+  <rect x="654" y="560" width="420" height="68" rx="14" fill="#4D7298"/>
+  <text x="762" y="603" fill="#FFFFFF" font-family="'DM Sans', sans-serif" font-size="24" font-weight="700">Channel Stable</text>
+
+  <path d="M582 446H618" stroke="#4D7298" stroke-width="8" stroke-linecap="round" stroke-dasharray="8 12"/>
+  <circle cx="600" cy="446" r="18" fill="#D0EFB1" stroke="#2E4A63" stroke-width="5"/>
+</svg>
