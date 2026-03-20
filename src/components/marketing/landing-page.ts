@@ -11,409 +11,514 @@ export class LandingPage extends LitElement {
   static override styles = [
     sharedStyles,
     css`
-    :host {
-      display: block;
-      color: var(--color-text-primary);
-    }
-
-    .sheet {
-      max-height: min(86vh, 820px);
-      overflow-y: auto;
-      gap: var(--space-5);
-      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-8));
-      background: linear-gradient(180deg, rgba(250, 252, 248, 0.97), rgba(246, 250, 255, 0.96));
-    }
-
-    .hero {
-      border-radius: var(--border-radius-lg);
-      border: 1px solid rgba(255, 255, 255, 0.9);
-      box-shadow: var(--shadow-md);
-      padding: var(--space-5);
-      background:
-        linear-gradient(140deg, rgba(208, 239, 177, 0.8), rgba(219, 232, 244, 0.82) 42%, rgba(236, 245, 255, 0.9) 100%),
-        repeating-linear-gradient(-24deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.22) 10px, rgba(255, 255, 255, 0) 10px, rgba(255, 255, 255, 0) 20px);
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--space-4);
-      align-items: start;
-    }
-
-    .hero-main {
-      display: grid;
-      gap: var(--space-3);
-      min-width: 0;
-    }
-
-    .hero-kicker {
-      display: inline-flex;
-      align-items: center;
-      width: max-content;
-      gap: var(--space-2);
-      border-radius: var(--border-radius-pill);
-      border: 1px solid rgba(46, 74, 99, 0.26);
-      background: rgba(255, 255, 255, 0.72);
-      color: var(--color-blue-dark);
-      font-size: var(--text-xs);
-      font-weight: var(--weight-bold);
-      letter-spacing: 0.35px;
-      padding: 6px 12px;
-    }
-
-    .hero-title {
-      font-size: clamp(28px, 5vw, 44px);
-      line-height: 1.05;
-      letter-spacing: -0.8px;
-      max-width: 20ch;
-      text-wrap: balance;
-    }
-
-    .hero-copy {
-      font-size: var(--text-md);
-      color: rgba(17, 17, 17, 0.82);
-      max-width: 58ch;
-      line-height: 1.45;
-      text-wrap: pretty;
-    }
-
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2);
-      margin-top: var(--space-1);
-    }
-
-    .hero-actions .btn {
-      width: auto;
-      min-width: 148px;
-      padding-left: var(--space-4);
-      padding-right: var(--space-4);
-    }
-
-    .btn-soft {
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      background: rgba(255, 255, 255, 0.82);
-      color: var(--color-text-primary);
-    }
-
-    .metrics {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: var(--space-2);
-    }
-
-    .metric {
-      border-radius: var(--border-radius-md);
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      background: rgba(255, 255, 255, 0.82);
-      padding: var(--space-3);
-      text-align: center;
-    }
-
-    .metric-value {
-      color: var(--color-blue-dark);
-      font-size: var(--text-xl);
-      font-weight: var(--weight-bold);
-      line-height: 1.05;
-    }
-
-    .metric-label {
-      margin-top: 2px;
-      color: var(--color-text-muted);
-      font-size: var(--text-xs);
-    }
-
-    .signal-strip {
-      border-radius: var(--border-radius-md);
-      padding: var(--space-3);
-      border: 1px solid rgba(46, 74, 99, 0.18);
-      background: linear-gradient(95deg, rgba(26, 37, 48, 0.9), rgba(77, 114, 152, 0.88));
-      color: rgba(255, 255, 255, 0.94);
-      display: grid;
-      gap: 7px;
-    }
-
-    .signal-title {
-      font-size: var(--text-sm);
-      font-weight: var(--weight-bold);
-      letter-spacing: 0.35px;
-      text-transform: uppercase;
-      opacity: 0.9;
-    }
-
-    .signal-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2);
-    }
-
-    .pill {
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      border-radius: var(--border-radius-pill);
-      padding: 5px 10px;
-      font-size: var(--text-xs);
-      background: rgba(255, 255, 255, 0.09);
-    }
-
-    .section {
-      display: grid;
-      gap: var(--space-3);
-    }
-
-    .section-head {
-      display: grid;
-      gap: 4px;
-    }
-
-    .section-title {
-      color: var(--color-blue-dark);
-      font-size: var(--text-xl);
-      font-weight: var(--weight-bold);
-      letter-spacing: -0.2px;
-    }
-
-    .section-sub {
-      color: var(--color-text-secondary);
-      font-size: var(--text-sm);
-      line-height: 1.45;
-    }
-
-    .route-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: var(--space-2);
-    }
-
-    .route-card {
-      border-radius: var(--border-radius-md);
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      background: rgba(255, 255, 255, 0.78);
-      padding: var(--space-3);
-      display: grid;
-      gap: 6px;
-    }
-
-    .route-head {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-      font-size: var(--text-sm);
-      font-weight: var(--weight-bold);
-      color: var(--color-text-primary);
-    }
-
-    .route-step {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: var(--weight-bold);
-      color: #fff;
-      background: var(--color-blue-dark);
-      flex-shrink: 0;
-    }
-
-    .route-dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: var(--color-blue);
-      box-shadow: 0 0 0 5px rgba(77, 114, 152, 0.15);
-      flex-shrink: 0;
-    }
-
-    .route-copy {
-      color: var(--color-text-secondary);
-      font-size: var(--text-sm);
-    }
-
-    .showcase {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: var(--space-3);
-    }
-
-    .showcase-layout {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: var(--space-3);
-    }
-
-    .hero-preview {
-      border-radius: var(--border-radius-lg);
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      background: linear-gradient(155deg, rgba(255, 255, 255, 0.88), rgba(234, 243, 252, 0.86));
-      box-shadow: var(--shadow-sm);
-      padding: var(--space-3);
-      display: grid;
-      gap: var(--space-2);
-    }
-
-    .hero-preview-title {
-      font-size: var(--text-sm);
-      font-weight: var(--weight-bold);
-      color: var(--color-blue-dark);
-      letter-spacing: 0.2px;
-      text-transform: uppercase;
-    }
-
-    .hero-preview-main {
-      border-radius: var(--border-radius-md);
-      overflow: hidden;
-      border: 1px solid rgba(0, 0, 0, 0.06);
-      background: rgba(255, 255, 255, 0.65);
-      position: relative;
-    }
-
-    .preview-status {
-      position: absolute;
-      top: var(--space-2);
-      left: var(--space-2);
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      border-radius: var(--border-radius-pill);
-      border: 1px solid rgba(255, 255, 255, 0.5);
-      background: rgba(26, 37, 48, 0.8);
-      color: rgba(255, 255, 255, 0.95);
-      font-size: 11px;
-      padding: 4px 9px;
-      z-index: 1;
-      font-weight: var(--weight-medium);
-    }
-
-    .preview-status::before {
-      content: '';
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--color-online);
-    }
-
-    .micro-cards {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: var(--space-2);
-    }
-
-    .micro-card {
-      border-radius: var(--border-radius-md);
-      border: 1px solid rgba(0, 0, 0, 0.07);
-      background: rgba(255, 255, 255, 0.84);
-      padding: var(--space-3);
-      display: grid;
-      gap: 4px;
-    }
-
-    .micro-card-title {
-      font-size: var(--text-sm);
-      font-weight: var(--weight-bold);
-      color: var(--color-text-primary);
-    }
-
-    .micro-card-copy {
-      font-size: var(--text-xs);
-      color: var(--color-text-secondary);
-      line-height: 1.45;
-    }
-
-    .flow-note {
-      border-radius: var(--border-radius-md);
-      border: 1px dashed rgba(46, 74, 99, 0.28);
-      background: rgba(219, 232, 244, 0.42);
-      padding: var(--space-3);
-      font-size: var(--text-sm);
-      color: var(--color-text-secondary);
-      line-height: 1.45;
-    }
-
-    .showcase-card {
-      border-radius: var(--border-radius-lg);
-      border: 1px solid rgba(0, 0, 0, 0.07);
-      background: rgba(255, 255, 255, 0.86);
-      box-shadow: var(--shadow-sm);
-      overflow: hidden;
-    }
-
-    .showcase-copy {
-      padding: var(--space-4);
-      display: grid;
-      gap: 6px;
-    }
-
-    .showcase-title {
-      font-size: var(--text-lg);
-      font-weight: var(--weight-bold);
-      color: var(--color-text-primary);
-    }
-
-    .showcase-text {
-      font-size: var(--text-sm);
-      color: var(--color-text-secondary);
-    }
-
-    .showcase-image {
-      width: 100%;
-      display: block;
-      object-fit: cover;
-      max-height: 220px;
-      background: rgba(255, 255, 255, 0.45);
-      border-top: 1px solid rgba(0, 0, 0, 0.06);
-    }
-
-    .footnote {
-      color: var(--color-text-muted);
-      text-align: center;
-      font-size: var(--text-xs);
-      padding-bottom: var(--space-1);
-    }
-
-    @media (min-width: 760px) {
-      .hero {
-        grid-template-columns: minmax(0, 1fr);
+      :host {
+        display: block;
+        color: var(--color-text-primary);
       }
 
-      .route-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+      .surface {
+        position: absolute;
+        inset: 0;
+        overflow-y: auto;
+        padding: calc(var(--map-status-bar-height) + var(--space-4)) var(--space-5)
+          calc(env(safe-area-inset-bottom, 0px) + var(--space-10));
+        display: grid;
+        gap: clamp(30px, 4.1vw, 53px);
+        background:
+          radial-gradient(circle at 84% -14%, rgba(53, 92, 126, 0.2), transparent 40%),
+          radial-gradient(circle at -10% 8%, rgba(178, 226, 134, 0.25), transparent 34%),
+          linear-gradient(180deg, #f7faf6, #edf4fb);
       }
 
-      .showcase {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .showcase-layout {
-        grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-      }
-
-      .micro-cards {
-        grid-template-columns: 1fr;
-      }
-
-    }
-
-    @media (max-width: 580px) {
-      .hero {
-        padding: var(--space-4);
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         gap: var(--space-3);
       }
 
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+      }
+
+      .brand-logo {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.92);
+        object-fit: contain;
+        padding: 4px;
+      }
+
+      .brand-copy {
+        display: grid;
+        gap: 2px;
+      }
+
+      .brand-title {
+        font-size: var(--text-lg);
+        font-weight: var(--weight-bold);
+        color: var(--color-blue-dark);
+        letter-spacing: -0.2px;
+      }
+
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+
+      .nav-chip {
+        border: 1px solid rgba(0, 0, 0, 0.09);
+        border-radius: var(--border-radius-pill);
+        padding: 7px 12px;
+        font-size: var(--text-xs);
+        color: var(--color-text-secondary);
+        background: rgba(255, 255, 255, 0.78);
+        text-decoration: none;
+      }
+
+      .hero {
+        border-radius: var(--border-radius-xl);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: linear-gradient(145deg, #102234, #2e4a63 46%, #4d7298 100%);
+        color: #f4f9fd;
+        padding: var(--space-6);
+        display: grid;
+        grid-template-columns: 1.05fr 1fr;
+        gap: var(--space-5);
+        align-items: center;
+      }
+
+      .hero-copy {
+        display: grid;
+        gap: var(--space-4);
+      }
+
+      .hero-eyebrow {
+        display: inline-flex;
+        width: max-content;
+        border-radius: var(--border-radius-pill);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        padding: 6px 11px;
+        font-size: var(--text-xs);
+        font-weight: var(--weight-bold);
+        letter-spacing: 0.35px;
+        background: rgba(255, 255, 255, 0.12);
+      }
+
       .hero-title {
-        font-size: clamp(24px, 8vw, 34px);
-        max-width: 100%;
+        font-size: clamp(30px, 5vw, 52px);
+        line-height: 1.08;
+        letter-spacing: -0.9px;
+        max-width: 18ch;
+      }
+
+      .hero-sub {
+        font-size: var(--text-md);
+        line-height: 1.5;
+        max-width: 52ch;
+        color: rgba(245, 248, 252, 0.9);
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
       }
 
       .hero-actions .btn {
-        width: 100%;
-        min-width: 0;
+        width: auto;
+        min-width: 156px;
       }
 
-      .metrics {
-        grid-template-columns: 1fr;
+      .hero-secondary {
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        color: #f2f7fb;
+        background: rgba(255, 255, 255, 0.1);
       }
-    }
-  `
+
+      .hero-preview {
+        border-radius: var(--border-radius-lg);
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+      }
+
+      .hero-image {
+        display: block;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+      }
+
+      .hero-meta {
+        border-top: 1px solid rgba(255, 255, 255, 0.18);
+        padding: var(--space-3);
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-2);
+      }
+
+      .hero-metric {
+        display: grid;
+        gap: 2px;
+      }
+
+      .hero-metric strong {
+        font-size: var(--text-sm);
+      }
+
+      .hero-metric span {
+        font-size: 11px;
+        color: rgba(245, 248, 252, 0.75);
+      }
+
+      .section {
+        display: grid;
+        gap: 14px;
+      }
+
+      .strip {
+        border-radius: var(--border-radius-lg);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: rgba(255, 255, 255, 0.88);
+        padding: var(--space-4);
+      }
+
+      .trust-list {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--space-3);
+      }
+
+      .trust-item {
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+        text-align: center;
+      }
+
+      .section-head {
+        display: grid;
+        gap: 3px;
+      }
+
+      .section-title {
+        font-size: var(--text-xl);
+        line-height: 1.2;
+        color: var(--color-blue-dark);
+        letter-spacing: -0.2px;
+      }
+
+      .section-sub {
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-3);
+      }
+
+      .cards.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .cards.four {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .card {
+        border: 1px solid rgba(0, 0, 0, 0.09);
+        border-radius: var(--border-radius-lg);
+        background: rgba(255, 255, 255, 0.84);
+        padding: var(--space-3);
+        display: grid;
+        gap: 4px;
+      }
+
+      .card h4 {
+        font-size: var(--text-md);
+        color: var(--color-text-primary);
+        margin: 0;
+      }
+
+      .card p {
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+        line-height: 1.45;
+        margin: 0;
+      }
+
+      .timeline {
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .timeline-row {
+        display: grid;
+        grid-template-columns: 40px 1fr;
+        gap: var(--space-3);
+        align-items: start;
+      }
+
+      .step-dot {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        font-size: var(--text-sm);
+        font-weight: var(--weight-bold);
+        color: #0d2d45;
+        background: rgba(178, 226, 134, 0.5);
+        border: 1px solid rgba(13, 45, 69, 0.16);
+      }
+
+      .step-copy {
+        border: 1px solid rgba(0, 0, 0, 0.09);
+        border-radius: var(--border-radius-lg);
+        background: rgba(255, 255, 255, 0.85);
+        padding: var(--space-3);
+      }
+
+      .step-copy strong {
+        display: block;
+        font-size: var(--text-md);
+      }
+
+      .step-copy span {
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+      }
+
+      .pair {
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        gap: var(--space-3);
+        align-items: start;
+      }
+
+      .stack-cards {
+        grid-template-columns: 1fr;
+        gap: var(--space-2);
+        align-content: start;
+      }
+
+      .stack-cards .card {
+        min-height: 0;
+      }
+
+      .visual-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-3);
+      }
+
+      .visual {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: var(--border-radius-lg);
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      .visual img {
+        width: 100%;
+        display: block;
+        aspect-ratio: 16 / 10;
+        object-fit: cover;
+      }
+
+      .visual-copy {
+        padding: var(--space-2) var(--space-3) var(--space-3);
+        display: grid;
+        gap: 3px;
+      }
+
+      .visual-copy strong {
+        font-size: var(--text-md);
+      }
+
+      .visual-copy span {
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+      }
+
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--space-3);
+      }
+
+      .kpi {
+        border: 1px solid rgba(0, 0, 0, 0.09);
+        border-radius: var(--border-radius-lg);
+        background: rgba(255, 255, 255, 0.86);
+        padding: var(--space-3);
+        display: grid;
+        gap: 2px;
+      }
+
+      .kpi strong {
+        font-size: clamp(22px, 2.8vw, 30px);
+        line-height: 1.1;
+        color: var(--color-blue-dark);
+      }
+
+      .kpi span {
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+      }
+
+      .quote {
+        border: 1px solid rgba(0, 0, 0, 0.09);
+        border-radius: var(--border-radius-lg);
+        background: rgba(255, 255, 255, 0.9);
+        padding: var(--space-4);
+      }
+
+      .quote p {
+        font-size: var(--text-md);
+        line-height: 1.45;
+        color: var(--color-text-primary);
+        margin: 0;
+      }
+
+      .quote span {
+        display: block;
+        margin-top: var(--space-2);
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+      }
+
+      .faq {
+        border: 1px solid rgba(0, 0, 0, 0.09);
+        border-radius: var(--border-radius-lg);
+        background: rgba(255, 255, 255, 0.86);
+        padding: var(--space-3);
+        display: grid;
+        gap: 4px;
+      }
+
+      .faq strong {
+        font-size: var(--text-sm);
+      }
+
+      .faq span {
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
+      }
+
+      .cta-banner {
+        border-radius: var(--border-radius-xl);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: linear-gradient(120deg, #0f2f47, #375873);
+        color: #f4f8fc;
+        padding: var(--space-5);
+        display: grid;
+        gap: var(--space-2);
+      }
+
+      .cta-banner h3,
+      .cta-banner p {
+        margin: 0;
+      }
+
+      .cta-banner p {
+        font-size: var(--text-md);
+        color: rgba(244, 248, 252, 0.9);
+      }
+
+      .cta-banner .btn-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+
+      .btn-ghost-light {
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.08);
+        color: #f4f8fc;
+      }
+
+      @media (max-width: 980px) {
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .pair {
+          grid-template-columns: 1fr;
+        }
+
+        .cards {
+          grid-template-columns: 1fr;
+        }
+
+        .cards.two,
+        .cards.four {
+          grid-template-columns: 1fr;
+        }
+
+        .trust-list {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .kpi-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .visual-row {
+          grid-template-columns: 1fr;
+        }
+
+      }
+
+      @media (max-width: 640px) {
+        .surface {
+          padding-left: var(--space-4);
+          padding-right: var(--space-4);
+          padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-8));
+          gap: clamp(21px, 5.6vw, 32px);
+        }
+
+        .topbar {
+          align-items: flex-start;
+          gap: var(--space-3);
+          flex-direction: column;
+        }
+
+        .nav {
+          width: 100%;
+          flex-wrap: wrap;
+        }
+
+        .hero {
+          padding: var(--space-5);
+        }
+
+        .hero-actions .btn {
+          width: 100%;
+          min-width: 0;
+        }
+
+        .hero-meta {
+          grid-template-columns: 1fr;
+        }
+
+        .trust-list {
+          grid-template-columns: 1fr;
+        }
+
+        .kpi-grid {
+          grid-template-columns: 1fr;
+        }
+
+      }
+    `,
   ];
 
   @property({ type: Boolean }) canInstall = false;
@@ -428,124 +533,340 @@ export class LandingPage extends LitElement {
 
   override render() {
     return html`
-      <screen-shell screen="landing">
-        <div class="sheet">
-          <section class="hero">
-            <div class="hero-main">
-              <div class="hero-kicker">REAL-TIME, FAIR, BEAUTIFUL MEETUPS</div>
-              <div class="hero-title">Meet halfway without the back-and-forth chaos.</div>
-              <p class="hero-copy">
-                2bottles turns one awkward decision into a smooth flow: invite your partner, get balanced midpoint options,
-                agree fast, and track both arrivals live.
+      <screen-shell screen="landing" .showSheetControls=${false}>
+        <div class="surface">
+          <header class="topbar">
+            <div class="brand">
+              <img class="brand-logo" src="/favicon.svg" alt="2bottles logo" />
+              <div class="brand-copy"><div class="brand-title">2bottles</div></div>
+            </div>
+
+            <nav class="nav" aria-label="Landing sections">
+              <a href="#flow" class="nav-chip">Flow</a>
+              <a href="#fairness" class="nav-chip">Fairness</a>
+              <a href="#faq" class="nav-chip">FAQ</a>
+            </nav>
+          </header>
+
+          <section class="hero" id="top">
+            <div class="hero-copy">
+              <div class="hero-eyebrow">REALTIME RENDEZVOUS</div>
+              <div class="hero-title">Get to "where should we meet?" in one clean flow.</div>
+              <p class="hero-sub">
+                Send one link, choose a balanced location, and watch both routes update in real time.
+                2bottles removes negotiation friction without removing human context.
               </p>
 
               <div class="hero-actions">
-                <button class="btn btn-primary" @click=${() => this._emit('start')}>Start a Session</button>
-                ${this.canInstall ? html`<button class="btn btn-soft" @click=${() => this._emit('install')}>Install App</button>` : ''}
+                <button class="btn btn-primary" @click=${() => this._emit('start')}>Start Session</button>
+                ${this.canInstall
+                  ? html`<button class="btn hero-secondary" @click=${() => this._emit('install')}>Install App</button>`
+                  : ''}
+              </div>
+            </div>
+
+            <div class="hero-preview">
+              <img class="hero-image" src="/illustrations/landing-route-radar.svg" alt="Route radar with midpoint convergence" loading="eager" />
+              <div class="hero-meta">
+                <div class="hero-metric">
+                  <strong>2 taps</strong>
+                  <span>to invite partner</span>
+                </div>
+                <div class="hero-metric">
+                  <strong>Live ETA</strong>
+                  <span>for both people</span>
+                </div>
+                <div class="hero-metric">
+                  <strong>Balanced</strong>
+                  <span>midpoint recommendations</span>
+                </div>
               </div>
             </div>
           </section>
 
-          <div class="metrics" aria-label="Why people love it">
-            <div class="metric">
-              <div class="metric-value">2 taps</div>
-              <div class="metric-label">to invite partner</div>
+          <section class="section strip">
+            <div class="trust-list">
+              <div class="trust-item">Balanced midpoint logic</div>
+              <div class="trust-item">Live route + ETA context</div>
+              <div class="trust-item">Invite with one link</div>
+              <div class="trust-item">Works as installable PWA</div>
             </div>
-            <div class="metric">
-              <div class="metric-value">Live</div>
-              <div class="metric-label">co-tracking updates</div>
-            </div>
-            <div class="metric">
-              <div class="metric-value">Balanced</div>
-              <div class="metric-label">midpoint-first decisions</div>
-            </div>
-          </div>
+          </section>
 
-          <section class="signal-strip" aria-label="Core product signals">
-            <div class="signal-title">Built for movement</div>
-            <div class="signal-row">
-              <span class="pill">Midpoint venue engine</span>
-              <span class="pill">ETA sync for both people</span>
-              <span class="pill">Manual place override</span>
-              <span class="pill">Installable app shell</span>
+          <section class="section" id="flow">
+            <div class="section-head">
+              <div class="section-title">How it feels in practice</div>
+              <div class="section-sub">Fast, fair, and visually clear from invite to arrival.</div>
+            </div>
+
+            <div class="cards">
+              <article class="card">
+                <h4>Create + Invite</h4>
+                <p>Start your session and share one link. No setup fatigue or repeated context sharing.</p>
+              </article>
+              <article class="card">
+                <h4>Agree Faster</h4>
+                <p>Fair venue options reduce back-and-forth by balancing travel burden across both people.</p>
+              </article>
+              <article class="card">
+                <h4>Track Together</h4>
+                <p>Live movement and status updates keep both participants aligned until arrival.</p>
+              </article>
             </div>
           </section>
 
           <section class="section">
             <div class="section-head">
-              <div class="section-title">What happens after "Built for movement"</div>
-              <div class="section-sub">This is the exact order users experience inside the app.</div>
+              <div class="section-title">Product surfaces</div>
+              <div class="section-sub">Custom visual system for planning, ranking, and live sync.</div>
             </div>
-            <div class="route-grid">
-              <article class="route-card">
-                <div class="route-head"><span class="route-step">1</span><span>Create + Invite</span></div>
-                <div class="route-copy">Start a session and send the link instantly to your partner.</div>
+
+            <div class="visual-row">
+              <article class="visual">
+                <img src="/illustrations/landing-fairness-board.svg" alt="Fairness board with route delta and venue score" loading="lazy" />
+                <div class="visual-copy">
+                  <strong>Fairness board</strong>
+                  <span>Route delta, venue quality, and confidence are visible at a glance.</span>
+                </div>
               </article>
-              <article class="route-card">
-                <div class="route-head"><span class="route-step">2</span><span>Pick Fair Spot</span></div>
-                <div class="route-copy">Review midpoint options scored around both travel times.</div>
+
+              <article class="visual">
+                <img src="/illustrations/landing-live-sync-grid.svg" alt="Live session grid with synchronized ETA signals" loading="lazy" />
+                <div class="visual-copy">
+                  <strong>Live sync grid</strong>
+                  <span>Status stream and ETA telemetry stay aligned for both participants.</span>
+                </div>
               </article>
-              <article class="route-card">
-                <div class="route-head"><span class="route-step">3</span><span>Track + Arrive</span></div>
-                <div class="route-copy">Watch live movement and ETA updates until both of you arrive.</div>
-              </article>
-            </div>
-            <div class="flow-note">
-              After these three steps, users land in live tracking and chat while the route remains visible in a sheet-first layout.
             </div>
           </section>
 
           <section class="section">
             <div class="section-head">
-              <div class="section-title">What the interface looks like during use</div>
-              <div class="section-sub">These previews map directly to the interaction flow above.</div>
+              <div class="section-title">Why normal meetup planning fails</div>
+              <div class="section-sub">Most plans break on fairness, context switching, and stale updates.</div>
             </div>
 
-            <div class="showcase-layout">
-              <article class="hero-preview">
-                <div class="hero-preview-title">Live usage view</div>
-                <div class="hero-preview-main">
-                  <div class="preview-status">Session synced</div>
-                  <img class="showcase-image" src="/illustrations/landing-map-scene.svg" alt="2bottles route and midpoint scene" loading="lazy" />
-                </div>
+            <div class="cards two">
+              <article class="card">
+                <h4>One person does all the travel</h4>
+                <p>Without a midpoint model, travel burden is silently uneven and causes friction.</p>
               </article>
-
-              <div class="micro-cards">
-                <article class="micro-card">
-                  <div class="micro-card-title">Map-first decisions</div>
-                  <div class="micro-card-copy">Venue and route context stay visible while users make selections in the sheet.</div>
-                </article>
-                <article class="micro-card">
-                  <div class="micro-card-title">Partner feedback loop</div>
-                  <div class="micro-card-copy">Suggestions, agreements, and movement updates stay synchronized in real time.</div>
-                </article>
-                <article class="micro-card">
-                  <div class="micro-card-title">Low-friction interaction</div>
-                  <div class="micro-card-copy">Each state uses focused controls so newcomers understand what to do next instantly.</div>
-                </article>
-              </div>
-            </div>
-
-            <div class="showcase">
-              <article class="showcase-card">
-                <div class="showcase-copy">
-                  <div class="showcase-title">Partner-centered flow</div>
-                  <div class="showcase-text">Both people stay aligned from invite to venue agreement with low-friction decisions.</div>
-                </div>
-                <img class="showcase-image" src="/illustrations/landing-duo-flow.svg" alt="2bottles partner journey" loading="lazy" />
+              <article class="card">
+                <h4>Coordination happens in scattered chat threads</h4>
+                <p>Links, ETAs, and choices get buried across apps, so people lose shared context.</p>
               </article>
             </div>
           </section>
 
-          <p class="footnote">2bottles keeps meetup planning fair, calm, and beautifully clear.</p>
+          <section class="section">
+            <div class="section-head">
+              <div class="section-title">Session flow, step by step</div>
+              <div class="section-sub">One sequence from invite to arrival, no side quests.</div>
+            </div>
+
+            <div class="timeline">
+              <div class="timeline-row">
+                <div class="step-dot">1</div>
+                <div class="step-copy">
+                  <strong>Create and share</strong>
+                  <span>Host creates a session and sends one link to a partner.</span>
+                </div>
+              </div>
+              <div class="timeline-row">
+                <div class="step-dot">2</div>
+                <div class="step-copy">
+                  <strong>Pick the meeting point</strong>
+                  <span>Venue suggestions are computed from both positions and shown with clear tradeoffs.</span>
+                </div>
+              </div>
+              <div class="timeline-row">
+                <div class="step-dot">3</div>
+                <div class="step-copy">
+                  <strong>Track progress together</strong>
+                  <span>Both participants see updates, statuses, and route changes in real time.</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section" id="fairness">
+            <div class="section-head">
+              <div class="section-title">Fairness engine, not guesswork</div>
+              <div class="section-sub">Venue ranking focuses on shared travel effort, not random proximity.</div>
+            </div>
+
+            <div class="pair">
+              <article class="visual">
+                <img src="/illustrations/landing-map-scene.svg" alt="Map scene showing balanced midpoint exploration" loading="lazy" />
+                <div class="visual-copy">
+                  <strong>Midpoint map context</strong>
+                  <span>Both routes are evaluated together before a venue is recommended.</span>
+                </div>
+              </article>
+
+              <div class="cards stack-cards">
+                <article class="card">
+                  <h4>Distance balancing</h4>
+                  <p>Recommendations prefer options that reduce one-sided detours.</p>
+                </article>
+                <article class="card">
+                  <h4>Venue quality filters</h4>
+                  <p>Suggestions include practical places people can actually meet.</p>
+                </article>
+                <article class="card">
+                  <h4>Fast recompute loop</h4>
+                  <p>If either person moves, the suggestion context can refresh quickly.</p>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <div class="section-title">Live intelligence while traveling</div>
+              <div class="section-sub">The app stays useful after a venue is chosen.</div>
+            </div>
+
+            <div class="cards four">
+              <article class="card">
+                <h4>Live ETA</h4>
+                <p>Each user can see timing context without manual check-ins.</p>
+              </article>
+              <article class="card">
+                <h4>Status sync</h4>
+                <p>Joined, en route, and arrived states remain aligned across devices.</p>
+              </article>
+              <article class="card">
+                <h4>Route context</h4>
+                <p>Map updates make route changes visible when conditions shift.</p>
+              </article>
+              <article class="card">
+                <h4>Resilient messaging</h4>
+                <p>Realtime transport keeps session events flowing under unstable connectivity.</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <div class="section-title">Visual proof of the flow</div>
+              <div class="section-sub">Dedicated session-state canvas for invite-to-arrival visibility.</div>
+            </div>
+
+            <article class="visual">
+              <img src="/illustrations/landing-duo-flow.svg" alt="Synchronized session stream showing shared movement state" loading="lazy" />
+              <div class="visual-copy">
+                <strong>Dual-participant coordination</strong>
+                <span>Both sides stay in lockstep through invite, choice, and movement.</span>
+              </div>
+            </article>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <div class="section-title">Performance snapshot</div>
+              <div class="section-sub">Built for fast practical decisions, not long planning threads.</div>
+            </div>
+
+            <div class="kpi-grid">
+              <div class="kpi">
+                <strong>2 taps</strong>
+                <span>invite partner into session</span>
+              </div>
+              <div class="kpi">
+                <strong>1 link</strong>
+                <span>for a complete shared context</span>
+              </div>
+              <div class="kpi">
+                <strong>Live</strong>
+                <span>state updates during travel</span>
+              </div>
+              <div class="kpi">
+                <strong>Fair</strong>
+                <span>venue recommendations by design</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <div class="section-title">People-first use cases</div>
+              <div class="section-sub">Designed for routine coordination, not one-off novelty.</div>
+            </div>
+
+            <div class="cards">
+              <article class="card">
+                <h4>Friends meeting after work</h4>
+                <p>Find a balanced cafe between neighborhoods without a long negotiation loop.</p>
+              </article>
+              <article class="card">
+                <h4>Study partners syncing quickly</h4>
+                <p>Pick neutral venues and avoid wasting time deciding where to meet.</p>
+              </article>
+              <article class="card">
+                <h4>Date-night planning</h4>
+                <p>Keep the decision fair and transparent before either person starts moving.</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <div class="section-title">What users care about</div>
+              <div class="section-sub">Feedback themes we optimize around.</div>
+            </div>
+
+            <div class="cards two">
+              <article class="quote">
+                <p>"The midpoint options stop the subtle argument about whose side of town wins."</p>
+                <span>Early tester, weekly meetup planner</span>
+              </article>
+              <article class="quote">
+                <p>"Seeing both ETAs in one view removed most of our back-and-forth texting."</p>
+                <span>Early tester, campus commuter</span>
+              </article>
+            </div>
+          </section>
+
+          <section class="section" id="faq">
+            <div class="section-head">
+              <div class="section-title">FAQ</div>
+              <div class="section-sub">Straight answers for common concerns.</div>
+            </div>
+
+            <div class="cards two">
+              <article class="faq">
+                <strong>Does everyone need to install the app?</strong>
+                <span>No. A partner can join via shared link. Install is optional for faster repeat use.</span>
+              </article>
+              <article class="faq">
+                <strong>Is location sharing always on?</strong>
+                <span>Location is session-driven. Participants control access through permission prompts.</span>
+              </article>
+              <article class="faq">
+                <strong>Can I use it for quick ad-hoc plans?</strong>
+                <span>Yes. It is optimized for short planning loops and immediate decisions.</span>
+              </article>
+              <article class="faq">
+                <strong>What if someone loses connectivity?</strong>
+                <span>Realtime updates are designed with resilient transport behavior and session recovery.</span>
+              </article>
+            </div>
+          </section>
+
+          <section class="cta-banner">
+            <h3>Stop negotiating the map. Start moving.</h3>
+            <p>Launch a session in seconds and let 2bottles handle fair venue context + live coordination.</p>
+            <div class="btn-row">
+              <button class="btn btn-primary" @click=${() => this._emit('start')}>Start Session</button>
+              ${this.canInstall
+                ? html`<button class="btn btn-ghost-light" @click=${() => this._emit('install')}>Install App</button>`
+                : ''}
+            </div>
+          </section>
+
         </div>
       </screen-shell>
     `;
-  }
-}
-
-declare global {
-  interface HTMLElementTagNameMap {
-    'landing-page': LandingPage;
   }
 }
