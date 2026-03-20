@@ -26,7 +26,7 @@ export class CreateSession extends LitElement {
 
     .gps-card {
       position: relative;
-      width: 100%;
+      box-sizing: border-box;
       background: rgba(77,114,152,0.07);
       border: 1px solid rgba(77,114,152,0.15);
       border-radius: var(--border-radius-md);
@@ -45,15 +45,15 @@ export class CreateSession extends LitElement {
 
     .edit-btn {
       position: absolute;
-      top: 10px;
-      right: 10px;
+      top: 0.8em;
+      right: 0.8em;
       border: 1px solid rgba(0,0,0,0.12);
       background: var(--color-surface);
       color: var(--color-blue-dark);
       border-radius: var(--border-radius-pill);
       font-size: var(--text-xs);
       font-weight: var(--weight-bold);
-      padding: 6px 10px;
+      padding: 0.25em 0.75em;
       cursor: pointer;
       transition: all var(--duration-fast);
     }
