@@ -50,7 +50,7 @@ export class LocationInput extends LitElement {
       outline: none;
       transition: border-color var(--duration-fast);
     }
-    input:focus { border-color: var(--color-blue); background: #fff; }
+    input:focus { border-color: var(--color-blue); background: var(--color-surface); }
     input::placeholder { color: var(--color-text-muted); }
 
     .dropdown {
@@ -139,7 +139,7 @@ export class LocationInput extends LitElement {
 
     .scope-btn {
       border: 1px solid rgba(0,0,0,0.12);
-      background: #fff;
+      background: var(--color-surface);
       color: var(--color-text-primary);
       border-radius: 999px;
       padding: 6px 10px;
@@ -220,7 +220,6 @@ export class LocationInput extends LitElement {
                 biasCenter: this._scope === 'nearby' ? this._nearbyCenter ?? undefined : undefined,
                 biasRadiusKm: this._scope === 'nearby' ? 30 : undefined,
             });
-            // Bug 39: Race condition check
             if (this._lastQuery === val && this._requestSeq === reqId) {
                 this._suggestions = results;
             }
@@ -248,7 +247,6 @@ export class LocationInput extends LitElement {
     if (scope === 'nearby' && !this._nearbyCenter) {
       this._nearbyCenter = await this._resolveNearbyCenter();
     }
-    // Re-run query in the new scope if user already typed text.
     const current = this.value.trim();
     if (current.length >= 2) await this._search(current);
   }
@@ -285,7 +283,6 @@ export class LocationInput extends LitElement {
   }
 
   private _onBlur() {
-    // Small delay so clicks on suggestions register before blur closes dropdown
     if (this._blurTimer) clearTimeout(this._blurTimer);
     this._blurTimer = setTimeout(() => {
       this._open = false;

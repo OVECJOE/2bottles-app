@@ -1,3 +1,11 @@
+/**
+ * <app-shell> — top-level application container.
+ *
+ * Responsibilities:
+ *   route setup and lazy screen loading
+ *   global overlays (toasts, loading, dialogs)
+ *   app install prompt wiring and location permission takeover
+ */
 import { LitElement, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
@@ -50,7 +58,6 @@ export class AppShell extends LitElement {
     }
 
     override async firstUpdated() {
-        // 1. Initialize stores
         await Promise.all([
             uiStore.init(),
             sessionStore.init(),
@@ -60,7 +67,6 @@ export class AppShell extends LitElement {
         this._setupInstallPromptHandlers();
         await this._syncLocationPermissionState();
 
-        // 2. Setup Router
         const outlet = this.renderRoot.querySelector('#outlet');
         this._router = new Router(outlet);
         
@@ -79,7 +85,6 @@ export class AppShell extends LitElement {
             { path: '(.*)', component: 'landing-page', action: async () => { await import('./marketing/landing-page.ts'); } }
         ]);
 
-        // 3. Handle reconnection logic
         const path = window.location.pathname;
         const session = sessionStore.session;
         
@@ -89,10 +94,8 @@ export class AppShell extends LitElement {
                 if (sessionStore.isHost) {
                     await p2pService.init(session.id);
                 } else if (!path.startsWith('/join/')) {
-                    // If we are on home but have a session, maybe redirect to coordinate?
                     await p2pService.connect(session.id);
                 } else {
-                    // If we are on /join/ID, the component handles it, but we can ensure p2p is ready
                     await p2pService.init(); 
                 }
             } catch (err) {

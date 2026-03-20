@@ -4,25 +4,138 @@
    ========================================================== */
 
 :root {
+      /* ----------------------------------------------------------
+       Primitive Palette
+   ---------------------------------------------------------- */
+      --green-100: #D0EFB1;
+      --green-400: #9DD674;
+      --green-600: #7ab84a;
+      --green-900: #2d5a0e;
+
+      --blue-100: #dbe8f4;
+      --blue-500: #4D7298;
+      --blue-600: #3a5e80;
+      --blue-700: #2e4a63;
+
+      --neutral-0: #ffffff;
+      --neutral-50: #fafcf8;
+      --neutral-100: #f4f6f8;
+      --neutral-200: #E9EDEF;
+      --neutral-300: #dddddd;
+      --neutral-400: #888888;
+      --neutral-500: #555555;
+      --neutral-600: #5f6368;
+      --neutral-700: #243240;
+      --neutral-800: #1a2530;
+      --neutral-900: #111111;
+
+      --danger-100: #fdecea;
+      --danger-500: #ea4335;
+      --danger-700: #c0392b;
+
+      --warning-100: #fff4e0;
+      --warning-700: #8a5c00;
+
+      --accent-amber-500: #fbbc04;
+
+      /* ----------------------------------------------------------
+       Semantic Tokens
+   ---------------------------------------------------------- */
+      --color-action: var(--blue-500);
+      --color-action-hover: var(--blue-600);
+      --color-action-strong: var(--blue-700);
+      --color-action-text: var(--neutral-0);
+
+      --color-success: var(--green-100);
+      --color-success-hover: var(--green-400);
+      --color-success-strong: var(--green-600);
+      --color-success-text: var(--green-900);
+
+      --color-surface: var(--neutral-0);
+      --color-surface-muted: var(--neutral-50);
+      --color-surface-soft: var(--neutral-100);
+      --color-surface-inverse: var(--neutral-800);
+
+      --color-text: var(--neutral-900);
+      --color-text-secondary: var(--neutral-500);
+      --color-text-muted: var(--neutral-400);
+      --color-text-inverse: var(--neutral-0);
+
+      --color-border: rgba(0, 0, 0, 0.10);
+      --color-border-strong: rgba(0, 0, 0, 0.18);
+
+      --color-info: var(--blue-100);
+      --color-info-text: var(--blue-700);
+      --color-warning: var(--warning-100);
+      --color-warning-text: var(--warning-700);
+      --color-danger: var(--danger-100);
+      --color-danger-text: var(--danger-700);
+
+      --color-disabled-bg: #cccccc;
+      --color-disabled-text: #666666;
+
+      /* ----------------------------------------------------------
+       Component-level Tokens (public override contracts)
+   ---------------------------------------------------------- */
+      --chat-bubble-them-bg: var(--neutral-200);
+      --chat-bubble-mine-bg: var(--color-action);
+      --chat-bubble-mine-text: var(--color-action-text);
+      --chat-input-bg: var(--color-surface);
+      --chat-input-border: var(--neutral-300);
+
+      --invite-sheet-bg: linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-soft) 100%);
+      --location-permission-surface-bg: linear-gradient(160deg, #e7f6d6 0%, #d9e8f5 54%, #f7fbff 100%);
+
+      --landing-surface-bg: linear-gradient(180deg, #f7faf6, #edf4fb);
+      --landing-hero-bg: linear-gradient(145deg, #102234, #2e4a63 46%, #4d7298 100%);
+      --landing-hero-text: #f4f9fd;
+      --landing-hero-text-secondary: #f2f7fb;
+      --landing-step-text: #0d2d45;
+      --landing-cta-bg: linear-gradient(120deg, #0f2f47, #375873);
+      --landing-cta-text: #f4f8fc;
+
+      --map-pin-you: #4285f4;
+      --map-pin-partner: var(--accent-amber-500);
+      --map-pin-destination: var(--danger-500);
+      --map-poi-fallback: var(--blue-500);
+
+      --map-style-background: #ede8e0;
+      --map-style-land: #e6e0d7;
+      --map-style-land-overlay: #ddd7ce;
+      --map-style-park: #cfd9c5;
+      --map-style-grass: #d6dccf;
+      --map-style-water: #b8cfe0;
+      --map-style-road-major: #c8bfb0;
+      --map-style-road-primary: #cdc5b8;
+      --map-style-road-secondary: #d0c9bc;
+      --map-style-road-tertiary: #d5cfc4;
+      --map-style-road-street: #dad4ca;
+      --map-style-road-service: #dedad2;
+      --map-style-road-path: #e2ddd6;
+      --map-style-building: #d8d2c8;
+      --map-style-building-top: #ddd8cf;
+      --map-style-label: #5a5248;
+      --map-style-label-halo: rgba(237,232,224,0.85);
+
     /* ----------------------------------------------------------
      Brand Colors
   ---------------------------------------------------------- */
-    --color-green: #D0EFB1;
+      --color-green: var(--color-success);
     --color-green-mid: #9DD674;
     /* hover / active states   */
     --color-green-dark: #7ab84a;
     /* pressed / focus rings   */
-    --color-green-text: #2d5a0e;
+      --color-green-text: var(--color-success-text);
     /* text on --color-green   */
 
-    --color-blue: #4D7298;
-    --color-blue-light: #dbe8f4;
+      --color-blue: var(--color-action);
+      --color-blue-light: var(--blue-100);
     /* subtle backgrounds      */
-    --color-blue-mid: #3a5e80;
+      --color-blue-mid: var(--color-action-hover);
     /* hover                   */
-    --color-blue-dark: #2e4a63;
+      --color-blue-dark: var(--color-action-strong);
     /* pressed / headings      */
-    --color-blue-text: #ffffff;
+      --color-blue-text: var(--color-action-text);
     /* text on --color-blue    */
 
     /* ----------------------------------------------------------
@@ -37,28 +150,28 @@
     --color-surface-600: #2f4155;
     /* borders on dark bg      */
 
-    --color-sheet-bg: rgba(250, 252, 248, 0.97);
+   --color-sheet-bg: rgba(250, 252, 248, 0.97);
     /* bottom sheets         */
     --color-sheet-bg-solid: #fafcf8;
     /* non-backdrop version  */
 
-    --color-text-primary: #111111;
-    --color-text-secondary: #555555;
-    --color-text-muted: #888888;
-    --color-text-inverted: #ffffff;
+   --color-text-primary: var(--color-text);
+  --color-text-secondary: var(--neutral-500);
+  --color-text-muted: var(--neutral-400);
+   --color-text-inverted: var(--color-text-inverse);
     --color-text-on-dark: rgba(255, 255, 255, 0.85);
     --color-text-on-dark-muted: rgba(255, 255, 255, 0.45);
 
     /* ----------------------------------------------------------
      Semantic
   ---------------------------------------------------------- */
-    --color-success-bg: #D0EFB1;
+   --color-success-bg: var(--color-success);
     /* reuses brand green      */
     --color-success-text: #2d5a0e;
-    --color-danger-bg: #fdecea;
-    --color-danger-text: #c0392b;
-    --color-warning-bg: #fff4e0;
-    --color-warning-text: #8a5c00;
+   --color-danger-bg: var(--color-danger);
+  --color-danger-text: var(--danger-700);
+   --color-warning-bg: var(--color-warning);
+  --color-warning-text: var(--warning-700);
 
     --color-online: #22c55e;
     --color-offline: #94a3b8;
@@ -177,4 +290,23 @@
     --map-status-bar-height: 38px;
     --fab-size: 42px;
     --pin-size: 14px;
+}
+
+[data-theme='dark'] {
+   --color-surface: #18181b;
+   --color-surface-muted: #222227;
+   --color-surface-soft: #2a2a31;
+   --color-text: #fafafa;
+   --color-text-secondary: #d1d5db;
+   --color-text-muted: #9ca3af;
+   --color-border: rgba(255, 255, 255, 0.14);
+   --color-border-strong: rgba(255, 255, 255, 0.22);
+
+   --color-sheet-bg: rgba(31, 36, 43, 0.96);
+   --color-sheet-bg-solid: #1f242b;
+   --color-text-on-dark: rgba(255, 255, 255, 0.92);
+   --color-text-on-dark-muted: rgba(255, 255, 255, 0.58);
+   --chat-bubble-them-bg: #2a2f38;
+   --chat-input-bg: #20252d;
+   --chat-input-border: rgba(255, 255, 255, 0.14);
 }

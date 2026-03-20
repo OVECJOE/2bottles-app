@@ -21,8 +21,6 @@ interface MenuItem {
   action: () => void | Promise<void>;
   danger?: boolean;
 }
-
-// @customElement('app-menu') -- Replaced with safe manual registration below
 export class AppMenu extends LitElement {
   static override styles = css`
     :host { display: block; }

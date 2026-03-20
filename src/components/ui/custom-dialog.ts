@@ -1,8 +1,16 @@
+/**
+ * <custom-dialog> — reusable modal shell with optional custom slotted content.
+ *
+ * Properties:
+ *   open, title, message, confirmLabel, cancelLabel
+ *   hideDefaultActions, allowBackdropDismiss, fullscreen
+ *
+ * Dispatches:
+ *   dialog-result { confirmed: boolean }
+ */
 import { LitElement, html, css } from 'lit';
 import { property } from 'lit/decorators.js';
 import { sharedStyles } from '../../styles/shared-styles.js';
-
-// @customElement('custom-dialog')
 export class CustomDialog extends LitElement {
     static override styles = [
         sharedStyles,
@@ -131,18 +139,18 @@ export class CustomDialog extends LitElement {
     override render() {
         const hasCustomContent = this.childElementCount > 0;
         return html`
-            <div class="backdrop" @click=${() => { if (this.allowBackdropDismiss) this._handleAction(false); }}></div>
-            <div class="dialog ${this.fullscreen ? 'fullscreen' : ''}" role="dialog" aria-modal="true" aria-label=${this.title || 'Confirmation dialog'}>
+            <div class="backdrop" part="backdrop" @click=${() => { if (this.allowBackdropDismiss) this._handleAction(false); }}></div>
+            <div class="dialog ${this.fullscreen ? 'fullscreen' : ''}" part="dialog" role="dialog" aria-modal="true" aria-label=${this.title || 'Confirmation dialog'}>
                 <slot></slot>
                 ${hasCustomContent ? '' : html`
-                    ${this.title ? html`<div class="title">${this.title}</div>` : ''}
-                    <div class="message">${this.message}</div>
+                    ${this.title ? html`<div class="title" part="title">${this.title}</div>` : ''}
+                    <div class="message" part="message">${this.message}</div>
                     ${this.hideDefaultActions ? '' : html`
-                        <div class="actions">
-                            <button class="btn btn-primary" @click=${() => this._handleAction(true)}>
+                        <div class="actions" part="actions">
+                            <button class="btn btn-primary" part="confirm" @click=${() => this._handleAction(true)}>
                                 ${this.confirmLabel}
                             </button>
-                            <button class="btn btn-ghost" @click=${() => this._handleAction(false)}>
+                            <button class="btn btn-ghost" part="cancel" @click=${() => this._handleAction(false)}>
                                 ${this.cancelLabel}
                             </button>
                         </div>

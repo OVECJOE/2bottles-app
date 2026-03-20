@@ -1,3 +1,11 @@
+/**
+ * <map-view> — full-screen MapLibre canvas used by every app flow.
+ *
+ * Responsibilities:
+ *   render own/partner/destination pins and midpoint marker
+ *   draw live route polylines and fit camera to active trip geometry
+ *   emit lightweight map UI details (GPS badge + info card)
+ */
 import { LitElement, html } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import maplibregl from 'maplibre-gl';
@@ -17,12 +25,10 @@ const DEFAULT_ZOOM = 13;
 const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const ROUTING_ENDPOINT = (import.meta.env.VITE_ROUTING_ENDPOINT as string | undefined) || '/api/route';
 
-// Layer IDs
 const LAYER_YOU = 'layer-you';
 const LAYER_PARTNER = 'layer-partner';
 const LAYER_DESTINATION = 'layer-destination';
 
-// Source IDs
 const SOURCE_YOU = 'source-you';
 const SOURCE_PARTNER = 'source-partner';
 const SOURCE_DESTINATION = 'source-destination';
@@ -31,9 +37,11 @@ const SOURCE_ROUTE_OWN = 'source-route-own';
 const SOURCE_ROUTE_PARTNER = 'source-route-partner';
 const SOURCE_ROUTE_SINGLE = 'source-route-single';
 
-// ---------------------------------------------------------------------------
-// Procedural Icon Generation
-// ---------------------------------------------------------------------------
+function readToken(name: string, fallback: string): string {
+    if (typeof window === 'undefined') return fallback;
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return value || fallback;
+}
 
 function createPinImage(color: string, initials?: string): ImageData {
     const canvas = document.createElement('canvas');
@@ -41,18 +49,16 @@ function createPinImage(color: string, initials?: string): ImageData {
     canvas.height = 64;
     const ctx = canvas.getContext('2d')!;
 
-    // Shadow
     ctx.shadowColor = 'rgba(0,0,0,0.3)';
     ctx.shadowBlur = 8;
     ctx.shadowOffsetY = 4;
 
-    // Outer circle
+    const surface = readToken('--color-surface', '#ffffff');
     ctx.beginPath();
     ctx.arc(32, 28, 22, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = surface;
     ctx.fill();
 
-    // Inner circle (colored)
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
     ctx.beginPath();
@@ -60,7 +66,6 @@ function createPinImage(color: string, initials?: string): ImageData {
     ctx.fillStyle = color;
     ctx.fill();
 
-    // Pin tip
     ctx.beginPath();
     ctx.moveTo(32, 60);
     ctx.lineTo(22, 42);
@@ -69,9 +74,10 @@ function createPinImage(color: string, initials?: string): ImageData {
     ctx.fillStyle = color;
     ctx.fill();
 
-    // White center dot or initials
+    // Canvas pin drawing uses simple arc + path primitives.
+    // Reference: https://developer.mozilla.org/docs/Web/API/CanvasRenderingContext2D
     if (initials) {
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = surface;
         ctx.font = 'bold 18px "DM Sans", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -79,38 +85,36 @@ function createPinImage(color: string, initials?: string): ImageData {
     } else {
         ctx.beginPath();
         ctx.arc(32, 28, 6, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = surface;
         ctx.fill();
     }
 
     return ctx.getImageData(0, 0, 64, 64);
 }
 
-function createDestinationImage(emoji: string): ImageData {
+function createDestinationImage(emoji: string, color: string): ImageData {
     const canvas = document.createElement('canvas');
     canvas.width = 80;
     canvas.height = 80;
     const ctx = canvas.getContext('2d')!;
 
-    // Pin shape
     ctx.beginPath();
     ctx.moveTo(40, 78);
     ctx.bezierCurveTo(75, 40, 75, 10, 40, 10);
     ctx.bezierCurveTo(5, 10, 5, 40, 40, 78);
-    ctx.fillStyle = '#ea4335';
+    ctx.fillStyle = color;
     ctx.fill();
 
-    ctx.strokeStyle = '#ffffff';
+    const surface = readToken('--color-surface', '#ffffff');
+    ctx.strokeStyle = surface;
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // White circle for icon
     ctx.beginPath();
     ctx.arc(40, 36, 22, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = surface;
     ctx.fill();
 
-    // Emoji
     ctx.font = '32px serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -119,26 +123,27 @@ function createDestinationImage(emoji: string): ImageData {
     return ctx.getImageData(0, 0, 80, 80);
 }
 
-function createFallbackPoiImage(): ImageData {
+function createFallbackPoiImage(color: string): ImageData {
     const canvas = document.createElement('canvas');
     canvas.width = 48;
     canvas.height = 48;
     const ctx = canvas.getContext('2d')!;
 
+    const surface = readToken('--color-surface', '#ffffff');
     ctx.beginPath();
     ctx.arc(24, 24, 18, 0, Math.PI * 2);
-    ctx.fillStyle = '#4D7298';
+    ctx.fillStyle = color;
     ctx.fill();
 
     ctx.beginPath();
     ctx.arc(24, 24, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = surface;
     ctx.fill();
 
     return ctx.getImageData(0, 0, 48, 48);
 }
 
-function makeMidpointEl(): HTMLElement {
+function makeMidpointEl(color: string): HTMLElement {
     const wrap = document.createElement('div');
     wrap.style.cssText = `
     position: relative; width: 48px; height: 48px;
@@ -148,7 +153,7 @@ function makeMidpointEl(): HTMLElement {
     const ring = document.createElement('div');
     ring.style.cssText = `
     position: absolute; inset: 0; border-radius: 50%;
-    border: 2px dashed rgba(77,114,152,0.7);
+        border: 2px dashed ${color};
     animation: spin-slow 8s linear infinite;
   `;
     wrap.appendChild(ring);
@@ -156,8 +161,8 @@ function makeMidpointEl(): HTMLElement {
     const dot = document.createElement('div');
     dot.style.cssText = `
     width: 10px; height: 10px; border-radius: 50%;
-    background: #4D7298;
-    box-shadow: 0 0 0 4px rgba(77,114,152,0.18);
+        background: ${color};
+        box-shadow: 0 0 0 4px rgba(77,114,152,0.18);
   `;
     wrap.appendChild(dot);
 
@@ -171,10 +176,6 @@ type MapInfoCard = {
     rows: InfoRow[];
     loading?: boolean;
 };
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 @customElement('map-view')
 export class MapView extends LitElement {
@@ -263,9 +264,8 @@ export class MapView extends LitElement {
             const missingId = e?.id;
             if (!missingId || this._map?.hasImage(missingId)) return;
             try {
-                this._map?.addImage(missingId, createFallbackPoiImage());
+                this._map?.addImage(missingId, createFallbackPoiImage(readToken('--map-poi-fallback', '#4D7298')));
             } catch {
-                // Ignore duplicate/add race.
             }
         });
     }
@@ -276,7 +276,6 @@ export class MapView extends LitElement {
 
         this.dispatchEvent(new CustomEvent('map-view:ready', { bubbles: true, composed: true }));
 
-        // Sync everything immediately on load
         this._syncFromStore();
 
         if (locationStore.own) {
@@ -293,10 +292,6 @@ export class MapView extends LitElement {
         });
     }
 
-    // ---------------------------------------------------------------------------
-    // Brand style
-    // ---------------------------------------------------------------------------
-
     private _applyBrandStyle() {
         const map = this._map;
         if (!map) return;
@@ -305,29 +300,29 @@ export class MapView extends LitElement {
             if (map.getLayer(layer)) { try { map.setPaintProperty(layer, prop, value); } catch { } }
         };
 
-        p('background', 'background-color', '#ede8e0');
-        p('landuse', 'fill-color', '#e6e0d7');
-        p('landuse_overlay', 'fill-color', '#ddd7ce');
-        p('park', 'fill-color', '#cfd9c5');
-        p('landuse-park', 'fill-color', '#cfd9c5');
-        p('grass', 'fill-color', '#d6dccf');
-        p('water', 'fill-color', '#b8cfe0');
-        p('waterway', 'line-color', '#b8cfe0');
-        p('road-motorway', 'line-color', '#c8bfb0');
-        p('road-trunk', 'line-color', '#c8bfb0');
-        p('road-primary', 'line-color', '#cdc5b8');
-        p('road-secondary', 'line-color', '#d0c9bc');
-        p('road-tertiary', 'line-color', '#d5cfc4');
-        p('road-street', 'line-color', '#dad4ca');
-        p('road-service', 'line-color', '#dedad2');
-        p('road-path', 'line-color', '#e2ddd6');
-        p('building', 'fill-color', '#d8d2c8');
+        p('background', 'background-color', readToken('--map-style-background', '#ede8e0'));
+        p('landuse', 'fill-color', readToken('--map-style-land', '#e6e0d7'));
+        p('landuse_overlay', 'fill-color', readToken('--map-style-land-overlay', '#ddd7ce'));
+        p('park', 'fill-color', readToken('--map-style-park', '#cfd9c5'));
+        p('landuse-park', 'fill-color', readToken('--map-style-park', '#cfd9c5'));
+        p('grass', 'fill-color', readToken('--map-style-grass', '#d6dccf'));
+        p('water', 'fill-color', readToken('--map-style-water', '#b8cfe0'));
+        p('waterway', 'line-color', readToken('--map-style-water', '#b8cfe0'));
+        p('road-motorway', 'line-color', readToken('--map-style-road-major', '#c8bfb0'));
+        p('road-trunk', 'line-color', readToken('--map-style-road-major', '#c8bfb0'));
+        p('road-primary', 'line-color', readToken('--map-style-road-primary', '#cdc5b8'));
+        p('road-secondary', 'line-color', readToken('--map-style-road-secondary', '#d0c9bc'));
+        p('road-tertiary', 'line-color', readToken('--map-style-road-tertiary', '#d5cfc4'));
+        p('road-street', 'line-color', readToken('--map-style-road-street', '#dad4ca'));
+        p('road-service', 'line-color', readToken('--map-style-road-service', '#dedad2'));
+        p('road-path', 'line-color', readToken('--map-style-road-path', '#e2ddd6'));
+        p('building', 'fill-color', readToken('--map-style-building', '#d8d2c8'));
         p('building', 'fill-opacity', 0.5);
-        p('building-top', 'fill-color', '#ddd8cf');
+        p('building-top', 'fill-color', readToken('--map-style-building-top', '#ddd8cf'));
 
         ['place-city', 'place-town', 'place-village', 'place-suburb', 'road-label', 'poi-label'].forEach(l => {
-            p(l, 'text-color', '#5a5248');
-            p(l, 'text-halo-color', 'rgba(237,232,224,0.85)');
+            p(l, 'text-color', readToken('--map-style-label', '#5a5248'));
+            p(l, 'text-halo-color', readToken('--map-style-label-halo', 'rgba(237,232,224,0.85)'));
             p(l, 'text-halo-width', 1.2);
         });
     }
@@ -347,7 +342,6 @@ export class MapView extends LitElement {
 
         const screen = uiStore.screen;
 
-        // Auto-fit if we just got a partner or destination
         if ((partner && !hadPartner) || (destination && !hadDestination)) {
             this._onFitTracking();
         }
@@ -394,12 +388,14 @@ export class MapView extends LitElement {
     private _setupVectorLayers() {
         const map = this._map!;
 
-        // Add pins images
-        map.addImage('pin-me', createPinImage('#4285f4', sessionStore.ownName?.charAt(0) || 'Y'));
-        map.addImage('pin-partner', createPinImage('#fbbc04', sessionStore.partnerName?.charAt(0) || 'P'));
-        map.addImage('pin-destination', createDestinationImage(sessionStore.selectedVenue?.emoji || '📍'));
+        const youColor = readToken('--map-pin-you', '#4285f4');
+        const partnerColor = readToken('--map-pin-partner', '#fbbc04');
+        const destinationColor = readToken('--map-pin-destination', '#ea4335');
 
-        // Add pins sources
+        map.addImage('pin-me', createPinImage(youColor, sessionStore.ownName?.charAt(0) || 'Y'));
+        map.addImage('pin-partner', createPinImage(partnerColor, sessionStore.partnerName?.charAt(0) || 'P'));
+        map.addImage('pin-destination', createDestinationImage(sessionStore.selectedVenue?.emoji || '📍', destinationColor));
+
         [SOURCE_YOU, SOURCE_PARTNER, SOURCE_DESTINATION].forEach(id => {
             if (!map.getSource(id)) {
                 map.addSource(id, {
@@ -409,7 +405,6 @@ export class MapView extends LitElement {
             }
         });
 
-        // Add route sources
         if (!map.getSource(SOURCE_ROUTE_OWN)) {
             map.addSource(SOURCE_ROUTE_OWN, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         }
@@ -420,21 +415,19 @@ export class MapView extends LitElement {
             map.addSource(SOURCE_ROUTE_SINGLE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         }
 
-        // Pulse layer for You
         map.addLayer({
             id: 'pulse-you',
             type: 'circle',
             source: SOURCE_YOU,
             paint: {
                 'circle-radius': 14,
-                'circle-color': '#4285f4',
+                'circle-color': youColor,
                 'circle-opacity': 0.4,
                 'circle-stroke-width': 2,
-                'circle-stroke-color': '#ffffff'
+                'circle-stroke-color': readToken('--color-surface', '#ffffff')
             }
         });
 
-        // Layer for You
         map.addLayer({
             id: LAYER_YOU,
             type: 'symbol',
@@ -447,21 +440,19 @@ export class MapView extends LitElement {
             }
         });
 
-        // Pulse layer for Partner
         map.addLayer({
             id: 'pulse-partner',
             type: 'circle',
             source: SOURCE_PARTNER,
             paint: {
                 'circle-radius': 14,
-                'circle-color': '#fbbc04',
+                'circle-color': partnerColor,
                 'circle-opacity': 0.4,
                 'circle-stroke-width': 2,
-                'circle-stroke-color': '#ffffff'
+                'circle-stroke-color': readToken('--color-surface', '#ffffff')
             }
         });
 
-        // Layer for Partner
         map.addLayer({
             id: LAYER_PARTNER,
             type: 'symbol',
@@ -474,7 +465,6 @@ export class MapView extends LitElement {
             }
         });
 
-        // Layer for Destination
         map.addLayer({
             id: LAYER_DESTINATION,
             type: 'symbol',
@@ -487,7 +477,6 @@ export class MapView extends LitElement {
             }
         });
 
-        // Sync again once images/layers are ready
         this._bindPinInteractions();
         this._syncFromStore();
         this._startPulseAnimation();
@@ -511,6 +500,9 @@ export class MapView extends LitElement {
     private _startPulseAnimation() {
         if (this._animId) cancelAnimationFrame(this._animId);
 
+        // The pulse is a simple sinusoidal oscillator so both radius and opacity
+        // breathe smoothly instead of stepping frame-to-frame.
+        // Math refresher: https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Math/sin
         const animate = () => {
             if (!this._map) return;
             const time = Date.now() / 1000;
@@ -531,16 +523,7 @@ export class MapView extends LitElement {
         animate();
     }
 
-    private _syncDestinationLabel() {
-        // This function is no longer relevant for vector pins.
-        // Labels for vector pins would require a separate symbol layer or custom rendering.
-        // For now, we'll keep it empty or remove it if labels are not needed for vector pins.
-    }
-
-
-    // ---------------------------------------------------------------------------
-    // Midpoint marker
-    // ---------------------------------------------------------------------------
+    private _syncDestinationLabel() {}
 
     private _showMidpoint(coords: Coordinates) {
         if (!this._map) return;
@@ -548,7 +531,7 @@ export class MapView extends LitElement {
             this._midpointMarker.setLngLat([coords.lng, coords.lat]);
             return;
         }
-        this._midpointMarker = new maplibregl.Marker({ element: makeMidpointEl(), anchor: 'center' })
+        this._midpointMarker = new maplibregl.Marker({ element: makeMidpointEl(readToken('--map-poi-fallback', '#4D7298')), anchor: 'center' })
             .setLngLat([coords.lng, coords.lat])
             .addTo(this._map);
     }
@@ -558,10 +541,6 @@ export class MapView extends LitElement {
         this._midpointMarker = null;
     }
 
-    // ---------------------------------------------------------------------------
-    // Camera
-    // ---------------------------------------------------------------------------
-
     private _flyTo(coords: Coordinates, zoom = 15, duration = 1200) {
         this._map?.flyTo({ center: [coords.lng, coords.lat], zoom, duration, essential: true });
     }
@@ -569,6 +548,8 @@ export class MapView extends LitElement {
     /**
      * Fit the viewport to show all provided points with padding.
      * Used by select-rendezvous (you+partner) and live-tracking (you+partner+dest).
+      * Reference: MapLibre `cameraForBounds` behavior and padding options.
+      * https://maplibre.org/maplibre-gl-js/docs/API/classes/Map/#cameraforbounds
      */
     fitBounds(a: Coordinates, b: Coordinates, paddingPx = 100, c?: Coordinates) {
         if (!this._map) return;
@@ -605,10 +586,6 @@ export class MapView extends LitElement {
             applyFit();
         }
     }
-
-    // ---------------------------------------------------------------------------
-    // Route lines
-    // ---------------------------------------------------------------------------
 
     private _routeKey(a: Coordinates, b: Coordinates): string {
         return `${a.lat.toFixed(3)},${a.lng.toFixed(3)}->${b.lat.toFixed(3)},${b.lng.toFixed(3)}`;
@@ -715,6 +692,9 @@ export class MapView extends LitElement {
             return this._routeInflight.get(key)!;
         }
 
+        // Route requests are memoized by rounded coordinate key and de-duplicated
+        // while in flight to avoid duplicate network calls during rapid GPS updates.
+        // See fetch + Promise patterns: https://developer.mozilla.org/docs/Web/API/Fetch_API
         const promise = (async () => {
             const params = new URLSearchParams({
                 overview: 'full',
@@ -752,7 +732,7 @@ export class MapView extends LitElement {
             youLine = await this._fetchRoute(you, dest);
         } catch {
         }
-        this._setLineSource(SOURCE_ROUTE_OWN, youLine, '#4285f4', true);
+        this._setLineSource(SOURCE_ROUTE_OWN, youLine, readToken('--map-pin-you', '#4285f4'), true);
 
         if (partner && this._routeMode === 'both') {
             let partnerLine: [number, number][] = [[partner.lng, partner.lat], [dest.lng, dest.lat]];
@@ -760,7 +740,7 @@ export class MapView extends LitElement {
                 partnerLine = await this._fetchRoute(partner, dest);
             } catch {
             }
-            this._setLineSource(SOURCE_ROUTE_PARTNER, partnerLine, '#fbbc04', true);
+            this._setLineSource(SOURCE_ROUTE_PARTNER, partnerLine, readToken('--map-pin-partner', '#fbbc04'), true);
         } else {
             this._removeLineSource(SOURCE_ROUTE_PARTNER);
         }
@@ -794,12 +774,11 @@ export class MapView extends LitElement {
             map.addSource(id, { type: 'geojson', data });
         }
 
-        // White casing underneath for legibility
         if (!map.getLayer(casingLyr)) {
             map.addLayer({
                 id: casingLyr, type: 'line', source: id,
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#ffffff', 'line-width': 6, 'line-opacity': 0.55 },
+                paint: { 'line-color': readToken('--color-surface', '#ffffff'), 'line-width': 6, 'line-opacity': 0.55 },
             });
         }
 
@@ -818,7 +797,7 @@ export class MapView extends LitElement {
     }
 
     private _drawRoute(coordinates: [number, number][]) {
-        this._setLineSource(SOURCE_ROUTE_SINGLE, coordinates, '#4D7298', true);
+        this._setLineSource(SOURCE_ROUTE_SINGLE, coordinates, readToken('--map-poi-fallback', '#4D7298'), true);
     }
 
     private _clearRoute() {
@@ -829,10 +808,6 @@ export class MapView extends LitElement {
             this._removeLineSource(s);
         });
     }
-
-    // ---------------------------------------------------------------------------
-    // Event handlers
-    // ---------------------------------------------------------------------------
 
     private _onMoveTo = (e: CustomEvent<{ coords: Coordinates; zoom?: number }>) => {
         this._flyTo(e.detail.coords, e.detail.zoom ?? 15);
@@ -954,13 +929,13 @@ export class MapView extends LitElement {
                     color: var(--color-text-primary);
                     border: 1px solid rgba(0,0,0,0.05);
                 }
-                .gps-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
-                .gps-status.good .gps-dot { background: #34a853; }
-                .gps-status.poor .gps-dot { background: #fbbc04; }
-                .gps-status.offline .gps-dot { background: #5f6368; }
-                .gps-status.error .gps-dot { background: #ea4335; }
+                .gps-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-disabled-bg); }
+                .gps-status.good .gps-dot { background: var(--color-online); }
+                .gps-status.poor .gps-dot { background: var(--map-pin-partner); }
+                .gps-status.offline .gps-dot { background: var(--color-offline); }
+                .gps-status.error .gps-dot { background: var(--danger-500); }
                 .gps-status.retry .gps-dot { 
-                    background: #fbbc04;
+                    background: var(--map-pin-partner);
                     animation: pulse-signal 1.5s ease-in-out infinite;
                 }
 

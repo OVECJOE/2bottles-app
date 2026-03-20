@@ -1,3 +1,11 @@
+/**
+ * <invite-partner> — host-side invite sharing screen.
+ *
+ * Responsibilities:
+ *   show live session join link
+ *   trigger native share or clipboard fallback
+ *   allow cancelling the active session
+ */
 import { LitElement, html, css } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { sessionStore, uiStore } from '../../store/index.js';
@@ -14,7 +22,7 @@ export class InvitePartner extends LitElement {
     :host { display: block; }
 
     .sheet {
-        background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+      background: var(--invite-sheet-bg);
         border-top: 1px solid rgba(0,0,0,0.05);
     }
 
@@ -53,7 +61,7 @@ export class InvitePartner extends LitElement {
         width: 64px;
         height: 64px;
         border-radius: 50%;
-        background: white;
+        background: var(--color-surface);
         box-shadow: 0 4px 12px rgba(0,0,0,0.12);
         display: flex;
         align-items: center;
@@ -69,7 +77,7 @@ export class InvitePartner extends LitElement {
 
     .link-card {
         width: 100%;
-        background: white;
+      background: var(--color-surface);
         border-radius: var(--border-radius-lg);
         padding: var(--space-4);
         border: 1px solid rgba(0,0,0,0.06);

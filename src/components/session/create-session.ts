@@ -22,8 +22,6 @@ export class CreateSession extends LitElement {
     sharedStyles,
     css`
     :host { display: block; }
-
-    /* Local overrides */
     .sheet { animation: slide-up var(--duration-sheet) var(--ease-out) both; }
 
     .gps-row {
@@ -142,7 +140,6 @@ export class CreateSession extends LitElement {
         locationStore.startWatching();
       }
     } catch {
-      // Ignore permission API failures; manual location entry still works.
     }
   }
 
@@ -162,8 +159,6 @@ export class CreateSession extends LitElement {
       detail: { coords: own, zoom: 15 },
     }));
 
-    // Reverse geocode for a human-readable name
-    // Bug 205: Debounce to prevent 429 Rate Limit
     const now = Date.now();
     const distMoved = this._lastGeocodePos ? ( (Math.abs(own.lat - this._lastGeocodePos.lat) + Math.abs(own.lng - this._lastGeocodePos.lng)) * 111000 ) : Infinity;
     
@@ -172,7 +167,6 @@ export class CreateSession extends LitElement {
 
     try {
       this._reverseInFlight = true;
-      // Stamp now so frequent GPS updates don't queue concurrent reverse requests.
       this._lastGeocodeTime = now;
       this._gpsName = await reverseGeocode(own.lat, own.lng);
       this._lastGeocodePos = { ...own };

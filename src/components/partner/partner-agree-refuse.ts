@@ -1,3 +1,10 @@
+/**
+ * <partner-agree-refuse> — collaboration screen after venue selection.
+ *
+ * Responsibilities:
+ *   real-time chat with partner
+ *   confirm or reset selected meetup venue
+ */
 import { LitElement, html, css } from 'lit';
 import { customElement, state, query } from 'lit/decorators.js';
 import { sessionStore, uiStore } from '../../store/index.js';
@@ -26,11 +33,8 @@ export class PartnerAgreeRefuse extends LitElement {
       box-shadow: var(--shadow-md);
       animation: slide-down var(--duration-base) var(--ease-out) both;
     }
-    .venue-pill-text { font-size: var(--text-sm); font-weight: var(--weight-medium); color: #fff; }
+    .venue-pill-text { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-text-inverted); }
     .venue-pill-sub  { font-size: var(--text-xs); color: var(--color-text-on-dark-muted); }
-
-    /* Local overrides rely on sharedStyles for .sheet and .handle */
-
 
     .partner-header {
       display: flex; align-items: center; gap: var(--space-3);
@@ -38,7 +42,7 @@ export class PartnerAgreeRefuse extends LitElement {
     }
     .avatar {
       width: 34px; height: 34px; border-radius: 50%;
-      background: var(--color-partner); color: #fff;
+      background: var(--color-partner); color: var(--color-text-inverted);
       display: flex; align-items: center; justify-content: center;
       font-weight: var(--weight-bold); font-size: var(--text-xs); flex-shrink: 0;
     }
@@ -63,8 +67,8 @@ export class PartnerAgreeRefuse extends LitElement {
       border-radius: 16px; font-size: var(--text-sm); line-height: var(--line-height-base);
       overflow-wrap: break-word; word-break: break-word;
     }
-    .bubble.them { background: #E9EDEF; color: var(--color-text-primary); border-bottom-left-radius: 4px; }
-    .bubble.mine { background: var(--color-blue); color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 2px 4px rgba(77,114,152,0.2); }
+    .bubble.them { background: var(--chat-bubble-them-bg); color: var(--color-text-primary); border-bottom-left-radius: 4px; }
+    .bubble.mine { background: var(--chat-bubble-mine-bg); color: var(--chat-bubble-mine-text); border-bottom-right-radius: 4px; box-shadow: 0 2px 4px rgba(77,114,152,0.2); }
 
     .chat-input-row {
       display: flex; gap: var(--space-2); align-items: center;
@@ -81,7 +85,7 @@ export class PartnerAgreeRefuse extends LitElement {
     .chat-input:focus { border-color: var(--color-blue); }
     .send-btn {
       width: 34px; height: 34px; border-radius: 50%;
-      background: var(--color-blue); color: #fff;
+      background: var(--color-blue); color: var(--color-blue-text);
       border: none; cursor: pointer; font-size: 14px;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
@@ -128,7 +132,6 @@ export class PartnerAgreeRefuse extends LitElement {
     const input = this.renderRoot.querySelector('.chat-input') as HTMLInputElement;
     if (input) input.value = ''; 
 
-    // Broadcast via P2P
     p2pService.send({ type: 'chat:message', text, timestamp });
 
     this._scrollToBottom();
@@ -163,7 +166,7 @@ export class PartnerAgreeRefuse extends LitElement {
       cancelLabel: 'Stay Here'
     });
 
-    if (!confirmed) return; // Bug 48: Confirmation
+    if (!confirmed) return;
 
     sessionStore.setOwnAgreed(false);
     sessionStore.setPartnerAgreed(false);
@@ -194,7 +197,7 @@ export class PartnerAgreeRefuse extends LitElement {
             <div class="partner-header">
             <div class="avatar">${sessionStore.partnerName ? sessionStore.partnerName[0].toUpperCase() : '?'}</div>
             <span class="partner-name">${sessionStore.partnerName || 'Partner'}</span>
-            <span class="online-badge" style="background: ${uiStore.isPartnerOnline ? 'var(--color-green)' : '#ccc'}; color: ${uiStore.isPartnerOnline ? 'var(--color-green-text)' : '#666'}">
+            <span class="online-badge" style="background: ${uiStore.isPartnerOnline ? 'var(--color-green)' : 'var(--color-disabled-bg)'}; color: ${uiStore.isPartnerOnline ? 'var(--color-green-text)' : 'var(--color-disabled-text)'}">
                 ● ${uiStore.isPartnerOnline ? 'Online' : 'Offline'}
             </span>
             </div>

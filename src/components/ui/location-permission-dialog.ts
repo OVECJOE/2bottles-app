@@ -1,3 +1,13 @@
+/**
+ * <location-permission-dialog> — full modal explaining why location is needed.
+ *
+ * Properties:
+ *   permissionState — 'prompt' | 'granted' | 'denied' | 'unknown'
+ *   canInstall      — whether install CTA should be shown
+ *
+ * Dispatches:
+ *   request-location, request-install, continue-manual
+ */
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
@@ -9,7 +19,7 @@ export class LocationPermissionDialog extends LitElement {
       width: 100%;
       max-height: min(780px, calc(100dvh - (2 * var(--space-4))));
       overflow: auto;
-      background: linear-gradient(160deg, #e7f6d6 0%, #d9e8f5 54%, #f7fbff 100%);
+      background: var(--location-permission-surface-bg);
       color: var(--color-text-primary);
       border-radius: var(--border-radius-xl);
       position: relative;
@@ -137,7 +147,7 @@ export class LocationPermissionDialog extends LitElement {
 
     .btn-primary {
       background: var(--color-blue);
-      color: #fff;
+      color: var(--color-blue-text);
     }
 
     .btn-primary:hover {

@@ -73,7 +73,7 @@ export class EndSession extends LitElement {
 
     .btn-primary {
       display: block; width: 100%; padding: 13px var(--space-4);
-      background: var(--color-blue); color: #fff;
+      background: var(--color-blue); color: var(--color-blue-text);
       border: none; border-radius: var(--border-radius-md);
       font-family: var(--font-sans); font-size: var(--text-md);
       font-weight: var(--weight-bold); cursor: pointer;

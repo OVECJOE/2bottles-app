@@ -14,8 +14,6 @@ export class PartnerEnded extends LitElement {
         sharedStyles,
         css`
     :host { display: block; }
-
-    /* Local overrides */
     .sheet { text-align: center; }
 
     .handle { width: 36px; height: 4px; background: rgba(0,0,0,0.12); border-radius: var(--border-radius-pill); margin: 0 auto var(--space-5); }

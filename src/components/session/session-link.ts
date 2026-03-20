@@ -15,8 +15,6 @@ export class SessionLink extends LitElement {
     sharedStyles,
     css`
     :host { display: block; }
-
-    /* Local overrides */
     .sheet { animation: slide-up var(--duration-sheet) var(--ease-out) both; }
 
     .icon-row {
@@ -105,7 +103,6 @@ export class SessionLink extends LitElement {
         });
         return;
       } catch {
-        // User cancellation and unsupported share targets both fall back to copy.
       }
     }
     await this._copyLink();
@@ -114,7 +111,6 @@ export class SessionLink extends LitElement {
   private _startTracking() {
     locationStore.startWatching();
     sessionStore.setSessionStatus('live');
-    // Clear midpoint marker — we're moving to tracking mode
     this.dispatchEvent(new CustomEvent('map-view:clear-midpoint', { bubbles: true, composed: true }));
     uiStore.goToLiveTracking();
   }

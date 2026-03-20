@@ -1,3 +1,10 @@
+/**
+ * <partner-invite-received> — joiner-side entry screen for invite links.
+ *
+ * Responsibilities:
+ *   auto-join host session from route param peerId
+ *   collect joiner name and accept/decline invitation
+ */
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
@@ -17,7 +24,6 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
     css`
     :host { display: block; }
 
-    /* Local overrides */
     .sheet { animation: slide-up var(--duration-sheet) var(--ease-out) both; }
 
     .host-info {
@@ -32,7 +38,7 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
     .avatar {
         width: 44px; height: 44px;
         background: var(--color-partner);
-        color: #fff;
+      color: var(--color-text-inverted);
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -59,7 +65,6 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
   }
 
   private async _handleAutoJoin(peerId: string) {
-    // If already in THIS session, don't re-join
     if (sessionStore.session?.id === peerId && p2pService.isConnected) return;
 
     this._connecting = true;
@@ -85,29 +90,20 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
   private async _accept() {
     this._accepting = true;
     try {
-      // 1. Share info
       if (this._name) {
         sessionStore.setOwnName(this._name);
         p2pService.broadcastUserInfo(this._name);
       }
 
-      // 2. Peer accepts -> send status to host
       p2pService.send({ type: 'partner:status', status: 'accepted' });
 
-      // 3. Start watching location
       locationStore.startWatching();
 
-      // 4. Update local state
       sessionStore.setPartnerStatus('accepted');
 
-      // Host will receive 'accepted' and navigate to venue selection
-      // Joiner stays here until Host picks a venue and sends 'session:venue'
-      // UPDATE: To smooth the flow, we now navigate directly to the selection screen
       uiStore.showToast('Joined! Waiting for host to pick a spot.');
       uiStore.goToSelectVenue();
     } finally {
-      // Keep it disabled, navigation or state change will handle the rest
-      // but in case of some weird async delay, we don't want to re-enable too soon
     }
   }
 

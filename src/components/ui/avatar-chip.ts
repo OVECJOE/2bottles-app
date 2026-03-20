@@ -73,11 +73,11 @@ export class AvatarChip extends LitElement {
         ].join('');
 
         return html`
-      <div class="avatar-wrap">
-        <div class="avatar" style=${style}>${this.initials}</div>
-        ${this.status ? html`<div class="status-dot ${this.status}"></div>` : ''}
+      <div class="avatar-wrap" part="avatar-wrap">
+        <div class="avatar" part="avatar" style=${style}>${this.initials}</div>
+        ${this.status ? html`<div class="status-dot ${this.status}" part="status-dot"></div>` : ''}
       </div>
-      ${this.name ? html`<span class="name">${this.name}</span>` : ''}
+      ${this.name ? html`<span class="name" part="name">${this.name}</span>` : ''}
     `;
     }
 }

@@ -61,7 +61,7 @@ export class SelectRendezvous extends LitElement {
       transition: all var(--duration-fast);
     }
     .tab.active {
-      background: var(--color-blue); color: #fff; border-color: var(--color-blue);
+      background: var(--color-blue); color: var(--color-blue-text); border-color: var(--color-blue);
     }
 
     .venues { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: var(--space-2); }
@@ -265,7 +265,6 @@ export class SelectRendezvous extends LitElement {
     this._selectedId = venue.id;
     locationStore.setDestination(venue.coordinates);
 
-    // Fit bounds to show you + partner + the venue
     const own = locationStore.own;
     const partner = locationStore.partner;
     if (own && partner) {
@@ -316,7 +315,6 @@ export class SelectRendezvous extends LitElement {
     sessionStore.selectVenue(venue);
     locationStore.setDestination(venue.coordinates);
 
-    // Broadcast to partner
     p2pService.broadcastVenue(venue);
 
     uiStore.goToAgreeRefuse();

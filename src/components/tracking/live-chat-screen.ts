@@ -1,3 +1,10 @@
+/**
+ * <live-chat> — full chat view used during active tracking.
+ *
+ * Responsibilities:
+ *   render session chat history
+ *   send P2P messages and return to tracking map
+ */
 import { LitElement, html, css } from 'lit';
 import { customElement, state, query } from 'lit/decorators.js';
 import { sessionStore, uiStore } from '../../store/index.js';
@@ -7,7 +14,7 @@ import '../ui/screen-shell.js';
 @customElement('live-chat')
 export class LiveChatScreen extends LitElement {
     static override styles = css`
-    :host { display: flex; flex-direction: column; height: 100vh; background: #ffffff; overflow: hidden; }
+    :host { display: flex; flex-direction: column; height: 100vh; background: var(--color-surface); overflow: hidden; }
     screen-shell { display: flex; flex-direction: column; flex: 1; height: 100%; min-height: 0; }
 
     .chat-container {
@@ -19,14 +26,14 @@ export class LiveChatScreen extends LitElement {
         padding: var(--space-4) var(--space-5);
         display: flex; align-items: center; gap: var(--space-3);
         border-bottom: 1px solid rgba(0,0,0,0.05);
-        background: #fff;
+        background: var(--color-surface);
     }
     .back-btn {
         background: none; border: none; font-size: 20px; cursor: pointer; padding: 0;
     }
     .avatar {
         width: 38px; height: 38px; border-radius: 50%;
-        background: var(--color-partner); color: #fff;
+        background: var(--color-partner); color: var(--color-text-inverted);
         display: flex; align-items: center; justify-content: center;
         font-weight: var(--weight-bold);
     }
@@ -49,22 +56,22 @@ export class LiveChatScreen extends LitElement {
         border-radius: 18px; font-size: var(--text-md); line-height: 1.4;
         overflow-wrap: break-word; word-break: break-word;
     }
-    .bubble.them { background: #E9EDEF; color: var(--color-text-primary); border-bottom-left-radius: 4px; }
-    .bubble.mine { background: var(--color-blue); color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 2px 4px rgba(77,114,152,0.2); }
+    .bubble.them { background: var(--chat-bubble-them-bg); color: var(--color-text-primary); border-bottom-left-radius: 4px; }
+    .bubble.mine { background: var(--chat-bubble-mine-bg); color: var(--chat-bubble-mine-text); border-bottom-right-radius: 4px; box-shadow: 0 2px 4px rgba(77,114,152,0.2); }
 
     .input-area {
         padding: var(--space-4) var(--space-5) calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
-        background: #fff; border-top: 1px solid rgba(0,0,0,0.05);
+        background: var(--color-surface); border-top: 1px solid rgba(0,0,0,0.05);
         display: flex; gap: var(--space-3); align-items: center;
     }
     .input {
         flex: 1; padding: 12px 16px; border-radius: 24px;
-        border: 1px solid #ddd; font-family: inherit; font-size: var(--text-md); outline: none;
+        border: 1px solid var(--chat-input-border); background: var(--chat-input-bg); font-family: inherit; font-size: var(--text-md); outline: none;
     }
     .input:focus { border-color: var(--color-blue); }
     .send {
         width: 44px; height: 44px; border-radius: 50%;
-        background: var(--color-blue); color: #fff;
+        background: var(--color-blue); color: var(--color-blue-text);
         border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
         transition: transform 0.2s;
     }

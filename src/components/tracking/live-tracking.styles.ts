@@ -108,7 +108,7 @@ export const liveTrackingStyles = css`
     .text-btn:hover { background: var(--color-blue-light); }
     .text-btn.active {
         background: var(--color-blue);
-        color: #fff;
+        color: var(--color-blue-text);
     }
 
     .route-mode-row {
@@ -120,7 +120,7 @@ export const liveTrackingStyles = css`
 
     .route-mode-btn {
         border: 1px solid rgba(0,0,0,0.12);
-        background: #fff;
+        background: var(--color-surface);
         color: var(--color-text-primary);
         border-radius: 999px;
         padding: 6px 10px;
@@ -167,15 +167,15 @@ export const liveTrackingStyles = css`
         min-width: 18px;
         height: 18px;
         border-radius: 999px;
-        background: #ea4335;
-        color: #fff;
+        background: var(--danger-500);
+        color: var(--color-text-inverted);
         font-size: 10px;
         font-weight: var(--weight-bold);
         line-height: 18px;
         text-align: center;
         padding: 0 5px;
         box-shadow: 0 2px 6px rgba(0,0,0,0.22);
-        border: 1px solid #fff;
+        border: 1px solid var(--color-surface);
     }
 
     .chat-view { flex: 1; display: flex; flex-direction: column; min-height: 0; padding-top: var(--space-2); }
@@ -201,7 +201,7 @@ export const liveTrackingStyles = css`
     .chat-input input {
         flex: 1; padding: 10px 16px; border-radius: var(--border-radius-pill);
         border: var(--border-width) solid var(--border-color); font-size: var(--text-md); outline: none;
-        background: #fff; transition: border-color var(--duration-fast);
+        background: var(--chat-input-bg); transition: border-color var(--duration-fast);
     }
     .chat-input input:focus { border-color: var(--color-blue); }
     .chat-input button {

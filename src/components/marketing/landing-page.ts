@@ -1,3 +1,10 @@
+/**
+ * <landing-page> — marketing-first home screen.
+ *
+ * Responsibilities:
+ *   present product story and trust signals
+ *   emit CTA actions (`start` or `install`) to app-shell
+ */
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
@@ -27,7 +34,7 @@ export class LandingPage extends LitElement {
         background:
           radial-gradient(circle at 84% -14%, rgba(53, 92, 126, 0.2), transparent 40%),
           radial-gradient(circle at -10% 8%, rgba(178, 226, 134, 0.25), transparent 34%),
-          linear-gradient(180deg, #f7faf6, #edf4fb);
+          var(--landing-surface-bg);
       }
 
       .topbar {
@@ -84,8 +91,8 @@ export class LandingPage extends LitElement {
       .hero {
         border-radius: var(--border-radius-xl);
         border: 1px solid rgba(0, 0, 0, 0.08);
-        background: linear-gradient(145deg, #102234, #2e4a63 46%, #4d7298 100%);
-        color: #f4f9fd;
+        background: var(--landing-hero-bg);
+        color: var(--landing-hero-text);
         padding: var(--space-6);
         display: grid;
         grid-template-columns: 1.05fr 1fr;
@@ -137,7 +144,7 @@ export class LandingPage extends LitElement {
 
       .hero-secondary {
         border: 1px solid rgba(255, 255, 255, 0.28);
-        color: #f2f7fb;
+        color: var(--landing-hero-text-secondary);
         background: rgba(255, 255, 255, 0.1);
       }
 
@@ -274,7 +281,7 @@ export class LandingPage extends LitElement {
         place-items: center;
         font-size: var(--text-sm);
         font-weight: var(--weight-bold);
-        color: #0d2d45;
+        color: var(--landing-step-text);
         background: rgba(178, 226, 134, 0.5);
         border: 1px solid rgba(13, 45, 69, 0.16);
       }
@@ -416,8 +423,8 @@ export class LandingPage extends LitElement {
       .cta-banner {
         border-radius: var(--border-radius-xl);
         border: 1px solid rgba(0, 0, 0, 0.08);
-        background: linear-gradient(120deg, #0f2f47, #375873);
-        color: #f4f8fc;
+        background: var(--landing-cta-bg);
+        color: var(--landing-cta-text);
         padding: var(--space-5);
         display: grid;
         gap: var(--space-2);
@@ -442,7 +449,7 @@ export class LandingPage extends LitElement {
       .btn-ghost-light {
         border: 1px solid rgba(255, 255, 255, 0.3);
         background: rgba(255, 255, 255, 0.08);
-        color: #f4f8fc;
+        color: var(--landing-cta-text);
       }
 
       @media (max-width: 980px) {

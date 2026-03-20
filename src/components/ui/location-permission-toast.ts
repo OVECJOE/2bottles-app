@@ -1,3 +1,13 @@
+/**
+ * <location-permission-toast> — compact permission prompt shown above map UI.
+ *
+ * Properties:
+ *   permissionState — 'prompt' | 'granted' | 'denied' | 'unknown'
+ *   canInstall      — whether install CTA should be shown
+ *
+ * Dispatches:
+ *   request-location, request-install
+ */
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 

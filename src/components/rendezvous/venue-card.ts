@@ -1,3 +1,11 @@
+/**
+ * <venue-card> — selectable row for a meetup venue candidate.
+ *
+ * Properties:
+ *   emoji, name, address
+ *   distanceKm, etaMinutes
+ *   selected — visual selected state
+ */
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
@@ -77,7 +85,7 @@ export class VenueCard extends LitElement {
       width: 18px; height: 18px; border-radius: 50%;
       background: var(--color-blue);
       display: flex; align-items: center; justify-content: center;
-      font-size: 10px; color: #fff;
+      font-size: 10px; color: var(--color-blue-text);
     }
   `;
 

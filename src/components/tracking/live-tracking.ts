@@ -1,3 +1,11 @@
+/**
+ * <live-tracking> — active navigation + ETA + in-session chat overlay.
+ *
+ * Responsibilities:
+ *   compute rolling ETA/progress from live coordinates
+ *   drive proximity/arrival notifications
+ *   coordinate map behavior (follow, route mode, fit bounds)
+ */
 import { LitElement, html } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import { liveTrackingStyles } from './live-tracking.styles.js';
@@ -97,6 +105,10 @@ export class LiveTracking extends LitElement {
     const distOwn = haversineMeters(own, destination);
     const distPart = partner ? haversineMeters(partner, destination) : null;
 
+    // ETA is distance / speed. We estimate personal speed from recent movement
+    // and clamp it to a realistic urban range to avoid wild spikes.
+    // Distance math reference (great-circle/haversine):
+    // https://en.wikipedia.org/wiki/Haversine_formula
     const speedKmhOwn = this._estimateOwnSpeedKmh(own);
     const etaOwn = Math.round((distOwn / 1000) / speedKmhOwn * 60);
     const etaPart = distPart !== null ? Math.round((distPart / 1000) / 12 * 60) : null;
@@ -169,6 +181,9 @@ export class LiveTracking extends LitElement {
       return 10;
     }
 
+    // Convert elapsed milliseconds to hours for km/h, with a 1-second floor
+    // so near-simultaneous GPS samples cannot blow up the speed estimate.
+    // Unit conversion refresher: https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Date/now
     const dtHours = Math.max((now - this._lastOwnSample.t) / 3_600_000, 1 / 3600);
     const movedMeters = haversineMeters(
       { lat: this._lastOwnSample.lat, lng: this._lastOwnSample.lng },

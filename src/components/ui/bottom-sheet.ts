@@ -66,15 +66,16 @@ export class BottomSheet extends LitElement {
 
     override render() {
         return html`
-      <div class="sheet">
+      <div class="sheet" part="sheet">
         <div
           class="handle-wrap"
+          part="handle-wrap"
           @pointerdown=${this._onDragStart}
           @pointermove=${this._onDragMove}
           @pointerup=${this._onDragEnd}
           @pointercancel=${this._onDragEnd}
         >
-          <div class="handle"></div>
+          <div class="handle" part="handle"></div>
         </div>
         <slot></slot>
       </div>

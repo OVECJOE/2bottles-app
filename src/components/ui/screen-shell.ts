@@ -16,8 +16,6 @@ import { property, state } from 'lit/decorators.js';
 import './app-menu.js';
 import { uiStore } from '../../store/index.js';
 import type { AppScreen } from '../../types/index.js';
-
-// @customElement('screen-shell')
 export class ScreenShell extends LitElement {
   static override styles = css`
     :host { display: block; }
@@ -107,7 +105,7 @@ export class ScreenShell extends LitElement {
       border-radius: 50%;
       border: none;
       background: var(--color-blue);
-      color: #fff;
+      color: var(--color-blue-text);
       font-size: 18px;
       font-weight: var(--weight-bold);
       cursor: pointer;
