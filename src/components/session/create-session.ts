@@ -114,6 +114,7 @@ export class CreateSession extends LitElement {
   @state() private _gpsName = 'Detecting your location…';
   @state() private _gpsReady = false;
   @state() private _usingGps = true;
+  @state() private _showManualInput = true;
   @state() private _manualSelection: GeocodeSuggestion | null = null;
   @state() private _loading = false;
   @state() private _error = '';
@@ -154,10 +155,12 @@ export class CreateSession extends LitElement {
 
     this._gpsReady = true;
 
-    this.dispatchEvent(new CustomEvent('map-view:move-to', {
-      bubbles: true, composed: true,
-      detail: { coords: own, zoom: 15 },
-    }));
+    if (this._usingGps) {
+      this.dispatchEvent(new CustomEvent('map-view:move-to', {
+        bubbles: true, composed: true,
+        detail: { coords: own, zoom: 15 },
+      }));
+    }
 
     const now = Date.now();
     const distMoved = this._lastGeocodePos ? ( (Math.abs(own.lat - this._lastGeocodePos.lat) + Math.abs(own.lng - this._lastGeocodePos.lng)) * 111000 ) : Infinity;
@@ -182,6 +185,9 @@ export class CreateSession extends LitElement {
   private _onLocationSelected(e: CustomEvent<GeocodeSuggestion>) {
     this._manualSelection = e.detail;
     this._usingGps = false;
+    this._showManualInput = false;
+    locationStore.stopWatching();
+    locationStore.setOwnLocation({ lat: e.detail.lat, lng: e.detail.lng });
     this.dispatchEvent(new CustomEvent('map-view:move-to', {
       bubbles: true, composed: true,
       detail: { coords: { lat: e.detail.lat, lng: e.detail.lng }, zoom: 15 },
@@ -191,6 +197,12 @@ export class CreateSession extends LitElement {
   private _useGps() {
     this._usingGps = true;
     this._manualSelection = null;
+    this._showManualInput = false;
+    locationStore.startWatching();
+  }
+
+  private _editLocation() {
+    this._showManualInput = true;
   }
 
   private async _handleCreate() {
@@ -232,6 +244,9 @@ export class CreateSession extends LitElement {
     const hasLocation = this._usingGps ? this._gpsReady : !!this._manualSelection;
     const canProceed = hasLocation && this._name.trim().length >= 2;
     const acc = locationStore.accuracy;
+    const activeName = this._usingGps
+      ? this._gpsName
+      : (this._manualSelection?.shortName || `${locationStore.own?.lat.toFixed(4)}, ${locationStore.own?.lng.toFixed(4)}`);
 
     return html`
       <screen-shell screen='create-session'>
@@ -242,33 +257,48 @@ export class CreateSession extends LitElement {
           <p class="subtitle">Your location helps us find a fair spot for both of you</p>
         </div>
 
-        <button
-          type="button"
-          class="gps-row ${this._usingGps && this._gpsReady ? 'active' : ''}"
-          @click=${this._useGps}
-          aria-pressed=${this._usingGps ? 'true' : 'false'}
-          aria-label="Use current GPS location"
-        >
+        <div class="gps-row ${this._usingGps && this._gpsReady ? 'active' : ''}" role="group" aria-label="Selected location">
           <div class="gps-icon">📍</div>
           <div class="gps-text">
-            <div class="gps-name">${this._gpsName}</div>
+            <div class="gps-name">${activeName}</div>
             <div class="gps-meta">
-              ${this._gpsReady
-        ? `GPS · ${acc ? `±${Math.round(acc)}m` : 'high accuracy'}`
-        : 'Waiting for GPS signal…'}
+              ${this._usingGps
+                ? (this._gpsReady
+                  ? `GPS · ${acc ? `±${Math.round(acc)}m` : 'high accuracy'}`
+                  : 'Waiting for GPS signal…')
+                : 'Manual location selected'}
             </div>
           </div>
-          ${this._gpsReady
-        ? html`<span class="live-badge">LIVE</span>`
-        : html`<span class="pending-badge">…</span>`}
-        </button>
+          ${this._usingGps
+            ? (this._gpsReady
+              ? html`<span class="live-badge">LIVE</span>`
+              : html`<span class="pending-badge">…</span>`)
+            : html`<span class="live-badge">MANUAL</span>`}
+          <button
+            type="button"
+            class="btn btn-ghost"
+            style="margin-left: var(--space-2);"
+            @click=${this._editLocation}
+            aria-label="Edit location"
+          >Edit</button>
+          ${!this._usingGps ? html`
+            <button
+              type="button"
+              class="btn btn-ghost"
+              style="margin-left: var(--space-1);"
+              @click=${this._useGps}
+              aria-label="Use live GPS"
+            >Use live</button>
+          ` : ''}
+        </div>
 
-        <div class="or-row">or enter address manually</div>
-
-        <location-input
-          placeholder="e.g. Nicon Town, Lekki Phase 1"
-          @location-selected=${this._onLocationSelected}
-        ></location-input>
+        ${this._showManualInput ? html`
+          <div class="or-row">enter address manually</div>
+          <location-input
+            placeholder="e.g. Nicon Town, Lekki Phase 1"
+            @location-selected=${this._onLocationSelected}
+          ></location-input>
+        ` : ''}
 
         <input
           type="text"
@@ -288,7 +318,7 @@ export class CreateSession extends LitElement {
           <div class="selected-manual">
             <span>📍</span>
             <span>${this._manualSelection.shortName}</span>
-            <button type="button" @click=${this._useGps} title="Clear" aria-label="Clear manual location">✕</button>
+            <button type="button" @click=${this._editLocation} title="Edit" aria-label="Edit manual location">✎</button>
           </div>
         ` : ''}
 
