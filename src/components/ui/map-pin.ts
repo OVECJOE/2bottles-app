@@ -12,7 +12,6 @@
  */
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { tokens } from '../../styles/tokens.js';
 
 @customElement('map-pin')
 export class MapPin extends LitElement {
@@ -27,7 +26,7 @@ export class MapPin extends LitElement {
     .ring {
       position: absolute;
       border-radius: 50%;
-      border: 2px solid var(--pin-color, var(${tokens.colorAction}));
+      border: 2px solid var(--pin-color, var(--color-action));
       opacity: 0;
       animation: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
       pointer-events: none;
@@ -40,7 +39,7 @@ export class MapPin extends LitElement {
 
     .dot {
       border-radius: 50%;
-      background: var(--pin-color, var(${tokens.colorAction}));
+      background: var(--pin-color, var(--color-action));
       border: 2.5px solid rgba(255,255,255,0.95);
       box-shadow: 0 2px 8px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.06);
       position: relative; z-index: 1;
