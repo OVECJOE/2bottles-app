@@ -1,7 +1,7 @@
 /**
  * <create-session> — first screen.
- * Shows live GPS location. Lets the user override with a manual
- * address via <location-input> (real Nominatim autocomplete).
+ * Shows live GPS location. User can tap Edit on the live card
+ * to reveal manual search and overwrite the current location.
  * On confirm, calls sessionService.createSession() which hits
  * the API and navigates to invite-partner.
  */
@@ -24,29 +24,41 @@ export class CreateSession extends LitElement {
     :host { display: block; }
     .sheet { animation: slide-up var(--duration-sheet) var(--ease-out) both; }
 
-    .gps-row {
-      display: flex; align-items: center; gap: var(--space-3);
+    .gps-card {
+      position: relative;
       width: 100%;
       background: rgba(77,114,152,0.07);
       border: 1px solid rgba(77,114,152,0.15);
       border-radius: var(--border-radius-md);
       padding: var(--space-3);
       margin-bottom: var(--space-3);
-      cursor: pointer;
-      font: inherit;
-      text-align: left;
-      transition: background var(--duration-fast);
+      transition: background var(--duration-fast), border-color var(--duration-fast);
     }
-    button.gps-row { appearance: none; }
-    .gps-row:hover { background: rgba(77,114,152,0.12); }
-    .gps-row:focus-visible {
-      outline: 2px solid var(--color-blue);
-      outline-offset: 2px;
-    }
-    .gps-row.active {
+    .gps-card.active {
       border-color: var(--color-blue);
       background: var(--color-blue-light);
     }
+    .gps-row {
+      display: flex; align-items: center; gap: var(--space-3);
+      padding-right: 72px;
+    }
+
+    .edit-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      border: 1px solid rgba(0,0,0,0.12);
+      background: var(--color-surface);
+      color: var(--color-blue-dark);
+      border-radius: var(--border-radius-pill);
+      font-size: var(--text-xs);
+      font-weight: var(--weight-bold);
+      padding: 6px 10px;
+      cursor: pointer;
+      transition: all var(--duration-fast);
+    }
+    .edit-btn:hover { background: var(--color-blue-light); border-color: var(--color-blue); }
+    .edit-btn:active { transform: scale(0.97); }
 
     .gps-icon {
       width: 36px; height: 36px; border-radius: var(--border-radius-sm);
@@ -72,27 +84,16 @@ export class CreateSession extends LitElement {
       font-size: 10px; color: var(--color-text-muted); flex-shrink: 0;
     }
 
-    .or-row {
-      display: flex; align-items: center; gap: var(--space-3);
-      margin: var(--space-1) 0 var(--space-3);
-      font-size: var(--text-xs); color: var(--color-text-muted);
+    .manual-editor {
+      margin-top: var(--space-3);
+      padding-top: var(--space-3);
+      border-top: 1px solid rgba(0,0,0,0.08);
+      display: grid;
+      gap: var(--space-2);
     }
-    .or-row::before, .or-row::after {
-      content: ''; flex: 1; height: 0.5px; background: rgba(0,0,0,0.1);
-    }
-
-    .selected-manual {
-      display: flex; align-items: center; gap: var(--space-2);
-      padding: var(--space-2) var(--space-3);
-      background: rgba(208,239,177,0.4);
-      border: 1px solid rgba(208,239,177,0.9);
-      border-radius: var(--border-radius-md);
-      margin-top: var(--space-2);
-      font-size: var(--text-sm);
-    }
-    .selected-manual button {
-      margin-left: auto; background: none; border: none;
-      font-size: 14px; cursor: pointer; color: var(--color-text-muted); padding: 0;
+    .manual-hint {
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
     }
 
     .error {
@@ -113,9 +114,8 @@ export class CreateSession extends LitElement {
 
   @state() private _gpsName = 'Detecting your location…';
   @state() private _gpsReady = false;
-  @state() private _usingGps = true;
-  @state() private _showManualInput = true;
-  @state() private _manualSelection: GeocodeSuggestion | null = null;
+  @state() private _manualOverride = false;
+  @state() private _showManualEditor = false;
   @state() private _loading = false;
   @state() private _error = '';
   @state() private _name = '';
@@ -155,12 +155,12 @@ export class CreateSession extends LitElement {
 
     this._gpsReady = true;
 
-    if (this._usingGps) {
-      this.dispatchEvent(new CustomEvent('map-view:move-to', {
-        bubbles: true, composed: true,
-        detail: { coords: own, zoom: 15 },
-      }));
-    }
+    this.dispatchEvent(new CustomEvent('map-view:move-to', {
+      bubbles: true, composed: true,
+      detail: { coords: own, zoom: 15 },
+    }));
+
+    if (this._manualOverride) return;
 
     const now = Date.now();
     const distMoved = this._lastGeocodePos ? ( (Math.abs(own.lat - this._lastGeocodePos.lat) + Math.abs(own.lng - this._lastGeocodePos.lng)) * 111000 ) : Infinity;
@@ -183,31 +183,34 @@ export class CreateSession extends LitElement {
   }
 
   private _onLocationSelected(e: CustomEvent<GeocodeSuggestion>) {
-    this._manualSelection = e.detail;
-    this._usingGps = false;
-    this._showManualInput = false;
-    locationStore.stopWatching();
-    locationStore.setOwnLocation({ lat: e.detail.lat, lng: e.detail.lng });
+    const selected = e.detail;
+    const coords = { lat: selected.lat, lng: selected.lng };
+
+    this._manualOverride = true;
+    this._showManualEditor = false;
+    this._gpsName = selected.shortName;
+    this._gpsReady = true;
+    this._lastGeocodePos = coords;
+    this._lastGeocodeTime = Date.now();
+
+    if (locationStore.isWatching) locationStore.stopWatching();
+    locationStore.setOwnLocation(coords);
+
     this.dispatchEvent(new CustomEvent('map-view:move-to', {
       bubbles: true, composed: true,
-      detail: { coords: { lat: e.detail.lat, lng: e.detail.lng }, zoom: 15 },
+      detail: { coords, zoom: 15 },
     }));
+
+    this._error = '';
   }
 
-  private _useGps() {
-    this._usingGps = true;
-    this._manualSelection = null;
-    this._showManualInput = false;
-    locationStore.startWatching();
-  }
-
-  private _editLocation() {
-    this._showManualInput = true;
+  private _toggleManualEditor() {
+    this._showManualEditor = !this._showManualEditor;
   }
 
   private async _handleCreate() {
     const trimmedName = this._name.trim();
-    const hasLocation = this._usingGps ? this._gpsReady : !!this._manualSelection;
+    const hasLocation = this._gpsReady;
     const canProceed = hasLocation && trimmedName.length >= 2;
     if (!canProceed) {
       this._error = !hasLocation
@@ -221,10 +224,6 @@ export class CreateSession extends LitElement {
     this._error = '';
 
     try {
-      if (!this._usingGps && this._manualSelection) {
-        locationStore.setOwnLocation({ lat: this._manualSelection.lat, lng: this._manualSelection.lng });
-      }
-
       sessionStore.setOwnName(trimmedName);
 
       const peerId = await p2pService.init();
@@ -241,12 +240,9 @@ export class CreateSession extends LitElement {
   }
 
   override render() {
-    const hasLocation = this._usingGps ? this._gpsReady : !!this._manualSelection;
+    const hasLocation = this._gpsReady;
     const canProceed = hasLocation && this._name.trim().length >= 2;
     const acc = locationStore.accuracy;
-    const activeName = this._usingGps
-      ? this._gpsName
-      : (this._manualSelection?.shortName || `${locationStore.own?.lat.toFixed(4)}, ${locationStore.own?.lng.toFixed(4)}`);
 
     return html`
       <screen-shell screen='create-session'>
@@ -257,48 +253,44 @@ export class CreateSession extends LitElement {
           <p class="subtitle">Your location helps us find a fair spot for both of you</p>
         </div>
 
-        <div class="gps-row ${this._usingGps && this._gpsReady ? 'active' : ''}" role="group" aria-label="Selected location">
-          <div class="gps-icon">📍</div>
-          <div class="gps-text">
-            <div class="gps-name">${activeName}</div>
-            <div class="gps-meta">
-              ${this._usingGps
-                ? (this._gpsReady
-                  ? `GPS · ${acc ? `±${Math.round(acc)}m` : 'high accuracy'}`
-                  : 'Waiting for GPS signal…')
-                : 'Manual location selected'}
+        <div class="gps-card ${this._gpsReady ? 'active' : ''}">
+          <div class="gps-row" aria-live="polite">
+            <div class="gps-icon">📍</div>
+            <div class="gps-text">
+              <div class="gps-name">${this._gpsName}</div>
+              <div class="gps-meta">
+                ${this._manualOverride
+                  ? 'Manual location selected'
+                  : this._gpsReady
+                    ? `GPS · ${acc ? `±${Math.round(acc)}m` : 'high accuracy'}`
+                    : 'Waiting for GPS signal…'}
+              </div>
             </div>
+            ${this._gpsReady
+              ? html`<span class="live-badge">${this._manualOverride ? 'MANUAL' : 'LIVE'}</span>`
+              : html`<span class="pending-badge">…</span>`}
           </div>
-          ${this._usingGps
-            ? (this._gpsReady
-              ? html`<span class="live-badge">LIVE</span>`
-              : html`<span class="pending-badge">…</span>`)
-            : html`<span class="live-badge">MANUAL</span>`}
+
           <button
             type="button"
-            class="btn btn-ghost"
-            style="margin-left: var(--space-2);"
-            @click=${this._editLocation}
-            aria-label="Edit location"
-          >Edit</button>
-          ${!this._usingGps ? html`
-            <button
-              type="button"
-              class="btn btn-ghost"
-              style="margin-left: var(--space-1);"
-              @click=${this._useGps}
-              aria-label="Use live GPS"
-            >Use live</button>
+            class="edit-btn"
+            @click=${this._toggleManualEditor}
+            aria-expanded=${this._showManualEditor ? 'true' : 'false'}
+            aria-controls="manual-location-editor"
+          >
+            ${this._showManualEditor ? 'Done' : 'Edit'}
+          </button>
+
+          ${this._showManualEditor ? html`
+            <div class="manual-editor" id="manual-location-editor">
+              <div class="manual-hint">Search and select an address to replace the current location.</div>
+              <location-input
+                placeholder="Search address"
+                @location-selected=${this._onLocationSelected}
+              ></location-input>
+            </div>
           ` : ''}
         </div>
-
-        ${this._showManualInput ? html`
-          <div class="or-row">enter address manually</div>
-          <location-input
-            placeholder="e.g. Nicon Town, Lekki Phase 1"
-            @location-selected=${this._onLocationSelected}
-          ></location-input>
-        ` : ''}
 
         <input
           type="text"
@@ -313,14 +305,6 @@ export class CreateSession extends LitElement {
           minlength="2"
           maxlength="48"
         />
-
-        ${this._manualSelection && !this._usingGps ? html`
-          <div class="selected-manual">
-            <span>📍</span>
-            <span>${this._manualSelection.shortName}</span>
-            <button type="button" @click=${this._editLocation} title="Edit" aria-label="Edit manual location">✎</button>
-          </div>
-        ` : ''}
 
         <button
           class="btn btn-primary"
