@@ -619,11 +619,11 @@ export class LandingPage extends LitElement {
         display: grid;
         place-items: center;
         z-index: 15;
-        padding: var(--space-4);
+        padding: clamp(var(--space-4), 5vw, var(--space-6));
       }
 
       .quiz {
-        width: min(520px, 100%);
+        width: min(520px, calc(100vw - 2 * clamp(var(--space-4), 5vw, var(--space-6))));
         border-radius: var(--border-radius-xl);
         border: 1px solid var(--color-border-strong);
         background:
@@ -734,6 +734,8 @@ export class LandingPage extends LitElement {
         .subtitle { font-size: var(--text-md); }
         .flow-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .preview-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .quiz-overlay { padding: var(--space-5); }
+        .quiz { border-radius: var(--border-radius-lg); }
         .coach {
           top: 8px;
           border-radius: var(--border-radius-lg);
