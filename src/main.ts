@@ -2,6 +2,7 @@ import './styles/global.css';
 import { initDemoAnalytics } from './services/demo-analytics.service.js';
 
 const SW_REFRESH_KEY = '2b:sw-refresh-at';
+const ONBOARDING_COMPLETED_KEY = '2b:onboarding-completed';
 type BootMode = 'landing' | 'app';
 type LandingAction = 'start' | 'install';
 
@@ -19,6 +20,10 @@ initDemoAnalytics();
 
 function isLandingPath(pathname: string): boolean {
     return pathname === '/' || pathname === '/index.html';
+}
+
+function hasCompletedOnboarding(): boolean {
+    return localStorage.getItem(ONBOARDING_COMPLETED_KEY) === '1';
 }
 
 function syncLandingInstallCapability() {
@@ -49,6 +54,11 @@ async function mountAppShell() {
 
 async function renderForCurrentPath() {
     if (isLandingPath(window.location.pathname)) {
+        if (hasCompletedOnboarding()) {
+            window.history.replaceState({}, '', '/create-session');
+            await mountAppShell();
+            return;
+        }
         await mountLandingPage();
         return;
     }
@@ -76,6 +86,7 @@ document.addEventListener('landing-action', async (event) => {
         return;
     }
 
+    localStorage.setItem(ONBOARDING_COMPLETED_KEY, '1');
     window.history.pushState({}, '', '/create-session');
     await mountAppShell();
 });

@@ -190,15 +190,25 @@ export class LandingPage extends LitElement {
         animation: signal-pulse 1.6s var(--ease-in-out) infinite;
       }
 
-      .badge {
-        width: max-content;
-        border-radius: var(--border-radius-pill);
-        border: 1px solid var(--color-border-strong);
+      .eyebrow {
         font-size: var(--text-xs);
-        font-weight: var(--weight-bold);
         letter-spacing: 0.7px;
-        padding: 6px 11px;
-        background: linear-gradient(120deg, rgba(255, 255, 255, 0.90), rgba(244, 246, 248, 0.9));
+        font-weight: var(--weight-bold);
+        color: var(--color-blue-dark);
+        text-transform: uppercase;
+      }
+
+      .invite-link {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--color-text-secondary);
+        border-bottom: 1px dashed var(--color-border-strong);
+        padding-bottom: 2px;
+      }
+
+      .score-line {
+        font-size: var(--text-sm);
+        color: var(--color-text-secondary);
       }
 
       .title {
@@ -1283,7 +1293,7 @@ export class LandingPage extends LitElement {
           <div class="step-title">Invite your partner</div>
           <div class="step-copy">Like the real invite step, send one link to pull your partner in.</div>
           <div class="row">
-            <span class="badge">demo://rendezvous/invite/f2a9</span>
+            <span class="invite-link">demo://rendezvous/invite/f2a9</span>
           </div>
           <button class="action" @click=${this._sendInvite}>${this._inviteSent ? 'Invite Sent' : 'Send Demo Invite'}</button>
         </div>
@@ -1329,7 +1339,7 @@ export class LandingPage extends LitElement {
           <div class="step-title">You are ready</div>
           <div class="step-copy">You have completed the same path users follow in real sessions.</div>
           <div class="row">
-            <span class="badge">Quiz score: ${this._quizCorrectCount}/2</span>
+            <span class="score-line">Quiz score: ${this._quizCorrectCount}/2</span>
           </div>
           <button class="action" @click=${this._enterRealApp}>Enter Real App</button>
         </div>
@@ -1348,7 +1358,7 @@ export class LandingPage extends LitElement {
         <div class="stage" aria-live="polite">
           <section class="hero">
             <div class="intro-copy">
-              <span class="badge">ACTIVE ONBOARDING DEMO</span>
+              <span class="eyebrow">Active Onboarding Demo</span>
               <div class="title">Learn 2bottles by using it, not by reading about it.</div>
               <p class="subtitle">
                 This guided simulation runs the full rendezvous flow with prompts, checks, and realistic decisions.
