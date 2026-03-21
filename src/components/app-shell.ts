@@ -42,11 +42,6 @@ export class AppShell extends LitElement {
     private _deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
     private _permissionStatus?: PermissionStatus;
 
-    private _redirect(commands: { redirect: (path: string) => unknown }, path: string, toast?: string) {
-        if (toast) uiStore.showToast(toast);
-        return commands.redirect(path);
-    }
-
     private _hasActiveSession(): boolean {
         return sessionStore.isSessionActive;
     }
@@ -89,9 +84,11 @@ export class AppShell extends LitElement {
             {
                 path: '/invite',
                 component: 'invite-partner',
-                action: async (_context, commands) => {
+                action: async () => {
                     if (!this._isHostFlow()) {
-                        return this._redirect(commands, '/create-session', 'Start a new session before opening invite.');
+                        uiStore.showToast('Start a new session before opening invite.');
+                        Router.go('/create-session');
+                        return;
                     }
                     await import('./session/invite-partner.js');
                 }
@@ -101,9 +98,11 @@ export class AppShell extends LitElement {
             {
                 path: '/select-venue',
                 component: 'select-rendezvous',
-                action: async (_context, commands) => {
+                action: async () => {
                     if (!this._hasActiveSession()) {
-                        return this._redirect(commands, '/create-session', 'Create or join a session first.');
+                        uiStore.showToast('Create or join a session first.');
+                        Router.go('/create-session');
+                        return;
                     }
                     await import('./rendezvous/select-rendezvous.js');
                 }
@@ -111,12 +110,16 @@ export class AppShell extends LitElement {
             {
                 path: '/coordinate',
                 component: 'partner-agree-refuse',
-                action: async (_context, commands) => {
+                action: async () => {
                     if (!this._hasActiveSession()) {
-                        return this._redirect(commands, '/create-session', 'Create or join a session first.');
+                        uiStore.showToast('Create or join a session first.');
+                        Router.go('/create-session');
+                        return;
                     }
                     if (!sessionStore.selectedVenue) {
-                        return this._redirect(commands, '/select-venue', 'Pick a meetup spot before coordination.');
+                        uiStore.showToast('Pick a meetup spot before coordination.');
+                        Router.go('/select-venue');
+                        return;
                     }
                     await import('./partner/partner-agree-refuse.js');
                 }
@@ -124,12 +127,16 @@ export class AppShell extends LitElement {
             {
                 path: '/tracking',
                 component: 'live-tracking',
-                action: async (_context, commands) => {
+                action: async () => {
                     if (!this._hasActiveSession()) {
-                        return this._redirect(commands, '/create-session', 'Create or join a session before tracking.');
+                        uiStore.showToast('Create or join a session before tracking.');
+                        Router.go('/create-session');
+                        return;
                     }
                     if (!sessionStore.selectedVenue) {
-                        return this._redirect(commands, '/select-venue', 'Pick a meetup spot before tracking starts.');
+                        uiStore.showToast('Pick a meetup spot before tracking starts.');
+                        Router.go('/select-venue');
+                        return;
                     }
                     await import('./tracking/live-tracking.js');
                 }
@@ -137,9 +144,11 @@ export class AppShell extends LitElement {
             {
                 path: '/chat',
                 component: 'live-chat',
-                action: async (_context, commands) => {
+                action: async () => {
                     if (!this._hasActiveSession()) {
-                        return this._redirect(commands, '/create-session', 'Create or join a session before opening chat.');
+                        uiStore.showToast('Create or join a session before opening chat.');
+                        Router.go('/create-session');
+                        return;
                     }
                     await import('./tracking/live-chat-screen.js');
                 }
@@ -147,9 +156,11 @@ export class AppShell extends LitElement {
             {
                 path: '/session-link',
                 component: 'session-link',
-                action: async (_context, commands) => {
+                action: async () => {
                     if (!this._hasActiveSession()) {
-                        return this._redirect(commands, '/create-session', 'Create or join a session first.');
+                        uiStore.showToast('Create or join a session first.');
+                        Router.go('/create-session');
+                        return;
                     }
                     await import('./session/session-link.js');
                 }
@@ -157,9 +168,11 @@ export class AppShell extends LitElement {
             {
                 path: '/ended',
                 component: 'end-session',
-                action: async (_context, commands) => {
+                action: async () => {
                     if (!sessionStore.session && !sessionStore.selectedVenue) {
-                        return this._redirect(commands, '/create-session', 'No session summary is available yet.');
+                        uiStore.showToast('No session summary is available yet.');
+                        Router.go('/create-session');
+                        return;
                     }
                     await import('./tracking/end-session.js');
                 }
@@ -167,16 +180,20 @@ export class AppShell extends LitElement {
             {
                 path: '/save-spot',
                 component: 'save-spot-page',
-                action: async (_context, commands) => {
+                action: async () => {
                     if (!sessionStore.selectedVenue) {
-                        return this._redirect(commands, '/ended', 'Finish a meetup before saving a spot.');
+                        uiStore.showToast('Finish a meetup before saving a spot.');
+                        Router.go('/ended');
+                        return;
                     }
                     await import('./spot/save-spot-page.js');
                 }
             },
             {
                 path: '(.*)',
-                action: (_context, commands) => this._redirect(commands, '/create-session')
+                action: () => {
+                    Router.go('/create-session');
+                }
             }
         ]);
 
