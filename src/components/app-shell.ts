@@ -42,6 +42,19 @@ export class AppShell extends LitElement {
     private _deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
     private _permissionStatus?: PermissionStatus;
 
+    private _redirect(commands: { redirect: (path: string) => unknown }, path: string, toast?: string) {
+        if (toast) uiStore.showToast(toast);
+        return commands.redirect(path);
+    }
+
+    private _hasActiveSession(): boolean {
+        return sessionStore.isSessionActive;
+    }
+
+    private _isHostFlow(): boolean {
+        return this._hasActiveSession() && sessionStore.isHost;
+    }
+
     override connectedCallback() {
         super.connectedCallback();
         this._unsubUI = uiStore.subscribe(() => {
@@ -73,16 +86,98 @@ export class AppShell extends LitElement {
         this._router.setRoutes([
             { path: '/', component: 'landing-page', action: async () => { await import('./marketing/landing-page.ts'); } },
             { path: '/create-session', component: 'create-session', action: async () => { await import('./session/create-session.js'); } },
-            { path: '/invite', component: 'invite-partner', action: async () => { await import('./session/invite-partner.js'); } },
+            {
+                path: '/invite',
+                component: 'invite-partner',
+                action: async (_context, commands) => {
+                    if (!this._isHostFlow()) {
+                        return this._redirect(commands, '/create-session', 'Start a new session before opening invite.');
+                    }
+                    await import('./session/invite-partner.js');
+                }
+            },
             { path: '/join/:peerId', component: 'partner-invite-received', action: async () => { await import('./partner/partner-invite-received.js'); } },
             { path: '/rejected', component: 'partner-ended', action: async () => { await import('./partner/partner-ended.js'); } },
-            { path: '/select-venue', component: 'select-rendezvous', action: async () => { await import('./rendezvous/select-rendezvous.js'); } },
-            { path: '/coordinate', component: 'partner-agree-refuse', action: async () => { await import('./partner/partner-agree-refuse.js'); } },
-            { path: '/tracking', component: 'live-tracking', action: async () => { await import('./tracking/live-tracking.js'); } },
-            { path: '/chat', component: 'live-chat', action: async () => { await import('./tracking/live-chat-screen.js'); } },
-            { path: '/session-link', component: 'session-link', action: async () => { await import('./session/session-link.js'); } },
-            { path: '/ended', component: 'end-session', action: async () => { await import('./tracking/end-session.js'); } },
-            { path: '(.*)', component: 'landing-page', action: async () => { await import('./marketing/landing-page.ts'); } }
+            {
+                path: '/select-venue',
+                component: 'select-rendezvous',
+                action: async (_context, commands) => {
+                    if (!this._hasActiveSession()) {
+                        return this._redirect(commands, '/create-session', 'Create or join a session first.');
+                    }
+                    await import('./rendezvous/select-rendezvous.js');
+                }
+            },
+            {
+                path: '/coordinate',
+                component: 'partner-agree-refuse',
+                action: async (_context, commands) => {
+                    if (!this._hasActiveSession()) {
+                        return this._redirect(commands, '/create-session', 'Create or join a session first.');
+                    }
+                    if (!sessionStore.selectedVenue) {
+                        return this._redirect(commands, '/select-venue', 'Pick a meetup spot before coordination.');
+                    }
+                    await import('./partner/partner-agree-refuse.js');
+                }
+            },
+            {
+                path: '/tracking',
+                component: 'live-tracking',
+                action: async (_context, commands) => {
+                    if (!this._hasActiveSession()) {
+                        return this._redirect(commands, '/create-session', 'Create or join a session before tracking.');
+                    }
+                    if (!sessionStore.selectedVenue) {
+                        return this._redirect(commands, '/select-venue', 'Pick a meetup spot before tracking starts.');
+                    }
+                    await import('./tracking/live-tracking.js');
+                }
+            },
+            {
+                path: '/chat',
+                component: 'live-chat',
+                action: async (_context, commands) => {
+                    if (!this._hasActiveSession()) {
+                        return this._redirect(commands, '/create-session', 'Create or join a session before opening chat.');
+                    }
+                    await import('./tracking/live-chat-screen.js');
+                }
+            },
+            {
+                path: '/session-link',
+                component: 'session-link',
+                action: async (_context, commands) => {
+                    if (!this._hasActiveSession()) {
+                        return this._redirect(commands, '/create-session', 'Create or join a session first.');
+                    }
+                    await import('./session/session-link.js');
+                }
+            },
+            {
+                path: '/ended',
+                component: 'end-session',
+                action: async (_context, commands) => {
+                    if (!sessionStore.session && !sessionStore.selectedVenue) {
+                        return this._redirect(commands, '/create-session', 'No session summary is available yet.');
+                    }
+                    await import('./tracking/end-session.js');
+                }
+            },
+            {
+                path: '/save-spot',
+                component: 'save-spot-page',
+                action: async (_context, commands) => {
+                    if (!sessionStore.selectedVenue) {
+                        return this._redirect(commands, '/ended', 'Finish a meetup before saving a spot.');
+                    }
+                    await import('./spot/save-spot-page.js');
+                }
+            },
+            {
+                path: '(.*)',
+                action: (_context, commands) => this._redirect(commands, '/create-session')
+            }
         ]);
 
         const path = window.location.pathname;

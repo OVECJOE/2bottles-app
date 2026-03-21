@@ -3,9 +3,11 @@
  * allows saving the venue, and cleans up all session state.
  */
 import { LitElement, html, css } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
+import { Router } from '@vaadin/router';
+import type { Venue } from '../../types/index.js';
 
 @customElement('end-session')
 export class EndSession extends LitElement {
@@ -96,34 +98,62 @@ export class EndSession extends LitElement {
     .btn-save:active { transform: scale(0.98); }
   `;
 
-  @state() private _saved = false;
   private static readonly ARRIVAL_RADIUS_M = 60;
+  private _snapshotTaken = false;
+  private _snapshotVenue: Venue | null = null;
+  private _snapshotOwnArrived = false;
+  private _snapshotPartnerArrived = false;
+  private _snapshotAvgEta = 0;
+  private _snapshotMessageCount = 0;
 
-  private _stateSummary() {
-    const ownArrived = locationStore.ownDistanceM !== null && locationStore.ownDistanceM <= EndSession.ARRIVAL_RADIUS_M;
-    const partnerArrived =
+  override connectedCallback() {
+    super.connectedCallback();
+    this._captureSnapshot();
+  }
+
+  private _captureSnapshot() {
+    if (this._snapshotTaken) return;
+
+    this._snapshotVenue = sessionStore.selectedVenue;
+    this._snapshotOwnArrived = locationStore.ownDistanceM !== null && locationStore.ownDistanceM <= EndSession.ARRIVAL_RADIUS_M;
+    this._snapshotPartnerArrived =
       (locationStore.partnerDistanceM !== null && locationStore.partnerDistanceM <= EndSession.ARRIVAL_RADIUS_M) ||
       sessionStore.partner?.status === 'arrived';
-    const bothArrived = ownArrived && partnerArrived;
-    return { ownArrived, partnerArrived, bothArrived };
-  }
 
-  private _avgEta(): number {
-    const v = sessionStore.selectedVenue;
-    if (!v) return 0;
-    return Math.round((v.etaMinutesFromYou + v.etaMinutesFromPartner) / 2);
-  }
+    const ownEta = locationStore.ownEtaMinutes;
+    const partnerEta = locationStore.partnerEtaMinutes;
+    if (ownEta !== null && partnerEta !== null) {
+      this._snapshotAvgEta = Math.round((ownEta + partnerEta) / 2);
+    } else if (ownEta !== null) {
+      this._snapshotAvgEta = ownEta;
+    } else if (partnerEta !== null) {
+      this._snapshotAvgEta = partnerEta;
+    } else if (this._snapshotVenue) {
+      this._snapshotAvgEta = Math.round((this._snapshotVenue.etaMinutesFromYou + this._snapshotVenue.etaMinutesFromPartner) / 2);
+    }
 
-  private _messageCount(): number {
-    return sessionStore.chatMessages.length;
+    this._snapshotMessageCount = sessionStore.chatMessages.length;
+    this._snapshotTaken = true;
   }
 
   private _save() {
-    this._saved = true;
-    uiStore.showToast(`📌 ${sessionStore.selectedVenue?.name ?? 'Spot'} saved`);
+    if (!this._snapshotVenue) {
+      uiStore.showToast('No selected venue to save yet.');
+      return;
+    }
+    Router.go('/save-spot');
   }
 
-  private _end() {
+  private async _end() {
+    const confirmed = await uiStore.confirm({
+      title: 'End this meetup?',
+      message: 'This will close the session for both people and clear live tracking from this device.',
+      confirmLabel: 'End Meetup',
+      cancelLabel: 'Go Back',
+    });
+
+    if (!confirmed) return;
+
     p2pService.endSessionForAll();
     sessionStore.endSession();
     locationStore.reset();
@@ -133,9 +163,12 @@ export class EndSession extends LitElement {
   }
 
   override render() {
-    const v = sessionStore.selectedVenue;
+    this._captureSnapshot();
+    const v = this._snapshotVenue;
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const { ownArrived, partnerArrived, bothArrived } = this._stateSummary();
+    const ownArrived = this._snapshotOwnArrived;
+    const partnerArrived = this._snapshotPartnerArrived;
+    const bothArrived = ownArrived && partnerArrived;
     const headline = bothArrived ? 'Rendezvous Complete' : ownArrived || partnerArrived ? 'Session Ended Midway' : 'Session Ended Early';
     const subtitle = bothArrived
       ? `${v?.name ?? 'Meetup spot'} · ${now}`
@@ -165,11 +198,11 @@ export class EndSession extends LitElement {
 
         <div class="stats-row">
           <div class="stat-card">
-            <div class="stat-val">${this._avgEta()}<span style="font-size:12px;font-weight:400"> min</span></div>
+            <div class="stat-val">${this._snapshotAvgEta}<span style="font-size:12px;font-weight:400"> min</span></div>
             <div class="stat-label">avg travel</div>
           </div>
           <div class="stat-card">
-            <div class="stat-val">${this._messageCount()}</div>
+            <div class="stat-val">${this._snapshotMessageCount}</div>
             <div class="stat-label">messages</div>
           </div>
           <div class="stat-card highlight">
@@ -191,10 +224,9 @@ export class EndSession extends LitElement {
         <button class="btn-primary" @click=${this._end}>End Session</button>
         <button
           class="btn-save"
-          ?disabled=${this._saved}
           @click=${this._save}
         >
-          ${this._saved ? '✓ Saved to favourites' : '📌 Save this spot'}
+          Save this spot
         </button>
       </div>
     `;

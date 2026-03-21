@@ -3,8 +3,9 @@ import { initDemoAnalytics } from './services/demo-analytics.service.js';
 
 const SW_REFRESH_KEY = '2b:sw-refresh-at';
 const ONBOARDING_COMPLETED_KEY = '2b:onboarding-completed';
+const QUICKSTART_QUERY_KEY = 'quickstart';
 type BootMode = 'landing' | 'app';
-type LandingAction = 'start' | 'install';
+type LandingAction = 'start' | 'install' | 'skip';
 
 interface BeforeInstallPromptEvent extends Event {
     prompt(): Promise<void>;
@@ -24,6 +25,11 @@ function isLandingPath(pathname: string): boolean {
 
 function hasCompletedOnboarding(): boolean {
     return localStorage.getItem(ONBOARDING_COMPLETED_KEY) === '1';
+}
+
+function hasQuickStartIntent(): boolean {
+    const value = new URLSearchParams(window.location.search).get(QUICKSTART_QUERY_KEY);
+    return value === '1' || value === 'true';
 }
 
 function syncLandingInstallCapability() {
@@ -54,7 +60,8 @@ async function mountAppShell() {
 
 async function renderForCurrentPath() {
     if (isLandingPath(window.location.pathname)) {
-        if (hasCompletedOnboarding()) {
+        if (hasCompletedOnboarding() || hasQuickStartIntent()) {
+            localStorage.setItem(ONBOARDING_COMPLETED_KEY, '1');
             window.history.replaceState({}, '', '/create-session');
             await mountAppShell();
             return;
@@ -83,6 +90,13 @@ document.addEventListener('landing-action', async (event) => {
 
     if (detail.action === 'install') {
         await requestInstallFromLanding();
+        return;
+    }
+
+    if (detail.action === 'skip') {
+        localStorage.setItem(ONBOARDING_COMPLETED_KEY, '1');
+        window.history.pushState({}, '', '/create-session');
+        await mountAppShell();
         return;
     }
 

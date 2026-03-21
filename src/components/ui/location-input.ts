@@ -167,6 +167,7 @@ export class LocationInput extends LitElement {
   @state() private _selectedIndex = -1;
   @state() private _scope: 'nearby' | 'global' = 'nearby';
   @state() private _nearbyCenter: { lat: number; lng: number } | null = null;
+  @state() private _searchIssue = '';
 
   private _debounceTimer: any = null;
   private _blurTimer: ReturnType<typeof setTimeout> | null = null;
@@ -198,6 +199,7 @@ export class LocationInput extends LitElement {
       this._suggestions = [];
       this._loading = false;
       this._open = false;
+      this._searchIssue = '';
       return;
     }
 
@@ -222,9 +224,13 @@ export class LocationInput extends LitElement {
             });
             if (this._lastQuery === val && this._requestSeq === reqId) {
                 this._suggestions = results;
+              this._searchIssue = '';
             }
         } catch {
-            if (this._lastQuery === val && this._requestSeq === reqId) this._suggestions = [];
+            if (this._lastQuery === val && this._requestSeq === reqId) {
+              this._suggestions = [];
+              this._searchIssue = 'Place search is temporarily unavailable. Please try again in a moment.';
+            }
         } finally {
             if (this._lastQuery === val && this._requestSeq === reqId) this._loading = false;
         }
@@ -361,7 +367,7 @@ export class LocationInput extends LitElement {
               <span class="loading-dot"></span>
             </div>
           ` : html`
-            <div class="empty">No results found</div>
+            <div class="empty">${this._searchIssue || 'No places found. Try a nearby landmark or switch to Global.'}</div>
           `}
         </div>
       ` : ''}

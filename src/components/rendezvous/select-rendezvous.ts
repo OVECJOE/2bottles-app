@@ -92,6 +92,63 @@ export class SelectRendezvous extends LitElement {
 
     .search-section { flex-shrink: 0; }
 
+    .empty-state {
+      text-align: center;
+      padding: var(--space-6);
+      color: var(--color-text-muted);
+      border: 1px dashed var(--color-border-strong);
+      border-radius: var(--border-radius-md);
+      background: rgba(255,255,255,0.6);
+    }
+
+    .empty-emoji {
+      font-size: 32px;
+      margin-bottom: var(--space-2);
+    }
+
+    .empty-title {
+      color: var(--color-text-primary);
+      font-size: var(--text-sm);
+      font-weight: var(--weight-medium);
+      margin-bottom: var(--space-1);
+    }
+
+    .empty-copy {
+      font-size: var(--text-sm);
+    }
+
+    .empty-actions {
+      margin-top: var(--space-3);
+      display: flex;
+      justify-content: center;
+    }
+
+    .mini-btn {
+      border: 1px solid var(--color-border-strong);
+      background: var(--color-surface);
+      color: var(--color-text-primary);
+      border-radius: var(--border-radius-pill);
+      padding: 6px 12px;
+      font-size: var(--text-xs);
+      font-weight: var(--weight-bold);
+      cursor: pointer;
+    }
+
+    .waiting-card {
+      text-align: center;
+      padding: var(--space-4);
+      color: var(--color-text-muted);
+      font-size: var(--text-sm);
+      border-radius: var(--border-radius-md);
+      background: rgba(0,0,0,0.03);
+    }
+
+    .waiting-title {
+      color: var(--color-text-primary);
+      font-weight: var(--weight-medium);
+      margin-bottom: 2px;
+    }
+
     .custom-selected {
       display: flex; align-items: flex-start; gap: var(--space-3);
       padding: var(--space-3); margin-top: var(--space-3);
@@ -320,6 +377,11 @@ export class SelectRendezvous extends LitElement {
     uiStore.goToAgreeRefuse();
   }
 
+  private _retrySuggestions() {
+    if (this._isComputing) return;
+    this._computeVenues();
+  }
+
   private get _canProceed() {
     return this._tab === 'midpoint' ? !!this._selectedId : !!this._customSpot;
   }
@@ -360,9 +422,13 @@ export class SelectRendezvous extends LitElement {
                 <div>Finding fair meetup spots...</div>
               </div>
             ` : this._venues.length === 0 ? html`
-              <div style="text-align:center; padding:var(--space-6); color:var(--color-text-muted)">
-                <div style="font-size:32px; margin-bottom:var(--space-2)">☕?</div>
-                <div>${this._suggestionError || 'No spots found near the midpoint. Try searching for a specific place.'}</div>
+              <div class="empty-state">
+                <div class="empty-emoji">☕?</div>
+                <div class="empty-title">We could not suggest meetup spots yet</div>
+                <div class="empty-copy">${this._suggestionError || 'Try again or switch to Search a place to pick your own destination.'}</div>
+                <div class="empty-actions">
+                  <button type="button" class="mini-btn" @click=${this._retrySuggestions}>Try Again</button>
+                </div>
               </div>
             ` : this._venues.map(v => html`
               <venue-card
@@ -401,8 +467,9 @@ export class SelectRendezvous extends LitElement {
                 Suggest This Spot →
             </button>
         ` : html`
-            <div style="text-align:center; padding:var(--space-4); color:var(--color-text-muted); font-size:var(--text-sm)">
-                Waiting for ${sessionStore.partnerName || 'host'} to pick a spot...
+          <div class="waiting-card">
+            <div class="waiting-title">Waiting for ${sessionStore.partnerName || 'host'} to suggest a spot...</div>
+            <div>As soon as they pick one, your screen will update automatically.</div>
             </div>
         `}
 

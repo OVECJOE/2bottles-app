@@ -11,7 +11,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import { sharedStyles } from '../../styles/shared-styles.js';
 
-type LandingCta = 'start' | 'install';
+type LandingCta = 'start' | 'install' | 'skip';
 type DemoStep = 'location' | 'quiz-location' | 'identity' | 'invite' | 'venue' | 'quiz-fairness' | 'tracking' | 'complete';
 type QuizOption = { id: string; label: string; correct: boolean };
 type DemoAnalyticsEvent = {
@@ -673,6 +673,12 @@ export class LandingPage extends LitElement {
         font-size: var(--text-sm);
       }
 
+      .quickstart-hint {
+        margin-top: var(--space-1);
+        font-size: var(--text-xs);
+        color: var(--color-text-muted);
+      }
+
       .quiz-result {
         font-size: var(--text-xs);
         font-weight: var(--weight-bold);
@@ -1119,6 +1125,15 @@ export class LandingPage extends LitElement {
     this._track('demo_step_started', { startedStep: this._step });
   }
 
+  private _skipDemo() {
+    this._demoCompleted = true;
+    this._track('demo_skipped', {
+      reason: 'user_already_familiar',
+      reachedStep: this._step,
+    });
+    this._emit('skip');
+  }
+
   private _toggleManualEditor() {
     if (this._step !== 'location') return;
     this._manualEditorOpen = !this._manualEditorOpen;
@@ -1425,15 +1440,17 @@ export class LandingPage extends LitElement {
       ${this._introOpen ? html`
         <div class="quiz-overlay" role="dialog" aria-modal="true" aria-label="Demo intro">
           <div class="quiz">
-            <span class="quiz-kicker">Onboarding Required</span>
+            <span class="quiz-kicker">Choose your start mode</span>
             <h3>Welcome to 2bottles</h3>
             <p>
-              You will complete a forced demo run before using real mode. It takes about 2 minutes and shows the full rendezvous loop.
+              New here? Run the interactive 2-minute demo. Already familiar? Skip straight into session setup.
             </p>
             <div class="row">
               <button class="action" @click=${this._startDemo}>Start Demo Mode</button>
+              <button class="action ghost" @click=${this._skipDemo}>I already know this</button>
               ${this.canInstall ? html`<button class="action ghost" @click=${() => this._emit('install')}>Install App</button>` : ''}
             </div>
+            <p class="quickstart-hint">Tip for another device: open with <strong>?quickstart=1</strong> to jump to setup.</p>
           </div>
         </div>
       ` : ''}

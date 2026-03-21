@@ -265,7 +265,7 @@ export class LiveTracking extends LitElement {
 
     if (confirmed) {
       p2pService.endSessionForAll();
-      sessionStore.endSession();
+      await sessionStore.setSessionStatus('ended');
       uiStore.goToEndSession();
     }
   }

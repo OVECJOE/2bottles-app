@@ -215,7 +215,7 @@ export class CreateSession extends LitElement {
     if (!canProceed) {
       this._error = !hasLocation
         ? 'We need your location to find a fair meetup spot.'
-        : 'Please enter a name with at least 2 characters.';
+        : 'Add your name so your partner knows it is you.';
       return;
     }
 
@@ -250,7 +250,7 @@ export class CreateSession extends LitElement {
         <div class="handle"></div>
         <div>
           <h2 class="title">Start a Rendezvous</h2>
-          <p class="subtitle">Your location helps us find a fair spot for both of you</p>
+          <p class="subtitle">We only use your location to find a fair place to meet.</p>
         </div>
 
         <div class="gps-card ${this._gpsReady ? 'active' : ''}">
@@ -283,9 +283,9 @@ export class CreateSession extends LitElement {
 
           ${this._showManualEditor ? html`
             <div class="manual-editor" id="manual-location-editor">
-              <div class="manual-hint">Search and select an address to replace the current location.</div>
+              <div class="manual-hint">Search for a place if your live pin is off.</div>
               <location-input
-                placeholder="Search address"
+                placeholder="Search a place or address"
                 @location-selected=${this._onLocationSelected}
               ></location-input>
             </div>

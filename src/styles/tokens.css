@@ -36,7 +36,7 @@
       --warning-100: #fff4e0;
       --warning-700: #8a5c00;
 
-      --accent-amber-500: #fbbc04;
+      --accent-teal-500: #007a8c;
 
       /* ----------------------------------------------------------
        Semantic Tokens
@@ -95,7 +95,7 @@
       --landing-cta-text: #f4f8fc;
 
       --map-pin-you: #4285f4;
-      --map-pin-partner: var(--accent-amber-500);
+      --map-pin-partner: var(--accent-teal-500);
       --map-pin-destination: var(--danger-500);
       --map-poi-fallback: var(--blue-500);
 
@@ -177,7 +177,7 @@
     --color-offline: #94a3b8;
 
 
-    --color-partner: #e8a020;
+    --color-partner: #007a8c;
     /* partner pin / ETA       */
     --color-destination: #c0392b;
     /* venue / destination pin */
