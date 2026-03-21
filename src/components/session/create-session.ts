@@ -27,8 +27,8 @@ export class CreateSession extends LitElement {
     .gps-card {
       position: relative;
       box-sizing: border-box;
-      background: rgba(77,114,152,0.07);
-      border: 1px solid rgba(77,114,152,0.15);
+      background: var(--color-info);
+      border: 1px solid var(--color-border-strong);
       border-radius: var(--border-radius-md);
       padding: var(--space-3);
       margin-bottom: var(--space-3);
@@ -47,7 +47,7 @@ export class CreateSession extends LitElement {
       position: absolute;
       top: 0.8em;
       right: 0.8em;
-      border: 1px solid rgba(0,0,0,0.12);
+      border: 1px solid var(--color-border-strong);
       background: var(--color-surface);
       color: var(--color-blue-dark);
       border-radius: var(--border-radius-pill);
@@ -87,7 +87,7 @@ export class CreateSession extends LitElement {
     .manual-editor {
       margin-top: var(--space-3);
       padding-top: var(--space-3);
-      border-top: 1px solid rgba(0,0,0,0.08);
+      border-top: 1px solid var(--color-border);
       display: grid;
       gap: var(--space-2);
     }
@@ -104,11 +104,11 @@ export class CreateSession extends LitElement {
     .name-input {
         box-sizing: border-box;
         width: 100%; padding: 12px;
-        border: 1px solid rgba(0,0,0,0.1); border-radius: var(--border-radius-md);
+      border: 1px solid var(--color-border); border-radius: var(--border-radius-md);
         font-family: var(--font-sans); font-size: var(--text-md);
         background: var(--color-sheet-bg);
     }
-    .name-input:focus { outline: none; border-color: var(--color-blue); box-shadow: 0 0 0 2px rgba(77,114,152,0.1); }
+    .name-input:focus { outline: none; border-color: var(--color-blue); box-shadow: 0 0 0 2px var(--color-blue-light); }
     .name-input { margin-top: var(--space-4); }
   `  ];
 

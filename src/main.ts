@@ -1,4 +1,5 @@
 import './styles/global.css';
+import { initDemoAnalytics } from './services/demo-analytics.service.js';
 
 const SW_REFRESH_KEY = '2b:sw-refresh-at';
 type BootMode = 'landing' | 'app';
@@ -14,6 +15,7 @@ let deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
 let canInstall = false;
 
 const appRoot = document.getElementById('app') ?? document.body;
+initDemoAnalytics();
 
 function isLandingPath(pathname: string): boolean {
     return pathname === '/' || pathname === '/index.html';
