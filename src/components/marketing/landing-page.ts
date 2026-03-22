@@ -715,12 +715,16 @@ export class LandingPage extends LitElement {
         place-items: center;
         z-index: 15;
         padding: clamp(var(--space-3), 3vw, var(--space-6));
+        overflow-x: hidden;
       }
 
       .quiz {
+        box-sizing: border-box;
         width: min(520px, calc(100vw - 2 * clamp(var(--space-4), 5vw, var(--space-6))));
+        max-width: 100%;
         max-height: min(760px, calc(100dvh - 2 * var(--space-3)));
         overflow-y: auto;
+        overflow-x: hidden;
         overscroll-behavior: contain;
         border-radius: 22px;
         border: 1px solid var(--modal-border);
@@ -917,6 +921,7 @@ export class LandingPage extends LitElement {
 
         .quiz {
           width: 100%;
+          max-width: 100%;
           max-height: min(88dvh, 760px);
           border-radius: 18px;
           padding: var(--space-4);
