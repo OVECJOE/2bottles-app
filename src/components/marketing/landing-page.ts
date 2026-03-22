@@ -73,6 +73,10 @@ export class LandingPage extends LitElement {
         --onboard-accent: #2f6fa6;
         --onboard-lime: #7ab84a;
         --onboard-glass: rgba(255, 255, 255, 0.76);
+        --modal-bg-a: rgba(250, 253, 255, 0.97);
+        --modal-bg-b: rgba(228, 241, 251, 0.95);
+        --modal-border: rgba(255, 255, 255, 0.34);
+        --modal-shadow: rgba(6, 20, 34, 0.42);
       }
 
       .surface {
@@ -704,27 +708,32 @@ export class LandingPage extends LitElement {
       .quiz-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(9, 20, 33, 0.74);
+        background:
+          radial-gradient(800px 400px at 50% 110%, rgba(122, 184, 74, 0.14), transparent 70%),
+          linear-gradient(180deg, rgba(9, 20, 33, 0.52), rgba(9, 20, 33, 0.82));
         display: grid;
         place-items: center;
         z-index: 15;
-        padding: clamp(var(--space-4), 5vw, var(--space-6));
+        padding: clamp(var(--space-3), 3vw, var(--space-6));
       }
 
       .quiz {
         width: min(520px, calc(100vw - 2 * clamp(var(--space-4), 5vw, var(--space-6))));
+        max-height: min(760px, calc(100dvh - 2 * var(--space-3)));
+        overflow-y: auto;
+        overscroll-behavior: contain;
         border-radius: 22px;
-        border: 1px solid rgba(255, 255, 255, 0.22);
+        border: 1px solid var(--modal-border);
         background:
-          linear-gradient(145deg, rgba(248, 252, 255, 0.96), rgba(233, 244, 253, 0.93)),
+          linear-gradient(145deg, var(--modal-bg-a), var(--modal-bg-b)),
           radial-gradient(520px 200px at 10% -20%, rgba(47, 111, 166, 0.2) 0%, transparent 70%);
-        padding: var(--space-5);
+        padding: clamp(var(--space-4), 2vw, var(--space-5));
         display: grid;
         gap: var(--space-3);
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(10px);
         position: relative;
-        overflow: hidden;
-        box-shadow: 0 26px 56px rgba(6, 20, 34, 0.4);
+        box-shadow: 0 26px 56px var(--modal-shadow);
+        scrollbar-width: thin;
       }
 
       .quiz::before {
@@ -744,23 +753,37 @@ export class LandingPage extends LitElement {
 
       .quiz-kicker {
         width: max-content;
-        border: 1px solid var(--color-border-strong);
+        border: 1px solid rgba(20, 34, 49, 0.2);
         border-radius: var(--border-radius-pill);
-        padding: 4px 9px;
+        padding: 5px 10px;
         font-size: var(--text-xs);
-        color: var(--color-blue-dark);
-        background: rgba(219, 232, 244, 0.7);
+        color: #1b5684;
+        background: linear-gradient(120deg, rgba(219, 232, 244, 0.86), rgba(208, 239, 177, 0.62));
       }
 
       .quiz h3 {
         margin: 0;
-        font-size: var(--text-xl);
+        font-size: clamp(22px, 2.4vw, 28px);
+        letter-spacing: -0.4px;
+        color: var(--onboard-ink);
       }
 
       .quiz p {
         margin: 0;
-        color: var(--color-text-secondary);
-        font-size: var(--text-sm);
+        color: var(--onboard-muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .quiz .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+      }
+
+      .quiz .row .action {
+        flex: 1;
+        min-width: 180px;
       }
 
       .mode-grid {
@@ -798,10 +821,15 @@ export class LandingPage extends LitElement {
         background: linear-gradient(130deg, rgba(220, 236, 250, 0.9), rgba(233, 247, 225, 0.86));
       }
 
+      .mode-btn:focus-visible {
+        outline: 2px solid rgba(47, 111, 166, 0.6);
+        outline-offset: 2px;
+      }
+
       .quickstart-hint {
         margin-top: var(--space-1);
         font-size: var(--text-xs);
-        color: var(--color-text-muted);
+        color: #536676;
       }
 
       .quiz-result {
@@ -878,6 +906,43 @@ export class LandingPage extends LitElement {
           border-radius: var(--border-radius-lg);
           align-items: flex-start;
           flex-direction: column;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .quiz-overlay {
+          align-items: end;
+          padding: var(--space-2);
+        }
+
+        .quiz {
+          width: 100%;
+          max-height: min(88dvh, 760px);
+          border-radius: 18px;
+          padding: var(--space-4);
+          gap: var(--space-2);
+        }
+
+        .quiz::before {
+          animation-duration: 10s;
+        }
+
+        .quiz h3 {
+          font-size: 22px;
+        }
+
+        .quiz .row {
+          display: grid;
+          grid-template-columns: 1fr;
+        }
+
+        .quiz .row .action {
+          min-width: 0;
+          width: 100%;
+        }
+
+        .quickstart-hint {
+          font-size: 11px;
         }
       }
 
