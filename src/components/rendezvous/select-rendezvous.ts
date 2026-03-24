@@ -41,12 +41,50 @@ export class SelectRendezvous extends LitElement {
       padding: var(--space-2) var(--space-3);
       display: flex; align-items: center; gap: var(--space-2);
       box-shadow: var(--shadow-md); font-size: var(--text-sm);
+      min-width: 0;
     }
-    .pill-label { flex: 1; font-weight: var(--weight-medium); color: var(--color-text-primary); }
+    .pill-icon { flex-shrink: 0; }
+    .pill-label {
+      flex: 1;
+      min-width: 0;
+      font-weight: var(--weight-medium);
+      color: var(--color-text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .pill-badge {
       font-size: 10px; font-weight: var(--weight-bold);
       background: var(--color-green); color: var(--color-green-text);
       padding: 2px 8px; border-radius: var(--border-radius-pill);
+      max-width: 52%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 1;
+    }
+
+    @media (max-width: 640px) {
+      .pill-inner {
+        flex-wrap: wrap;
+        align-items: flex-start;
+        row-gap: 6px;
+      }
+
+      .pill-label {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+      }
+
+      .pill-badge {
+        max-width: 100%;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        line-height: 1.2;
+      }
     }
 
     .sheet { max-height: 68vh; }
@@ -396,7 +434,7 @@ export class SelectRendezvous extends LitElement {
       <screen-shell screen='select-rendezvous'>
       <div class="top-pill">
         <div class="pill-inner">
-          <span>⊙</span>
+          <span class="pill-icon">⊙</span>
           <span class="pill-label">Fair area prepared</span>
           <span class="pill-badge">${this._venues.length} spots nearby</span>
         </div>
