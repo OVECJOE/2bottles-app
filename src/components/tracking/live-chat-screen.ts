@@ -27,6 +27,8 @@ export class LiveChatScreen extends LitElement {
         display: flex; align-items: center; gap: var(--space-3);
         border-bottom: 1px solid rgba(0,0,0,0.05);
         background: var(--color-surface);
+        backdrop-filter: blur(10px) saturate(130%);
+        -webkit-backdrop-filter: blur(10px) saturate(130%);
     }
     .back-btn {
         background: none; border: none; font-size: 20px; cursor: pointer; padding: 0;
@@ -62,6 +64,8 @@ export class LiveChatScreen extends LitElement {
     .input-area {
         padding: var(--space-4) var(--space-5) calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
         background: var(--color-surface); border-top: 1px solid rgba(0,0,0,0.05);
+        backdrop-filter: blur(10px) saturate(130%);
+        -webkit-backdrop-filter: blur(10px) saturate(130%);
         display: flex; gap: var(--space-3); align-items: center;
     }
     .input {

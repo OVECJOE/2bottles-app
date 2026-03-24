@@ -325,7 +325,10 @@ export class SaveSpotPage extends LitElement {
     .actions {
       position: sticky;
       bottom: 0;
-      background: linear-gradient(180deg, rgba(250, 252, 248, 0), rgba(250, 252, 248, 0.98) 28%);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0), var(--color-sheet-bg) 28%);
+      border-top: 1px solid var(--glass-border);
+      backdrop-filter: blur(10px) saturate(130%);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
       padding-top: var(--space-4);
       display: flex;
       gap: var(--space-2);

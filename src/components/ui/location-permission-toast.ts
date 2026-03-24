@@ -26,13 +26,12 @@ export class LocationPermissionToast extends LitElement {
 
     .card {
       border-radius: var(--border-radius-lg);
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      background:
-        linear-gradient(160deg, rgba(231, 246, 214, 0.92), rgba(217, 232, 245, 0.92) 58%, rgba(247, 251, 255, 0.94));
+      border: 1px solid var(--glass-border);
+      background: var(--color-sheet-bg);
       box-shadow: var(--shadow-xl);
       padding: var(--space-4);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(14px) saturate(135%);
+      -webkit-backdrop-filter: blur(14px) saturate(135%);
     }
 
     .chip {
@@ -47,7 +46,9 @@ export class LocationPermissionToast extends LitElement {
       border-radius: var(--border-radius-pill);
       padding: 4px 10px;
       margin-bottom: var(--space-2);
-      background: rgba(255, 255, 255, 0.7);
+      background: var(--color-surface);
+      backdrop-filter: blur(8px) saturate(125%);
+      -webkit-backdrop-filter: blur(8px) saturate(125%);
     }
 
     .title {
@@ -112,7 +113,9 @@ export class LocationPermissionToast extends LitElement {
 
     .btn-secondary {
       border: 1px solid rgba(0, 0, 0, 0.1);
-      background: rgba(255, 255, 255, 0.82);
+      background: var(--color-surface);
+      backdrop-filter: blur(8px) saturate(125%);
+      -webkit-backdrop-filter: blur(8px) saturate(125%);
       color: var(--color-text-primary);
       flex: 1 1 160px;
     }

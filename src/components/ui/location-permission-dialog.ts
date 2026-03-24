@@ -62,7 +62,9 @@ export class LocationPermissionDialog extends LitElement {
       font-size: var(--text-xs);
       font-weight: var(--weight-bold);
       color: var(--color-blue-dark);
-      background: rgba(255, 255, 255, 0.72);
+      background: var(--color-surface);
+      backdrop-filter: blur(8px) saturate(125%);
+      -webkit-backdrop-filter: blur(8px) saturate(125%);
       border: 1px solid rgba(77, 114, 152, 0.24);
       border-radius: var(--border-radius-pill);
       padding: 6px 12px;
@@ -95,8 +97,10 @@ export class LocationPermissionDialog extends LitElement {
       align-items: center;
       gap: var(--space-3);
       border-radius: var(--border-radius-md);
-      background: rgba(255, 255, 255, 0.76);
-      border: 1px solid rgba(255, 255, 255, 0.9);
+      background: var(--color-surface);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(10px) saturate(130%);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
       padding: var(--space-3);
       box-shadow: var(--shadow-sm);
       animation: rise 500ms var(--ease-out) both;
@@ -155,9 +159,11 @@ export class LocationPermissionDialog extends LitElement {
     }
 
     .btn-secondary {
-      background: rgba(255, 255, 255, 0.8);
+      background: var(--color-surface);
       color: var(--color-text-primary);
       border: 1px solid rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(8px) saturate(125%);
+      -webkit-backdrop-filter: blur(8px) saturate(125%);
     }
 
     .btn-quiet {
