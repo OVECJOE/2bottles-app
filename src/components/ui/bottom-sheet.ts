@@ -53,12 +53,42 @@ export class BottomSheet extends LitElement {
     }
 
     .handle-wrap:active .handle { background: rgba(0,0,0,0.22); }
+
+    @media (min-width: 1024px) {
+      :host {
+        top: calc(var(--map-status-bar-height) + var(--space-3));
+        right: var(--space-3);
+        bottom: var(--space-3);
+        left: auto;
+        width: min(var(--desktop-sheet-width, clamp(360px, 40vw, 520px)), calc(100vw - var(--space-6)));
+      }
+
+      .sheet {
+        height: 100%;
+        border-radius: var(--border-radius-xl);
+        transform: translateX(110%);
+        padding-bottom: var(--space-4);
+      }
+
+      :host([open]) .sheet {
+        transform: translateX(var(--drag-offset, 0px));
+      }
+
+      .handle {
+        width: 4px;
+        height: 36px;
+      }
+    }
   `;
 
     @property({ type: Boolean, reflect: true }) open = false;
 
-    private _startY = 0;
+    private _startPoint = 0;
     private _dragging = false;
+
+    private _isDesktop(): boolean {
+      return window.matchMedia('(min-width: 1024px)').matches;
+    }
 
     private _setOffset(y: number) {
         this.style.setProperty('--drag-offset', `${Math.max(0, y)}px`);
@@ -83,21 +113,23 @@ export class BottomSheet extends LitElement {
     }
 
     private _onDragStart(e: PointerEvent) {
-        this._startY = e.clientY;
+      this._startPoint = this._isDesktop() ? e.clientX : e.clientY;
         this._dragging = true;
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     }
 
     private _onDragMove(e: PointerEvent) {
         if (!this._dragging) return;
-        const delta = e.clientY - this._startY;
+      const current = this._isDesktop() ? e.clientX : e.clientY;
+      const delta = current - this._startPoint;
         this._setOffset(delta);
     }
 
     private _onDragEnd(e: PointerEvent) {
         if (!this._dragging) return;
         this._dragging = false;
-        const delta = e.clientY - this._startY;
+      const current = this._isDesktop() ? e.clientX : e.clientY;
+      const delta = current - this._startPoint;
         if (delta > 120) {
             this.dispatchEvent(new CustomEvent('sheet-dismiss', { bubbles: true, composed: true }));
         }

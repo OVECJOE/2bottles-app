@@ -20,6 +20,10 @@ export class ScreenShell extends LitElement {
   static override styles = css`
     :host { display: block; }
 
+    :host {
+      --desktop-sheet-width: clamp(360px, 40vw, 520px);
+    }
+
     ::slotted(.sheet) {
       transition: transform var(--duration-base) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
       will-change: transform, opacity;
@@ -29,6 +33,26 @@ export class ScreenShell extends LitElement {
       transform: translateY(110%);
       opacity: 0;
       pointer-events: none;
+    }
+
+    @media (min-width: 1024px) {
+      ::slotted(.sheet) {
+        position: absolute !important;
+        top: calc(var(--map-status-bar-height) + var(--space-3)) !important;
+        right: var(--space-3) !important;
+        bottom: var(--space-3) !important;
+        left: auto !important;
+        width: min(var(--desktop-sheet-width), calc(100vw - var(--space-6))) !important;
+        max-width: min(var(--desktop-sheet-width), calc(100vw - var(--space-6))) !important;
+        max-height: none !important;
+        border-radius: var(--border-radius-xl) !important;
+        animation: none !important;
+        overflow-y: auto;
+      }
+
+      :host([sheet-collapsed]) ::slotted(.sheet) {
+        transform: translateX(112%);
+      }
     }
 
     .status-bar {
@@ -115,6 +139,19 @@ export class ScreenShell extends LitElement {
     }
 
     .sheet-fab:active { transform: scale(0.94); }
+
+    @media (min-width: 1024px) {
+      .sheet-fab {
+        right: var(--space-3);
+        bottom: auto;
+        top: calc(50% + var(--map-status-bar-height) / 2);
+        transform: translateY(-50%);
+      }
+
+      .sheet-fab:active {
+        transform: translateY(-50%) scale(0.94);
+      }
+    }
   `;
 
   @property() screen: AppScreen = 'create-session';
@@ -122,12 +159,20 @@ export class ScreenShell extends LitElement {
 
   @state() private _menuOpen = false;
   @state() private _time = '';
+  @state() private _isDesktop = false;
 
   private _clockInterval?: ReturnType<typeof setInterval>;
   private _unsubUI?: () => void;
+  private _desktopMq?: MediaQueryList;
+  private _onDesktopChange = () => {
+    this._isDesktop = this._desktopMq?.matches ?? false;
+  };
 
   override connectedCallback() {
     super.connectedCallback();
+    this._desktopMq = window.matchMedia('(min-width: 1024px)');
+    this._isDesktop = this._desktopMq.matches;
+    this._desktopMq.addEventListener('change', this._onDesktopChange);
     this._updateClock();
     this._clockInterval = setInterval(() => this._updateClock(), 10_000);
     this.sheetCollapsed = !uiStore.sheetOpen;
@@ -141,6 +186,7 @@ export class ScreenShell extends LitElement {
     super.disconnectedCallback();
     clearInterval(this._clockInterval);
     this._unsubUI?.();
+    this._desktopMq?.removeEventListener('change', this._onDesktopChange);
   }
 
   private _updateClock() {
@@ -156,6 +202,11 @@ export class ScreenShell extends LitElement {
   }
 
   override render() {
+    const toggleLabel = this.sheetCollapsed ? 'Show panel' : 'Hide panel';
+    const toggleGlyph = this._isDesktop
+      ? (this.sheetCollapsed ? '←' : '→')
+      : (this.sheetCollapsed ? '↑' : '↓');
+
     return html`
       <div class="status-bar">
         <span class="time">${this._time}</span>
@@ -163,9 +214,9 @@ export class ScreenShell extends LitElement {
           <button
             class="sheet-toggle-btn"
             @click=${this._toggleSheet}
-            aria-label=${this.sheetCollapsed ? 'Show panel' : 'Hide panel'}
-            title=${this.sheetCollapsed ? 'Show panel' : 'Hide panel'}
-          >${this.sheetCollapsed ? '↑' : '↓'}</button>
+            aria-label=${toggleLabel}
+            title=${toggleLabel}
+          >${toggleGlyph}</button>
           <button
             class="menu-btn"
             @click=${this._toggleMenu}
@@ -186,9 +237,9 @@ export class ScreenShell extends LitElement {
         <button
           class="sheet-fab"
           @click=${this._toggleSheet}
-          aria-label="Show panel"
-          title="Show panel"
-        >⌃</button>
+          aria-label=${toggleLabel}
+          title=${toggleLabel}
+        >${this._isDesktop ? '←' : '⌃'}</button>
       ` : ''}
 
       <slot></slot>
