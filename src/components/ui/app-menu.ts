@@ -35,7 +35,10 @@ export class AppMenu extends LitElement {
       top: calc(var(--map-status-bar-height) + var(--space-1));
       right: var(--space-4);
       min-width: 210px;
-      background: rgba(255,255,255,0.98);
+      background: var(--color-sheet-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(14px) saturate(135%);
+      -webkit-backdrop-filter: blur(14px) saturate(135%);
       border-radius: var(--border-radius-lg);
       box-shadow: var(--shadow-xl), 0 0 0 1px rgba(0,0,0,0.06);
       z-index: var(--z-modal);

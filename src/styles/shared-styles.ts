@@ -9,6 +9,10 @@ export const sharedStyles = css`
   .sheet {
     position: absolute; bottom: 0; left: 0; right: 0;
     background: var(--color-sheet-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(14px) saturate(135%);
+    -webkit-backdrop-filter: blur(14px) saturate(135%);
     border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
     padding: var(--space-3) var(--space-5) calc(env(safe-area-inset-bottom, 0px) + var(--space-6));
     z-index: var(--z-sheet);
@@ -72,7 +76,9 @@ export const sharedStyles = css`
     width: 100%; padding: 12px;
     border: 1px solid rgba(0,0,0,0.1); border-radius: var(--border-radius-md);
     font-family: var(--font-sans); font-size: var(--text-md);
-    background: var(--color-sheet-bg);
+    background: var(--color-surface);
+    backdrop-filter: blur(10px) saturate(130%);
+    -webkit-backdrop-filter: blur(10px) saturate(130%);
     transition: border-color var(--duration-fast);
     box-sizing: border-box;
   }

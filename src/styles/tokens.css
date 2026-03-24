@@ -51,9 +51,15 @@
       --color-success-strong: var(--green-600);
       --color-success-text: var(--green-900);
 
-      --color-surface: var(--neutral-0);
-      --color-surface-muted: var(--neutral-50);
-      --color-surface-soft: var(--neutral-100);
+      --glass-bg-soft: linear-gradient(135deg, rgba(255,255,255,0.44), rgba(255,255,255,0.24));
+      --glass-bg: linear-gradient(135deg, rgba(255,255,255,0.62), rgba(255,255,255,0.34));
+      --glass-bg-strong: linear-gradient(140deg, rgba(255,255,255,0.76), rgba(255,255,255,0.44));
+      --glass-border: rgba(255, 255, 255, 0.58);
+      --glass-shadow: 0 10px 30px rgba(10, 14, 20, 0.16);
+
+      --color-surface: var(--glass-bg);
+      --color-surface-muted: var(--glass-bg-soft);
+      --color-surface-soft: var(--glass-bg-soft);
       --color-surface-inverse: var(--neutral-800);
 
       --color-text: var(--neutral-900);
@@ -150,9 +156,9 @@
     --color-surface-600: #2f4155;
     /* borders on dark bg      */
 
-   --color-sheet-bg: rgba(250, 252, 248, 0.97);
+  --color-sheet-bg: var(--glass-bg-strong);
     /* bottom sheets         */
-    --color-sheet-bg-solid: #fafcf8;
+   --color-sheet-bg-solid: rgba(250, 252, 248, 0.78);
     /* non-backdrop version  */
 
    --color-text-primary: var(--color-text);
@@ -293,17 +299,23 @@
 }
 
 [data-theme='dark'] {
-   --color-surface: #18181b;
-   --color-surface-muted: #222227;
-   --color-surface-soft: #2a2a31;
+  --glass-bg-soft: linear-gradient(135deg, rgba(28,32,38,0.62), rgba(22,26,33,0.36));
+  --glass-bg: linear-gradient(135deg, rgba(36,42,50,0.74), rgba(24,28,36,0.48));
+  --glass-bg-strong: linear-gradient(140deg, rgba(40,46,56,0.84), rgba(26,31,40,0.58));
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 14px 40px rgba(0, 0, 0, 0.44);
+
+  --color-surface: var(--glass-bg);
+  --color-surface-muted: var(--glass-bg-soft);
+  --color-surface-soft: var(--glass-bg-soft);
    --color-text: #fafafa;
    --color-text-secondary: #d1d5db;
    --color-text-muted: #9ca3af;
    --color-border: rgba(255, 255, 255, 0.14);
    --color-border-strong: rgba(255, 255, 255, 0.22);
 
-   --color-sheet-bg: rgba(31, 36, 43, 0.96);
-   --color-sheet-bg-solid: #1f242b;
+  --color-sheet-bg: var(--glass-bg-strong);
+  --color-sheet-bg-solid: rgba(31, 36, 43, 0.82);
    --color-text-on-dark: rgba(255, 255, 255, 0.92);
    --color-text-on-dark-muted: rgba(255, 255, 255, 0.58);
    --chat-bubble-them-bg: #2a2f38;

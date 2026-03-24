@@ -46,7 +46,9 @@ export class LocationInput extends LitElement {
       font-family: var(--font-sans);
       font-size: var(--text-md);
       color: var(--color-text-primary);
-      background: rgba(0,0,0,0.03);
+      background: var(--color-surface);
+      backdrop-filter: blur(10px) saturate(130%);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
       outline: none;
       transition: border-color var(--duration-fast);
     }
@@ -57,10 +59,12 @@ export class LocationInput extends LitElement {
       position: absolute;
       bottom: calc(10 * var(--space-2));
       left: 0; right: 0;
-      background: rgba(255,255,255,0.98);
+      background: var(--color-sheet-bg);
       border: 1px solid rgba(0,0,0,0.1);
       border-radius: var(--border-radius-md);
       box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(14px) saturate(135%);
+      -webkit-backdrop-filter: blur(14px) saturate(135%);
       z-index: var(--z-modal);
       max-height: min(280px, 42dvh);
       overflow-x: hidden;
@@ -140,6 +144,8 @@ export class LocationInput extends LitElement {
     .scope-btn {
       border: 1px solid rgba(0,0,0,0.12);
       background: var(--color-surface);
+      backdrop-filter: blur(8px) saturate(125%);
+      -webkit-backdrop-filter: blur(8px) saturate(125%);
       color: var(--color-text-primary);
       border-radius: 999px;
       padding: 6px 10px;
