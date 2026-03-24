@@ -395,7 +395,7 @@ export class MapView extends LitElement {
                 'circle-color': youColor,
                 'circle-opacity': 0.4,
                 'circle-stroke-width': 2,
-                'circle-stroke-color': readToken('--color-surface', '#ffffff')
+                'circle-stroke-color': readToken('--color-sheet-bg-solid', '#fafcf8')
             }
         });
 
@@ -420,7 +420,7 @@ export class MapView extends LitElement {
                 'circle-color': partnerColor,
                 'circle-opacity': 0.4,
                 'circle-stroke-width': 2,
-                'circle-stroke-color': readToken('--color-surface', '#ffffff')
+                'circle-stroke-color': readToken('--color-sheet-bg-solid', '#fafcf8')
             }
         });
 
@@ -749,7 +749,7 @@ export class MapView extends LitElement {
             map.addLayer({
                 id: casingLyr, type: 'line', source: id,
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': readToken('--color-surface', '#ffffff'), 'line-width': 6, 'line-opacity': 0.55 },
+                paint: { 'line-color': readToken('--color-sheet-bg-solid', '#fafcf8'), 'line-width': 6, 'line-opacity': 0.55 },
             });
         }
 

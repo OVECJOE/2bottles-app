@@ -40,6 +40,9 @@ export class LiveTracking extends LitElement {
 
   override connectedCallback() {
     super.connectedCallback();
+    // Always reset panel visibility when entering tracking.
+    // This avoids getting stuck if a previous screen persisted sheetOpen=false.
+    uiStore.openSheet();
     this._lastChatMessageCount = sessionStore.chatMessages.length;
     this._unsubLocation = locationStore.subscribe(() => {
       this._onLocationUpdate();
