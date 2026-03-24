@@ -11,6 +11,12 @@ const NOMINATIM_HARD_COOLDOWN_MS = 45 * 1000;
 const VENUE_SUGGESTION_CACHE_TTL_MS = 2 * 60 * 1000;
 const GEOAPIFY_CANDIDATE_CACHE_TTL_MS = 2 * 60 * 1000;
 const ROUTE_METRICS_CACHE_TTL_MS = 5 * 60 * 1000;
+const NOMINATIM_CACHE_MAX = 220;
+const PHOTON_CACHE_MAX = 220;
+const REVERSE_CACHE_MAX = 320;
+const VENUE_SUGGESTION_CACHE_MAX = 140;
+const GEOAPIFY_CANDIDATE_CACHE_MAX = 220;
+const ROUTE_METRICS_CACHE_MAX = 320;
 
 import type { Venue } from '../types/venue.types.js';
 import type { Coordinates } from '../types/location.types.js';
@@ -31,6 +37,7 @@ export interface MeetupSuggestionInput {
 }
 
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _debouncedResolve: ((value: GeocodeSuggestion[]) => void) | null = null;
 let _nextNominatimAt = 0;
 let _nominatimQueue: Promise<unknown> = Promise.resolve();
 const _nominatimCache = new Map<string, { expiry: number; data: NominatimResult[] }>();
@@ -51,10 +58,20 @@ interface RouteMetrics {
     distanceKm: number;
 }
 
+class HttpError extends Error {
+    status: number;
+
+    constructor(url: string, status: number) {
+        super(`${url} ${status}`);
+        this.name = 'HttpError';
+        this.status = status;
+    }
+}
+
 async function fetchOrThrow(url: string, init?: RequestInit): Promise<Response> {
     const res = await fetch(url, init);
     if (!res.ok) {
-        throw new Error(`${url} ${res.status}`);
+        throw new HttpError(url, res.status);
     }
     return res;
 }
@@ -77,6 +94,22 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
             },
         );
     });
+}
+
+function pruneCache<K, V extends { expiry: number }>(map: Map<K, V>, maxEntries: number) {
+    const now = Date.now();
+    for (const [key, value] of map) {
+        if (value.expiry <= now) map.delete(key);
+    }
+
+    if (map.size <= maxEntries) return;
+    const overflow = map.size - maxEntries;
+    let removed = 0;
+    for (const key of map.keys()) {
+        map.delete(key);
+        removed += 1;
+        if (removed >= overflow) break;
+    }
 }
 
 async function scheduleNominatim<T>(task: () => Promise<T>): Promise<T> {
@@ -112,12 +145,12 @@ async function fetchNominatimJson(pathAndQuery: string): Promise<NominatimResult
                 fetchOrThrow(url, { headers: { 'Accept-Language': getPreferredLanguage() } })
             );
             const data = (await res.json()) as NominatimResult[];
+            pruneCache(_nominatimCache, NOMINATIM_CACHE_MAX);
             _nominatimCache.set(url, { expiry: Date.now() + NOMINATIM_CACHE_TTL_MS, data });
             return data;
         } catch (err) {
             lastError = err;
-            const message = err instanceof Error ? err.message : String(err);
-            const isRateLimited = message.includes(' 429') || message.includes('429');
+            const isRateLimited = err instanceof HttpError && err.status === 429;
 
             if (isRateLimited) {
                 // Public endpoint is throttling: stop retry storm briefly.
@@ -285,6 +318,7 @@ async function fetchPhotonJson(pathAndQuery: string): Promise<PhotonResult[]> {
             });
     }
 
+    pruneCache(_photonCache, PHOTON_CACHE_MAX);
     _photonCache.set(url, { expiry: now + PHOTON_CACHE_TTL_MS, data: mapped });
     return mapped;
 }
@@ -351,6 +385,18 @@ export function geocodeAutocomplete(
     } = {}
 ): Promise<GeocodeSuggestion[]> {
     return new Promise((resolve, reject) => {
+        const clearPendingDebounce = () => {
+            if (_debounceTimer) {
+                clearTimeout(_debounceTimer);
+                _debounceTimer = null;
+            }
+            if (_debouncedResolve) {
+                // Resolve superseded callers instead of leaving hanging promises.
+                _debouncedResolve([]);
+                _debouncedResolve = null;
+            }
+        };
+
         const run = async () => {
             const q = query.trim();
             if (!q || q.length < 2) { resolve([]); return; }
@@ -392,10 +438,16 @@ export function geocodeAutocomplete(
         };
 
         if (options.immediate) {
+            clearPendingDebounce();
             run();
         } else {
-            if (_debounceTimer) clearTimeout(_debounceTimer);
-            _debounceTimer = setTimeout(run, options.debounceMs ?? 400);
+            clearPendingDebounce();
+            _debouncedResolve = resolve;
+            _debounceTimer = setTimeout(() => {
+                _debounceTimer = null;
+                _debouncedResolve = null;
+                run();
+            }, options.debounceMs ?? 400);
         }
     });
 }
@@ -430,9 +482,13 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
                     headers: { 'Accept-Language': getPreferredLanguage() },
                 })
             );
-            const data = await res.json();
-            const parts = (data.display_name as string).split(', ');
+            const data = await res.json() as { display_name?: string };
+            const displayName = typeof data.display_name === 'string' && data.display_name.trim().length > 0
+                ? data.display_name
+                : 'Pinned location';
+            const parts = displayName.split(', ');
             const label = parts.slice(0, 3).join(', ');
+            pruneCache(_reverseCache, REVERSE_CACHE_MAX);
             _reverseCache.set(cacheKey, { expiry: Date.now() + REVERSE_CACHE_TTL_MS, label });
             _reverseCooldownUntil = 0;
             return label;
@@ -584,6 +640,7 @@ export async function suggestMeetupVenues(input: MeetupSuggestionInput): Promise
             ? diversified
             : pool.slice(0, maxResults).map((x) => x.venue);
 
+        pruneCache(_venueSuggestionCache, VENUE_SUGGESTION_CACHE_MAX);
         _venueSuggestionCache.set(cacheKey, {
             expiry: Date.now() + VENUE_SUGGESTION_CACHE_TTL_MS,
             data: finalList,
@@ -701,8 +758,41 @@ function rectCacheKey(rect: GeoRect): string {
 }
 
 function buildCandidateRectangles(own: Coordinates, partner: Coordinates): GeoRect[] {
+    const ownLng = normalizeLng(own.lng);
+    const partnerLng = normalizeLng(partner.lng);
     const ownPartnerDistanceKm = getDistance(own.lat, own.lng, partner.lat, partner.lng);
     const basePaddingKm = Math.max(1.1, Math.min(6.5, ownPartnerDistanceKm * 0.22));
+    const latMin = Math.min(clampLat(own.lat), clampLat(partner.lat));
+    const latMax = Math.max(clampLat(own.lat), clampLat(partner.lat));
+    const midLat = (latMin + latMax) / 2;
+    const latDelta = basePaddingKm / 111.32;
+    const lngDelta = basePaddingKm / (111.32 * Math.max(0.2, Math.cos((midLat * Math.PI) / 180)));
+
+    const directSpan = Math.abs(ownLng - partnerLng);
+    if (directSpan > 180) {
+        const eastSideBase = normalizeRect({
+            west: Math.max(ownLng, partnerLng) - lngDelta,
+            south: clampLat(latMin - latDelta),
+            east: 180,
+            north: clampLat(latMax + latDelta),
+        });
+        const westSideBase = normalizeRect({
+            west: -180,
+            south: clampLat(latMin - latDelta),
+            east: Math.min(ownLng, partnerLng) + lngDelta,
+            north: clampLat(latMax + latDelta),
+        });
+
+        return [
+            eastSideBase,
+            expandRect(eastSideBase, 1.45),
+            expandRect(eastSideBase, 1.95),
+            westSideBase,
+            expandRect(westSideBase, 1.45),
+            expandRect(westSideBase, 1.95),
+        ];
+    }
+
     const base = buildRectFromCoordinates(own, partner, basePaddingKm);
     return [
         base,
@@ -748,13 +838,14 @@ async function fetchRouteMetrics(from: Coordinates, to: Coordinates): Promise<Ro
             routes?: Array<{ duration?: number; distance?: number }>;
         };
         const route = data.routes?.[0];
-        if (!route?.duration || !route?.distance) return null;
+        if (route?.duration == null || route?.distance == null) return null;
 
         const metrics: RouteMetrics = {
             minutes: route.duration / 60,
             distanceKm: route.distance / 1000,
         };
 
+        pruneCache(_routeMetricsCache, ROUTE_METRICS_CACHE_MAX);
         _routeMetricsCache.set(key, {
             expiry: Date.now() + ROUTE_METRICS_CACHE_TTL_MS,
             data: metrics,
@@ -859,6 +950,7 @@ async function fetchGeoapifyCandidates(
             });
         }
 
+        pruneCache(_geoapifyCandidateCache, GEOAPIFY_CANDIDATE_CACHE_MAX);
         _geoapifyCandidateCache.set(cacheKey, {
             expiry: Date.now() + GEOAPIFY_CANDIDATE_CACHE_TTL_MS,
             data: mapped,
@@ -898,7 +990,7 @@ async function collectVenueCandidatesProgressive(
 
                 const dYouKm = getDistance(own.lat, own.lng, venue.coordinates.lat, venue.coordinates.lng);
                 const dPartnerKm = getDistance(partner.lat, partner.lng, venue.coordinates.lat, venue.coordinates.lng);
-                if (Math.min(dYouKm, dPartnerKm) > maxPerUserKm) continue;
+                if (Math.max(dYouKm, dPartnerKm) > maxPerUserKm) continue;
 
                 seen.add(key);
                 merged.push(venue);
