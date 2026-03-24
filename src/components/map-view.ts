@@ -123,26 +123,6 @@ function createDestinationImage(emoji: string, color: string): ImageData {
     return ctx.getImageData(0, 0, 80, 80);
 }
 
-function createFallbackPoiImage(color: string): ImageData {
-    const canvas = document.createElement('canvas');
-    canvas.width = 48;
-    canvas.height = 48;
-    const ctx = canvas.getContext('2d')!;
-
-    const surface = readToken('--color-sheet-bg-solid', '#fafcf8');
-    ctx.beginPath();
-    ctx.arc(24, 24, 18, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(24, 24, 8, 0, Math.PI * 2);
-    ctx.fillStyle = surface;
-    ctx.fill();
-
-    return ctx.getImageData(0, 0, 48, 48);
-}
-
 function makeMidpointEl(color: string): HTMLElement {
     const wrap = document.createElement('div');
     wrap.style.cssText = `
@@ -934,9 +914,10 @@ export class MapView extends LitElement {
 
                 .map-info-sheet {
                     position: absolute;
-                    left: var(--space-4);
-                    right: var(--space-4);
-                    bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
+                    top: calc(var(--map-status-bar-height) + var(--space-3));
+                    left: var(--space-3);
+                    right: auto;
+                    width: min(360px, calc(100vw - (2 * var(--space-3))));
                     z-index: var(--z-modal);
                     background: var(--color-sheet-bg);
                     border-radius: var(--border-radius-lg);
@@ -944,7 +925,9 @@ export class MapView extends LitElement {
                     border: 1px solid var(--glass-border);
                     backdrop-filter: blur(14px) saturate(135%);
                     -webkit-backdrop-filter: blur(14px) saturate(135%);
-                    padding: var(--space-3) var(--space-4);
+                    padding: var(--space-3);
+                    transform-origin: top left;
+                    animation: map-info-pop 180ms var(--ease-out) both;
                 }
 
                 .map-info-head {
@@ -1001,6 +984,35 @@ export class MapView extends LitElement {
                     font-size: var(--text-xs);
                     color: var(--color-text-muted);
                     margin-top: var(--space-1);
+                }
+
+                @media (max-width: 760px) {
+                    .map-info-sheet {
+                        top: calc(var(--map-status-bar-height) + var(--space-2));
+                        left: var(--space-2);
+                        right: var(--space-2);
+                        width: auto;
+                        border-radius: var(--border-radius-md);
+                    }
+                }
+
+                @media (min-width: 1024px) {
+                    .map-info-sheet {
+                        width: min(380px, calc(100vw - (2 * var(--space-4))));
+                        top: calc(var(--map-status-bar-height) + var(--space-4));
+                        left: var(--space-4);
+                    }
+                }
+
+                @keyframes map-info-pop {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-6px) scale(0.98);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
                 }
 
                 @keyframes pulse-ring-premium {
