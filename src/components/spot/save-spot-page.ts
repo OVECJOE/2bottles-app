@@ -30,7 +30,7 @@ export class SaveSpotPage extends LitElement {
     }
 
     .sheet-content {
-      width: min(780px, 100%);
+      width: 100%;
       margin: 0 auto;
       padding-bottom: var(--space-3);
     }

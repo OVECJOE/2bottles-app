@@ -3,11 +3,13 @@
  * allows saving the venue, and cleans up all session state.
  */
 import { LitElement, html, css } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, state } from 'lit/decorators.js';
 import { sessionStore, uiStore, locationStore } from '../../store/index.js';
 import { p2pService } from '../../services/p2p.service.js';
 import { Router } from '@vaadin/router';
 import type { Venue } from '../../types/index.js';
+import '../ui/screen-shell.js';
+import '../ui/bottom-sheet.js';
 
 @customElement('end-session')
 export class EndSession extends LitElement {
@@ -28,17 +30,9 @@ export class EndSession extends LitElement {
     }
     .arrived-text { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--color-green-text); }
 
-    .sheet {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      background: var(--color-sheet-bg);
-      border-radius: var(--border-radius-xl) var(--border-radius-xl) 0 0;
-      padding: var(--space-3) var(--space-5) env(safe-area-inset-bottom, var(--space-8));
-      z-index: var(--z-sheet);
-      animation: slide-up var(--duration-sheet) var(--ease-out) both;
+    .sheet-content {
+      padding: var(--space-1) var(--space-1) var(--space-3);
     }
-
-    .handle { width: 36px; height: 4px; background: rgba(0,0,0,0.12); border-radius: var(--border-radius-pill); margin: 0 auto var(--space-4); }
 
     .hero {
       text-align: center; padding: var(--space-3) 0 var(--space-5);
@@ -105,10 +99,23 @@ export class EndSession extends LitElement {
   private _snapshotPartnerArrived = false;
   private _snapshotAvgEta = 0;
   private _snapshotMessageCount = 0;
+  @state() private _sheetOpen = true;
+  private _unsubUI?: () => void;
 
   override connectedCallback() {
     super.connectedCallback();
+    uiStore.openSheet();
+    this._sheetOpen = uiStore.sheetOpen;
+    this._unsubUI = uiStore.subscribe(() => {
+      this._sheetOpen = uiStore.sheetOpen;
+      this.requestUpdate();
+    });
     this._captureSnapshot();
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    this._unsubUI?.();
   }
 
   private _captureSnapshot() {
@@ -181,14 +188,15 @@ export class EndSession extends LitElement {
     const outcomeMark = bothArrived ? '✓' : ownArrived || partnerArrived ? '◐' : '✕';
 
     return html`
+      <screen-shell screen='end-session'>
       ${bothArrived ? html`
         <div class="arrived-badge">
           <span class="arrived-text">✓ Both arrived at ${v?.name ?? 'destination'}!</span>
         </div>
       ` : ''}
 
-      <div class="sheet">
-        <div class="handle"></div>
+      <bottom-sheet ?open=${this._sheetOpen} @sheet-dismiss=${() => uiStore.closeSheet()}>
+      <div class="sheet-content">
 
         <div class="hero">
           <span class="hero-emoji">${bothArrived ? '🤝' : '🧭'}</span>
@@ -229,6 +237,8 @@ export class EndSession extends LitElement {
           Save this spot
         </button>
       </div>
+      </bottom-sheet>
+      </screen-shell>
     `;
   }
 }

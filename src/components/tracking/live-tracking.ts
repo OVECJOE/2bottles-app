@@ -13,6 +13,7 @@ import { locationStore, sessionStore, uiStore } from '../../store/index.js';
 import { haversineMeters } from '../../services/geocoding.service.js';
 import { p2pService } from '../../services/p2p.service.js';
 import '../ui/screen-shell.js';
+import '../ui/bottom-sheet.js';
 
 @customElement('live-tracking')
 export class LiveTracking extends LitElement {
@@ -30,16 +31,20 @@ export class LiveTracking extends LitElement {
   @state() private _unreadMessages = 0;
   @state() private _followUser = false;
   @state() private _routeMode: 'both' | 'mine' = 'both';
+  @state() private _sheetOpen = true;
   
   private _ticker?: any;
   private _unsubLocation?: () => void;
   private _unsubSession?: () => void;
+  private _unsubUI?: () => void;
   private _lastOwnSample: { lat: number; lng: number; t: number } | null = null;
   private _lastChatMessageCount = 0;
   @query('.chat-body') private _chatBodyEl?: HTMLElement;
 
   override connectedCallback() {
     super.connectedCallback();
+    uiStore.openSheet();
+    this._sheetOpen = uiStore.sheetOpen;
     this._lastChatMessageCount = sessionStore.chatMessages.length;
     this._unsubLocation = locationStore.subscribe(() => {
       this._onLocationUpdate();
@@ -52,6 +57,10 @@ export class LiveTracking extends LitElement {
       }
       this.requestUpdate();
       if (this._showChat) this._scrollChatToBottom();
+    });
+    this._unsubUI = uiStore.subscribe(() => {
+      this._sheetOpen = uiStore.sheetOpen;
+      this.requestUpdate();
     });
 
     locationStore.startWatching();
@@ -93,6 +102,7 @@ export class LiveTracking extends LitElement {
     super.disconnectedCallback();
     this._unsubLocation?.();
     this._unsubSession?.();
+    this._unsubUI?.();
     clearInterval(this._ticker);
     this._fireMapEvent('map-view:follow-user', { enabled: false });
     this._fireMapEvent('map-view:route-mode', { mode: 'both' });
@@ -299,7 +309,8 @@ export class LiveTracking extends LitElement {
 
     return html`
         <screen-shell screen='live-tracking'>
-        <div class="tracking-overlay sheet">
+      <bottom-sheet ?open=${this._sheetOpen} @sheet-dismiss=${() => uiStore.closeSheet()}>
+      <div class="tracking-overlay">
                 <div class="status-strip ${isWatching ? 'online' : 'offline'}">
                     <div class="status-indicator">
                         <span class="pulse-dot"></span>
@@ -405,6 +416,7 @@ export class LiveTracking extends LitElement {
                     </div>
                 </div>
                 </div>
+                </bottom-sheet>
                 </screen-shell>
         `;
   }

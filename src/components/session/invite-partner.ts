@@ -77,11 +77,13 @@ export class InvitePartner extends LitElement {
 
     .link-card {
         width: 100%;
-      background: var(--color-surface);
+      background: var(--color-sheet-bg);
         border-radius: var(--border-radius-lg);
         padding: var(--space-4);
-        border: 1px solid rgba(0,0,0,0.06);
-        box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+        border: 1px solid var(--glass-border);
+        box-shadow: var(--glass-shadow);
+        backdrop-filter: blur(14px) saturate(135%);
+        -webkit-backdrop-filter: blur(14px) saturate(135%);
         margin: var(--space-4) 0;
         display: flex;
         flex-direction: column;
@@ -100,14 +102,16 @@ export class InvitePartner extends LitElement {
     }
 
     .link-value-container {
-        background: var(--color-blue-light);
+      background: var(--color-surface);
         padding: var(--space-3) var(--space-4);
         border-radius: var(--border-radius-md);
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: var(--space-2);
-        border: 1px solid rgba(0,0,0,0.04);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(10px) saturate(130%);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
     }
 
     .link-value {

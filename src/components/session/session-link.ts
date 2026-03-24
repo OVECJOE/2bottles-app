@@ -31,15 +31,18 @@ export class SessionLink extends LitElement {
 
 
     .link-card {
-      background: rgba(77,114,152,0.07);
-      border: 1.5px dashed rgba(77,114,152,0.4);
+      background: var(--color-sheet-bg);
+      border: 1px solid var(--glass-border);
       border-radius: var(--border-radius-md);
       padding: var(--space-3) var(--space-4);
       margin-bottom: var(--space-3);
       cursor: pointer;
       transition: background var(--duration-fast);
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: blur(14px) saturate(135%);
+      -webkit-backdrop-filter: blur(14px) saturate(135%);
     }
-    .link-card:hover { background: rgba(77,114,152,0.12); }
+    .link-card:hover { background: var(--color-surface); }
 
     .link-label { font-size: 10px; font-weight: var(--weight-bold); letter-spacing: 0.8px; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: var(--space-1); }
     .link-value { font-family: var(--font-mono); font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--color-blue); }
