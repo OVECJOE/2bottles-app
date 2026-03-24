@@ -53,7 +53,7 @@ function createPinImage(color: string, initials?: string): ImageData {
     ctx.shadowBlur = 8;
     ctx.shadowOffsetY = 4;
 
-    const surface = readToken('--color-surface', '#ffffff');
+    const surface = readToken('--color-sheet-bg-solid', '#fafcf8');
     ctx.beginPath();
     ctx.arc(32, 28, 22, 0, Math.PI * 2);
     ctx.fillStyle = surface;
@@ -105,7 +105,7 @@ function createDestinationImage(emoji: string, color: string): ImageData {
     ctx.fillStyle = color;
     ctx.fill();
 
-    const surface = readToken('--color-surface', '#ffffff');
+    const surface = readToken('--color-sheet-bg-solid', '#fafcf8');
     ctx.strokeStyle = surface;
     ctx.lineWidth = 4;
     ctx.stroke();
@@ -129,7 +129,7 @@ function createFallbackPoiImage(color: string): ImageData {
     canvas.height = 48;
     const ctx = canvas.getContext('2d')!;
 
-    const surface = readToken('--color-surface', '#ffffff');
+    const surface = readToken('--color-sheet-bg-solid', '#fafcf8');
     ctx.beginPath();
     ctx.arc(24, 24, 18, 0, Math.PI * 2);
     ctx.fillStyle = color;
@@ -258,15 +258,6 @@ export class MapView extends LitElement {
         this._map.on('error', (e) => {
             if (e.error?.message?.includes('Image') || e.error?.message?.includes('sprite')) return;
             console.warn('[MapView] Map error:', e.error);
-        });
-
-        this._map.on('styleimagemissing', (e: any) => {
-            const missingId = e?.id;
-            if (!missingId || this._map?.hasImage(missingId)) return;
-            try {
-                this._map?.addImage(missingId, createFallbackPoiImage(readToken('--map-poi-fallback', '#4D7298')));
-            } catch {
-            }
         });
     }
 
