@@ -4,10 +4,15 @@ export const liveTrackingStyles = css`
     :host { display: block; height: 100%; position: relative; }
 
     .tracking-overlay {
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        z-index: var(--z-sheet);
         display: flex; flex-direction: column;
         gap: var(--space-4);
-        padding: var(--space-1) var(--space-1) var(--space-3);
+        padding: var(--space-4);
     }
+
+    .tracking-overlay * { pointer-events: auto; }
 
     .status-strip {
         background: var(--color-sheet-bg);

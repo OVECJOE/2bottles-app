@@ -65,6 +65,17 @@ app-shell {
 }
 
 /* ----------------------------------------------------------
+   Borderless Theme Override
+   Force-disable visual borders app-wide.
+---------------------------------------------------------- */
+#app,
+#app *,
+#app *::before,
+#app *::after {
+    border-color: transparent !important;
+}
+
+/* ----------------------------------------------------------
    Map View — the element itself IS the Mapbox container.
    Must have explicit dimensions or Mapbox renders at 0x0.
 ---------------------------------------------------------- */

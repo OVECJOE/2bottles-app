@@ -54,7 +54,7 @@
       --glass-bg-soft: linear-gradient(135deg, rgba(255,255,255,0.44), rgba(255,255,255,0.24));
       --glass-bg: linear-gradient(135deg, rgba(255,255,255,0.62), rgba(255,255,255,0.34));
       --glass-bg-strong: linear-gradient(140deg, rgba(255,255,255,0.76), rgba(255,255,255,0.44));
-      --glass-border: rgba(255, 255, 255, 0.58);
+      --glass-border: transparent;
       --glass-shadow: 0 10px 30px rgba(10, 14, 20, 0.16);
 
       --color-surface: var(--glass-bg);
@@ -67,8 +67,8 @@
       --color-text-muted: var(--neutral-400);
       --color-text-inverse: var(--neutral-0);
 
-      --color-border: rgba(0, 0, 0, 0.10);
-      --color-border-strong: rgba(0, 0, 0, 0.18);
+      --color-border: transparent;
+      --color-border-strong: transparent;
 
       --color-info: var(--blue-100);
       --color-info-text: var(--blue-700);
@@ -199,9 +199,9 @@
     --border-radius-xl: 22px;
     --border-radius-pill: 999px;
 
-    --border-width: 0.5px;
-    --border-color: rgba(0, 0, 0, 0.10);
-    --border-color-dark: rgba(255, 255, 255, 0.12);
+    --border-width: 0px;
+    --border-color: transparent;
+    --border-color-dark: transparent;
 
     /* ----------------------------------------------------------
      Spacing scale (4px base)
@@ -302,7 +302,7 @@
   --glass-bg-soft: linear-gradient(135deg, rgba(28,32,38,0.62), rgba(22,26,33,0.36));
   --glass-bg: linear-gradient(135deg, rgba(36,42,50,0.74), rgba(24,28,36,0.48));
   --glass-bg-strong: linear-gradient(140deg, rgba(40,46,56,0.84), rgba(26,31,40,0.58));
-  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-border: transparent;
   --glass-shadow: 0 14px 40px rgba(0, 0, 0, 0.44);
 
   --color-surface: var(--glass-bg);
@@ -311,8 +311,8 @@
    --color-text: #fafafa;
    --color-text-secondary: #d1d5db;
    --color-text-muted: #9ca3af;
-   --color-border: rgba(255, 255, 255, 0.14);
-   --color-border-strong: rgba(255, 255, 255, 0.22);
+  --color-border: transparent;
+  --color-border-strong: transparent;
 
   --color-sheet-bg: var(--glass-bg-strong);
   --color-sheet-bg-solid: rgba(31, 36, 43, 0.82);
