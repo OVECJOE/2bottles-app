@@ -67,6 +67,14 @@ export class ScreenShell extends LitElement {
     .time {
       font-size: var(--text-xs); font-weight: var(--weight-bold);
       letter-spacing: 0.2px;
+      color: rgba(20, 27, 36, 0.92);
+      background: linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0.52));
+      border: 1px solid rgba(255,255,255,0.52);
+      border-radius: var(--border-radius-pill);
+      padding: 4px 10px;
+      box-shadow: 0 4px 16px rgba(5, 9, 14, 0.16);
+      backdrop-filter: blur(10px) saturate(135%);
+      -webkit-backdrop-filter: blur(10px) saturate(135%);
     }
 
     .menu-btn {
@@ -86,8 +94,6 @@ export class ScreenShell extends LitElement {
     }
     .menu-btn:hover  { background: rgba(255,255,255,0.96); }
     .menu-btn:active { transform: scale(0.94); }
-
-    .time { color: rgba(30,30,30,0.72); }
 
     .sheet-toggle-btn {
       pointer-events: all;
