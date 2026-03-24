@@ -38,13 +38,14 @@ export class ScreenShell extends LitElement {
     @media (min-width: 1024px) {
       ::slotted(.sheet) {
         position: absolute !important;
-        top: calc(var(--map-status-bar-height) + var(--space-3)) !important;
+        top: auto !important;
         right: var(--space-3) !important;
         bottom: var(--space-3) !important;
         left: auto !important;
         width: min(var(--desktop-sheet-width), calc(100vw - var(--space-6))) !important;
         max-width: min(var(--desktop-sheet-width), calc(100vw - var(--space-6))) !important;
-        max-height: none !important;
+        max-height: calc(100dvh - var(--map-status-bar-height) - (2 * var(--space-3))) !important;
+        height: auto !important;
         border-radius: var(--border-radius-xl) !important;
         animation: none !important;
         overflow-y: auto;

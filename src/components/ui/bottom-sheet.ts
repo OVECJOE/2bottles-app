@@ -56,18 +56,20 @@ export class BottomSheet extends LitElement {
 
     @media (min-width: 1024px) {
       :host {
-        top: calc(var(--map-status-bar-height) + var(--space-3));
+        top: auto;
         right: var(--space-3);
         bottom: var(--space-3);
         left: auto;
         width: min(var(--desktop-sheet-width, clamp(360px, 40vw, 520px)), calc(100vw - var(--space-6)));
+        max-height: calc(100dvh - var(--map-status-bar-height) - (2 * var(--space-3)));
       }
 
       .sheet {
-        height: 100%;
+        max-height: inherit;
         border-radius: var(--border-radius-xl);
         transform: translateX(110%);
         padding-bottom: var(--space-4);
+        overflow-y: auto;
       }
 
       :host([open]) .sheet {
