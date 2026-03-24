@@ -12,6 +12,7 @@
  *   screen    — current AppScreen, passed to <app-menu>
  */
 import { LitElement, html, css } from 'lit';
+import type { TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import './app-menu.js';
 import { uiStore } from '../../store/index.js';
@@ -124,6 +125,17 @@ export class ScreenShell extends LitElement {
     .sheet-toggle-btn:hover { background: var(--color-sheet-bg); }
     .sheet-toggle-btn:active { transform: scale(0.94); }
 
+    .icon {
+      width: 16px;
+      height: 16px;
+      display: block;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
     .status-actions {
       display: flex;
       align-items: center;
@@ -145,9 +157,18 @@ export class ScreenShell extends LitElement {
       font-size: 18px;
       font-weight: var(--weight-bold);
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       box-shadow: var(--shadow-lg);
       transition: transform var(--duration-fast), opacity var(--duration-fast);
       -webkit-tap-highlight-color: transparent;
+    }
+
+    .sheet-fab .icon {
+      width: 20px;
+      height: 20px;
+      stroke-width: 2.25;
     }
 
     .sheet-fab:active { transform: scale(0.94); }
@@ -213,11 +234,28 @@ export class ScreenShell extends LitElement {
     uiStore.toggleSheet();
   }
 
+  private _renderChevronIcon(direction: 'left' | 'right' | 'up' | 'down'): TemplateResult {
+    const path = direction === 'left'
+      ? 'M15 6 9 12 15 18'
+      : direction === 'right'
+        ? 'M9 6 15 12 9 18'
+        : direction === 'up'
+          ? 'M6 15 12 9 18 15'
+          : 'M6 9 12 15 18 9';
+
+    return html`
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d=${path}></path>
+      </svg>
+    `;
+  }
+
   override render() {
     const toggleLabel = this.sheetCollapsed ? 'Show panel' : 'Hide panel';
-    const toggleGlyph = this._isDesktop
-      ? (this.sheetCollapsed ? '←' : '→')
-      : (this.sheetCollapsed ? '↑' : '↓');
+    const toggleDirection: 'left' | 'right' | 'up' | 'down' = this._isDesktop
+      ? (this.sheetCollapsed ? 'left' : 'right')
+      : (this.sheetCollapsed ? 'up' : 'down');
+    const fabDirection: 'left' | 'up' = this._isDesktop ? 'left' : 'up';
 
     return html`
       <div class="status-bar">
@@ -228,7 +266,7 @@ export class ScreenShell extends LitElement {
             @click=${this._toggleSheet}
             aria-label=${toggleLabel}
             title=${toggleLabel}
-          >${toggleGlyph}</button>
+          >${this._renderChevronIcon(toggleDirection)}</button>
           <button
             class="menu-btn"
             @click=${this._toggleMenu}
@@ -251,7 +289,7 @@ export class ScreenShell extends LitElement {
           @click=${this._toggleSheet}
           aria-label=${toggleLabel}
           title=${toggleLabel}
-        >${this._isDesktop ? '←' : '⌃'}</button>
+        >${this._renderChevronIcon(fabDirection)}</button>
       ` : ''}
 
       <slot></slot>
