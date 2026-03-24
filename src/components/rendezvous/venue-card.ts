@@ -50,7 +50,10 @@ export class VenueCard extends LitElement {
     .icon {
       width: 44px; height: 44px;
       border-radius: var(--border-radius-sm);
-      background: rgba(255,255,255,0.8);
+      background: var(--color-surface);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(8px) saturate(125%);
+      -webkit-backdrop-filter: blur(8px) saturate(125%);
       display: flex; align-items: center; justify-content: center;
       font-size: 22px; flex-shrink: 0;
       transition: background var(--duration-fast);

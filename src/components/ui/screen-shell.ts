@@ -68,8 +68,8 @@ export class ScreenShell extends LitElement {
       font-size: var(--text-xs); font-weight: var(--weight-bold);
       letter-spacing: 0.2px;
       color: rgba(20, 27, 36, 0.92);
-      background: linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0.52));
-      border: 1px solid rgba(255,255,255,0.52);
+      background: var(--color-surface);
+      border: 1px solid var(--glass-border);
       border-radius: var(--border-radius-pill);
       padding: 4px 10px;
       box-shadow: 0 4px 16px rgba(5, 9, 14, 0.16);
@@ -79,8 +79,11 @@ export class ScreenShell extends LitElement {
 
     .menu-btn {
       pointer-events: all;
-      background: rgba(255,255,255,0.85);
-      border: none; border-radius: var(--border-radius-pill);
+      background: var(--color-surface);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(10px) saturate(130%);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
+      border-radius: var(--border-radius-pill);
       padding: 4px 10px;
       font-size: var(--text-xs); font-weight: var(--weight-bold);
       letter-spacing: 2px;
@@ -92,7 +95,7 @@ export class ScreenShell extends LitElement {
       -webkit-tap-highlight-color: transparent;
       line-height: 1;
     }
-    .menu-btn:hover  { background: rgba(255,255,255,0.96); }
+    .menu-btn:hover  { background: var(--color-sheet-bg); }
     .menu-btn:active { transform: scale(0.94); }
 
     .sheet-toggle-btn {
@@ -100,8 +103,10 @@ export class ScreenShell extends LitElement {
       width: 28px;
       height: 28px;
       border-radius: 50%;
-      border: none;
-      background: rgba(255,255,255,0.88);
+      border: 1px solid var(--glass-border);
+      background: var(--color-surface);
+      backdrop-filter: blur(10px) saturate(130%);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
       color: var(--color-text-primary);
       font-size: 13px;
       cursor: pointer;
@@ -115,7 +120,7 @@ export class ScreenShell extends LitElement {
       padding: 0;
     }
 
-    .sheet-toggle-btn:hover { background: rgba(255,255,255,0.98); }
+    .sheet-toggle-btn:hover { background: var(--color-sheet-bg); }
     .sheet-toggle-btn:active { transform: scale(0.94); }
 
     .status-actions {

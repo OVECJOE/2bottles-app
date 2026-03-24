@@ -54,7 +54,10 @@ export class MapPin extends LitElement {
 
     .label {
       margin-top: 5px;
-      background: rgba(255,255,255,0.96);
+      background: var(--color-surface);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(8px) saturate(125%);
+      -webkit-backdrop-filter: blur(8px) saturate(125%);
       color: var(--color-text-primary);
       font-family: var(--font-sans);
       font-size: 10px; font-weight: var(--weight-bold);

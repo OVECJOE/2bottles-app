@@ -34,7 +34,10 @@ export class SelectRendezvous extends LitElement {
       z-index: var(--z-topbar);
     }
     .pill-inner {
-      background: rgba(255,255,255,0.96); border-radius: var(--border-radius-md);
+      background: var(--color-surface); border-radius: var(--border-radius-md);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(10px) saturate(130%);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
       padding: var(--space-2) var(--space-3);
       display: flex; align-items: center; gap: var(--space-2);
       box-shadow: var(--shadow-md); font-size: var(--text-sm);
@@ -98,7 +101,9 @@ export class SelectRendezvous extends LitElement {
       color: var(--color-text-muted);
       border: 1px dashed var(--color-border-strong);
       border-radius: var(--border-radius-md);
-      background: rgba(255,255,255,0.6);
+      background: var(--color-surface);
+      backdrop-filter: blur(8px) saturate(125%);
+      -webkit-backdrop-filter: blur(8px) saturate(125%);
     }
 
     .empty-emoji {

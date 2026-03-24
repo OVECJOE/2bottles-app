@@ -923,11 +923,13 @@ export class MapView extends LitElement {
                 }
                 .gps-status {
                     display: flex; align-items: center; gap: var(--space-2);
-                    background: rgba(255,255,255,0.9); padding: 4px 12px;
+                    background: var(--color-surface); padding: 4px 12px;
                     border-radius: var(--border-radius-pill); font-size: 11px;
                     font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
                     color: var(--color-text-primary);
-                    border: 1px solid rgba(0,0,0,0.05);
+                    border: 1px solid var(--glass-border);
+                    backdrop-filter: blur(10px) saturate(130%);
+                    -webkit-backdrop-filter: blur(10px) saturate(130%);
                 }
                 .gps-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-disabled-bg); }
                 .gps-status.good .gps-dot { background: var(--color-online); }
@@ -945,10 +947,12 @@ export class MapView extends LitElement {
                     right: var(--space-4);
                     bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
                     z-index: var(--z-modal);
-                    background: rgba(255,255,255,0.97);
+                    background: var(--color-sheet-bg);
                     border-radius: var(--border-radius-lg);
-                    box-shadow: var(--shadow-lg);
-                    border: 1px solid rgba(0,0,0,0.08);
+                    box-shadow: var(--shadow-lg), var(--glass-shadow);
+                    border: 1px solid var(--glass-border);
+                    backdrop-filter: blur(14px) saturate(135%);
+                    -webkit-backdrop-filter: blur(14px) saturate(135%);
                     padding: var(--space-3) var(--space-4);
                 }
 
