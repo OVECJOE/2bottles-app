@@ -1281,7 +1281,7 @@ export class LandingPage extends LitElement {
           </div>
           2bottles
         </div>
-        <span>© 2025 2bottles. Built for Nigerian cities.</span>
+        <span>© 2026 2bottles. Built for Nigerian cities.</span>
         <div class="footer-links">
           <a href="#">Privacy</a>
           <a href="#">Terms</a>
