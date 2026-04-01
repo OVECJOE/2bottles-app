@@ -4,6 +4,7 @@ import { initDemoAnalytics } from './services/demo-analytics.service.js';
 const SW_REFRESH_KEY = '2b:sw-refresh-at';
 type BootMode = 'landing' | 'app';
 type LandingAction = 'start' | 'install' | 'skip';
+type LandingActionEventDetail = { action: LandingAction; byUserClick?: boolean };
 
 interface BeforeInstallPromptEvent extends Event {
     prompt(): Promise<void>;
@@ -68,8 +69,9 @@ async function requestInstallFromLanding() {
 }
 
 document.addEventListener('landing-action', async (event) => {
-    const detail = (event as CustomEvent<{ action: LandingAction }>).detail;
+    const detail = (event as CustomEvent<LandingActionEventDetail>).detail;
     if (!detail) return;
+    if (!detail.byUserClick) return;
 
     if (detail.action === 'install') {
         await requestInstallFromLanding();

@@ -18,6 +18,7 @@ import './ui/custom-dialog.js';
 import './ui/location-permission-toast.js';
 
 type LocationPermissionState = 'prompt' | 'granted' | 'denied' | 'unknown';
+type LandingActionDetail = { action: 'start' | 'install'; byUserClick?: boolean };
 
 interface BeforeInstallPromptEvent extends Event {
     prompt(): Promise<void>;
@@ -279,7 +280,9 @@ export class AppShell extends LitElement {
         this._locationTakeoverOpen = shouldPrompt;
     }
 
-    private _handleLandingAction = async (event: CustomEvent<{ action: 'start' | 'install' }>) => {
+    private _handleLandingAction = async (event: CustomEvent<LandingActionDetail>) => {
+        if (!event.detail.byUserClick) return;
+
         if (event.detail.action === 'install') {
             await this._requestInstall();
             return;

@@ -145,10 +145,10 @@ export class LandingPage extends LitElement {
         inset: 0;
         z-index: 0;
         background-image:
-          linear-gradient(rgba(12, 26, 39, 0.05) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(12, 26, 39, 0.05) 1px, transparent 1px);
+          linear-gradient(rgba(12, 26, 39, 0.05) 1px, #ffffff 1px),
+          linear-gradient(90deg, rgba(12, 26, 39, 0.05) 1px, #ffffff 1px);
         background-size: 40px 40px;
-        mask-image: radial-gradient(ellipse at 50% 40%, black 20%, transparent 76%);
+        mask-image: radial-gradient(ellipse at 50% 40%, black 20%, #ffffff 76%);
       }
 
       .hero-left {
@@ -657,9 +657,12 @@ export class LandingPage extends LitElement {
 
   @property({ type: Boolean }) canInstall = false;
 
-  private _emit(action: LandingCta) {
+  private _emit(action: LandingCta, sourceEvent?: Event) {
     this.dispatchEvent(new CustomEvent('landing-action', {
-      detail: { action },
+      detail: {
+        action,
+        byUserClick: Boolean(sourceEvent?.isTrusted),
+      },
       bubbles: true,
       composed: true,
     }));
@@ -996,7 +999,7 @@ export class LandingPage extends LitElement {
           <a href="#fairness">Fairness</a>
           <a href="#stories">Stories</a>
         </div>
-        <button class="nav-cta" @click=${() => this._emit('start')}>Start a rendezvous</button>
+        <button class="nav-cta" @click=${(event: Event) => this._emit('start', event)}>Start a rendezvous</button>
       </nav>
 
       <!-- HERO -->
@@ -1018,7 +1021,7 @@ export class LandingPage extends LitElement {
             factoring real routes and real time, not just the nearest dot on a map.
           </p>
           <div class="hero-actions">
-            <button class="btn-primary" @click=${() => this._emit('start')}>
+            <button class="btn-primary" @click=${(event: Event) => this._emit('start', event)}>
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                 <path d="M5.5 4.5L10.5 7.5L5.5 10.5V4.5Z" fill="white"/>
               </svg>
@@ -1257,11 +1260,11 @@ export class LandingPage extends LitElement {
             just share the link with whoever you're meeting.
           </p>
           <div class="cta-actions">
-            <button class="btn-primary" style="font-size:15px;padding:15px 26px" @click=${() => this._emit('start')}>
+            <button class="btn-primary" style="font-size:15px;padding:15px 26px" @click=${(event: Event) => this._emit('start', event)}>
               Start your first rendezvous
             </button>
             ${this.canInstall ? html`
-              <button class="btn-ghost" style="font-size:15px;padding:15px 26px" @click=${() => this._emit('install')}>
+              <button class="btn-ghost" style="font-size:15px;padding:15px 26px" @click=${(event: Event) => this._emit('install', event)}>
                 Install the app
               </button>
             ` : ''}
