@@ -579,7 +579,7 @@ export class LandingPage extends LitElement {
 
       .cta-fine {
         font-size: 12px;
-        color: var(--ink-faint);
+        color: var(--ink-muted);
       }
 
       /* ── FOOTER ── */
