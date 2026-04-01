@@ -2,7 +2,6 @@ import './styles/global.css';
 import { initDemoAnalytics } from './services/demo-analytics.service.js';
 
 const SW_REFRESH_KEY = '2b:sw-refresh-at';
-const ONBOARDING_COMPLETED_KEY = '2b:onboarding-completed';
 type BootMode = 'landing' | 'app';
 type LandingAction = 'start' | 'install' | 'skip';
 
@@ -78,13 +77,11 @@ document.addEventListener('landing-action', async (event) => {
     }
 
     if (detail.action === 'skip') {
-        localStorage.setItem(ONBOARDING_COMPLETED_KEY, '1');
         window.history.pushState({}, '', '/create-session');
         await mountAppShell();
         return;
     }
 
-    localStorage.setItem(ONBOARDING_COMPLETED_KEY, '1');
     window.history.pushState({}, '', '/create-session');
     await mountAppShell();
 });

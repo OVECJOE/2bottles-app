@@ -1,6 +1,6 @@
 # 2bottles Contributor Guide
 
-A deep technical onboarding guide for developers who want to contribute confidently to the 2bottles frontend.
+A deep technical guide for developers who want to contribute confidently to the 2bottles frontend.
 
 2bottles is a mobile-first Lit + TypeScript web app for coordinating in-person meetups between two people. The product centers on fairness (meeting midpoint-like zones), live location sharing, and low-friction session flows.
 
@@ -66,7 +66,7 @@ At startup:
 
 1. Global styles load and demo analytics are initialized.
 2. Boot mode is determined:
-   - Landing mode for `/` and `/index.html` when onboarding is not complete.
+   - Landing mode for `/` and `/index.html`.
    - App mode for main routed experience.
 3. Landing actions are listened for globally:
    - start
@@ -77,7 +77,6 @@ At startup:
 
 Important localStorage keys used here:
 
-- `2b:onboarding-completed`
 - `2b:sw-refresh-at`
 
 ## Routing model and screen architecture
@@ -115,7 +114,7 @@ Unknown routes redirect to `/create-session`.
 
 - `app-shell.ts`: root shell and route orchestration.
 - `map-view.ts`: full-screen map, markers, route drawing, map events.
-- `marketing/landing-page.ts`: onboarding/marketing and install/start actions.
+- `marketing/landing-page.ts`: marketing and install/start actions.
 - `session/*`: create/invite/link screens.
 - `partner/*`: join/agree/refuse/rejected flows.
 - `rendezvous/*`: fairness suggestions and venue selection.

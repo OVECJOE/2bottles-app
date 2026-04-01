@@ -1,10 +1,10 @@
 /**
- * <landing-page> — mandatory demo onboarding experience.
+ * <landing-page> — marketing entry experience.
  *
  * Responsibilities:
- *   run a guided, interactive simulation of the 2bottles flow
- *   teach key actions with step prompts and quiz checkpoints
- *   hand off users into real app mode once demo is completed
+ *   present product value and flow highlights
+ *   expose explicit start/install actions
+ *   hand off users into the routed app when a CTA is clicked
  */
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
