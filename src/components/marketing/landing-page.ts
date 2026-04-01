@@ -554,7 +554,7 @@ export class LandingPage extends LitElement {
         position: absolute;
         inset: 0;
         z-index: 0;
-        background: radial-gradient(900px 500px at 50% 100%, rgba(47, 111, 166, 0.07), transparent 70%);
+        background: radial-gradient(900px 500px at 50% 100%, rgba(47, 111, 166, 0.07), #ffffff 70%);
       }
 
       .cta-section .section-inner { position: relative; z-index: 1; }
