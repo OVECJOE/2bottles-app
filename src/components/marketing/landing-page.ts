@@ -77,12 +77,18 @@ export class LandingPage extends LitElement {
       .logo-mark {
         width: 30px;
         height: 30px;
-        border-radius: 9px;
-        background: linear-gradient(135deg, var(--blue), var(--green));
+        border-radius: 8px;
+        overflow: hidden;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+      }
+
+      .logo-mark img {
+        display: block;
+        width: 100%;
+        height: 100%;
       }
 
       .nav-links {
@@ -590,7 +596,8 @@ export class LandingPage extends LitElement {
         align-items: center;
         justify-content: space-between;
         font-size: 12px;
-        color: var(--ink-faint);
+        color: rgba(255, 255, 255, 0.72);
+        background: var(--ink);
       }
 
       .footer-logo {
@@ -599,7 +606,7 @@ export class LandingPage extends LitElement {
         gap: 8px;
         font-size: 13px;
         font-weight: 700;
-        color: var(--ink);
+        color: var(--white);
       }
 
       .footer-links {
@@ -608,12 +615,12 @@ export class LandingPage extends LitElement {
       }
 
       .footer-links a {
-        color: var(--ink-faint);
+        color: rgba(255, 255, 255, 0.72);
         text-decoration: none;
         transition: color 0.2s;
       }
 
-      .footer-links a:hover { color: var(--ink); }
+      .footer-links a:hover { color: var(--white); }
 
       /* ── ANIMATIONS ── */
       @keyframes pulse {
@@ -987,10 +994,7 @@ export class LandingPage extends LitElement {
       <nav class="nav">
         <a class="nav-logo" href="#">
           <div class="logo-mark">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="5.5" cy="8" r="4" fill="white" opacity=".92"/>
-              <circle cx="10.5" cy="8" r="4" fill="white" opacity=".6"/>
-            </svg>
+            <img src="/favicon.svg" alt="" aria-hidden="true" />
           </div>
           2bottles
         </a>
@@ -1277,10 +1281,7 @@ export class LandingPage extends LitElement {
       <footer class="footer">
         <div class="footer-logo">
           <div class="logo-mark">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="5" cy="7" r="3.5" fill="white" opacity=".92"/>
-              <circle cx="9" cy="7" r="3.5" fill="white" opacity=".58"/>
-            </svg>
+            <img src="/favicon.svg" alt="" aria-hidden="true" />
           </div>
           2bottles
         </div>
