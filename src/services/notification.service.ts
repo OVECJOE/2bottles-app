@@ -17,7 +17,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 export const notificationService = {
 
     async requestPermission(): Promise<NotificationPermission> {
-        if (!('Notification' in window)) return 'denied';
+        if (typeof Notification === 'undefined') return 'denied';
         if (Notification.permission === 'granted') return 'granted';
         return Notification.requestPermission();
     },

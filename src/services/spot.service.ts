@@ -20,96 +20,154 @@ export type SpotUploadResult = {
   description?: string;
 };
 
-type SpotCreateResponse = { spotId: string };
-type SpotRatingResponse = { ok: boolean };
+export type SpotCreateResponse = {
+  spotId: string;
+};
+
+export type SpotRatingResponse = {
+  ok: boolean;
+  averageRating?: number;
+  ratingsCount?: number;
+};
+
+export type SpotSuggestion = {
+  id: string;
+  name: string;
+  address: string;
+  category: string;
+  coordinates: Coordinates;
+  score: number;
+  averageRating?: number;
+  ratingsCount?: number;
+  reasons?: string[];
+};
+
+export type SpotSuggestionQuery = {
+  lat: number;
+  lng: number;
+  partnerLat?: number;
+  partnerLng?: number;
+  radiusMeters?: number;
+  limit?: number;
+  categories?: string[];
+  tags?: string[];
+  minRating?: number;
+  includeUserSaved?: boolean;
+};
+
 type SpotUploadResponse = SpotUploadResult;
 
-const SPOT_API_BASE = (import.meta.env.VITE_SPOT_API_BASE as string | undefined)?.trim() || '';
-const MOCK_SPOTS_KEY = '2b:mock-spots';
+const SPOT_API_BASE = (import.meta.env.VITE_SPOT_API_BASE as string | undefined)?.trim() || '/api';
+
+type CreateSpotApiResponse = {
+  spotId?: string;
+  id?: string;
+  spot?: { id?: string };
+};
+
+type UploadSpotApiResponse = {
+  url?: string;
+  completedAt?: string;
+  type?: 'image' | 'video';
+  description?: string;
+};
+
+type RatingSpotApiResponse = {
+  ok?: boolean;
+  averageRating?: number;
+  ratingsCount?: number;
+};
+
+type SpotSuggestionApiItem = {
+  id?: string;
+  name?: string;
+  address?: string;
+  category?: string;
+  score?: number;
+  averageRating?: number;
+  ratingsCount?: number;
+  reasons?: string[];
+  coordinates?: {
+    lat?: number;
+    lng?: number;
+  };
+};
+
+type SpotSuggestionApiResponse = {
+  spots?: SpotSuggestionApiItem[];
+  data?: SpotSuggestionApiItem[];
+};
 
 function getApiUrl(path: string): string {
-  if (!SPOT_API_BASE) return '';
   return `${SPOT_API_BASE.replace(/\/$/, '')}${path}`;
 }
 
-function readMockSpots(): any[] {
+async function parseJsonOrEmpty<T>(res: Response): Promise<T | null> {
   try {
-    return JSON.parse(localStorage.getItem(MOCK_SPOTS_KEY) || '[]');
+    return (await res.json()) as T;
   } catch {
-    return [];
+    return null;
   }
 }
 
-function writeMockSpots(spots: any[]) {
-  localStorage.setItem(MOCK_SPOTS_KEY, JSON.stringify(spots));
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  const body = await parseJsonOrEmpty<{ message?: string; error?: string }>(res);
+  return body?.message || body?.error || fallback;
 }
 
-async function mockCreateSpot(input: SpotCreateInput): Promise<SpotCreateResponse> {
-  const spotId = `spot_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const spots = readMockSpots();
-  spots.push({
-    id: spotId,
-    venueName: input.venueName,
-    venueAddress: input.venueAddress || '',
-    category: input.category || '',
-    coordinates: input.coordinates || null,
-    reason: input.reason || '',
-    rating: null,
-    comment: '',
-    uploads: [],
-    createdAt: Date.now(),
-  });
-  writeMockSpots(spots);
-  return { spotId };
-}
-
-async function mockSubmitRating(spotId: string, input: SpotRatingInput): Promise<SpotRatingResponse> {
-  const spots = readMockSpots();
-  const idx = spots.findIndex((s) => s.id === spotId);
-  if (idx >= 0) {
-    spots[idx].rating = input.rating;
-    spots[idx].comment = input.comment || '';
-    spots[idx].ratedAt = Date.now();
-    writeMockSpots(spots);
+function ensureSpotId(data: CreateSpotApiResponse | null): string {
+  const candidate = data?.spotId || data?.id || data?.spot?.id || '';
+  if (!candidate) {
+    throw new Error('Spot created but backend response has no spot id.');
   }
-  return { ok: true };
+  return candidate;
 }
 
-async function mockUpload(
-  spotId: string,
-  file: File,
-  description?: string,
-  onProgress?: (progress: number) => void,
-): Promise<SpotUploadResponse> {
-  if (onProgress) {
-    for (let p = 10; p <= 95; p += 15) {
-      onProgress(p);
-      await new Promise((resolve) => setTimeout(resolve, 60));
-    }
-  }
+function mapSuggestion(item: SpotSuggestionApiItem): SpotSuggestion | null {
+  const lat = item.coordinates?.lat;
+  const lng = item.coordinates?.lng;
 
-  const result: SpotUploadResult = {
-    url: URL.createObjectURL(file),
-    completedAt: new Date().toISOString(),
-    type: file.type.startsWith('video/') ? 'video' : 'image',
-    description: description?.trim() || undefined,
+  if (!item.id || !item.name || !item.address || !item.category) return null;
+  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+
+  return {
+    id: item.id,
+    name: item.name,
+    address: item.address,
+    category: item.category,
+    coordinates: { lat, lng },
+    score: typeof item.score === 'number' ? item.score : 0,
+    averageRating: item.averageRating,
+    ratingsCount: item.ratingsCount,
+    reasons: Array.isArray(item.reasons) ? item.reasons : undefined,
   };
+}
 
-  const spots = readMockSpots();
-  const idx = spots.findIndex((s) => s.id === spotId);
-  if (idx >= 0) {
-    spots[idx].uploads = spots[idx].uploads || [];
-    spots[idx].uploads.push(result);
-    writeMockSpots(spots);
+function buildSuggestionParams(query: SpotSuggestionQuery): URLSearchParams {
+  const params = new URLSearchParams({
+    lat: String(query.lat),
+    lng: String(query.lng),
+  });
+
+  if (typeof query.partnerLat === 'number') params.set('partnerLat', String(query.partnerLat));
+  if (typeof query.partnerLng === 'number') params.set('partnerLng', String(query.partnerLng));
+  if (typeof query.radiusMeters === 'number') params.set('radiusMeters', String(query.radiusMeters));
+  if (typeof query.limit === 'number') params.set('limit', String(query.limit));
+  if (typeof query.minRating === 'number') params.set('minRating', String(query.minRating));
+  if (typeof query.includeUserSaved === 'boolean') params.set('includeUserSaved', String(query.includeUserSaved));
+
+  for (const category of query.categories ?? []) {
+    params.append('category', category);
+  }
+  for (const tag of query.tags ?? []) {
+    params.append('tag', tag);
   }
 
-  if (onProgress) onProgress(100);
-  return result;
+  return params;
 }
 
 export async function createSpot(input: SpotCreateInput): Promise<SpotCreateResponse> {
   const url = getApiUrl('/spot');
-  if (!url) return mockCreateSpot(input);
 
   const res = await fetch(url, {
     method: 'POST',
@@ -117,14 +175,16 @@ export async function createSpot(input: SpotCreateInput): Promise<SpotCreateResp
     body: JSON.stringify(input),
   });
 
-  if (!res.ok) throw new Error('Unable to create spot.');
-  const data = await res.json();
-  return { spotId: data.spotId || data.id };
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, 'Unable to create spot.'));
+  }
+
+  const data = await parseJsonOrEmpty<CreateSpotApiResponse>(res);
+  return { spotId: ensureSpotId(data) };
 }
 
 export async function submitSpotRating(spotId: string, input: SpotRatingInput): Promise<SpotRatingResponse> {
   const url = getApiUrl(`/spot/${encodeURIComponent(spotId)}/rating`);
-  if (!url) return mockSubmitRating(spotId, input);
 
   const res = await fetch(url, {
     method: 'POST',
@@ -132,8 +192,16 @@ export async function submitSpotRating(spotId: string, input: SpotRatingInput): 
     body: JSON.stringify(input),
   });
 
-  if (!res.ok) throw new Error('Unable to save rating.');
-  return { ok: true };
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, 'Unable to save rating.'));
+  }
+
+  const data = await parseJsonOrEmpty<RatingSpotApiResponse>(res);
+  return {
+    ok: data?.ok ?? true,
+    averageRating: data?.averageRating,
+    ratingsCount: data?.ratingsCount,
+  };
 }
 
 export async function uploadSpotMedia(
@@ -142,11 +210,11 @@ export async function uploadSpotMedia(
   description?: string,
   onProgress?: (progress: number) => void,
 ): Promise<SpotUploadResponse> {
-  const url = getApiUrl(`/spot/${encodeURIComponent(spotId)}/upload`);
-  if (!url) return mockUpload(spotId, file, description, onProgress);
+  const url = getApiUrl('/spot/media');
 
   return new Promise<SpotUploadResponse>((resolve, reject) => {
     const form = new FormData();
+    form.append('spotId', spotId);
     form.append('file', file);
     if (description?.trim()) form.append('description', description.trim());
 
@@ -167,9 +235,14 @@ export async function uploadSpotMedia(
       }
 
       try {
-        const parsed = JSON.parse(xhr.responseText || '{}');
+        const parsed = JSON.parse(xhr.responseText || '{}') as UploadSpotApiResponse;
+        const mediaUrl = parsed.url || '';
+        if (!mediaUrl) {
+          reject(new Error('Upload succeeded but no media URL was returned.'));
+          return;
+        }
         resolve({
-          url: parsed.url,
+          url: mediaUrl,
           completedAt: parsed.completedAt || new Date().toISOString(),
           type: parsed.type || (file.type.startsWith('video/') ? 'video' : 'image'),
           description: parsed.description || description?.trim() || undefined,
@@ -181,4 +254,22 @@ export async function uploadSpotMedia(
 
     xhr.send(form);
   });
+}
+
+export async function suggestSpots(query: SpotSuggestionQuery): Promise<SpotSuggestion[]> {
+  const params = buildSuggestionParams(query);
+  const url = getApiUrl(`/spot?${params.toString()}`);
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, 'Unable to fetch spot suggestions.'));
+  }
+
+  const data = await parseJsonOrEmpty<SpotSuggestionApiResponse>(res);
+  const rows = data?.spots || data?.data || [];
+  return rows.map(mapSuggestion).filter((item): item is SpotSuggestion => item !== null);
 }
