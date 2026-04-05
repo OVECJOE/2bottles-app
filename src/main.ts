@@ -1,4 +1,5 @@
 import './styles/global.css';
+import { inject } from '@vercel/analytics';
 import { initDemoAnalytics } from './services/demo-analytics.service.js';
 
 const SW_REFRESH_KEY = '2b:sw-refresh-at';
@@ -17,6 +18,11 @@ let canInstall = false;
 
 const appRoot = document.getElementById('app') ?? document.body;
 initDemoAnalytics();
+
+const analyticsEnabled = import.meta.env.VITE_ENABLE_VERCEL_ANALYTICS !== 'false';
+if (import.meta.env.PROD && analyticsEnabled) {
+    inject();
+}
 
 function isLandingPath(pathname: string): boolean {
     return pathname === '/' || pathname === '/index.html';
