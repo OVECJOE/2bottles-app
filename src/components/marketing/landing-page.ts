@@ -45,6 +45,11 @@ export class LandingPage extends LitElement {
         --border-strong: rgba(12, 26, 39, 0.2);
         --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
         --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+        background:
+          radial-gradient(1200px 620px at 6% -10%, rgba(74, 139, 196, 0.14) 0%, rgba(74, 139, 196, 0) 66%),
+          radial-gradient(900px 520px at 96% 8%, rgba(122, 184, 74, 0.11) 0%, rgba(122, 184, 74, 0) 68%),
+          linear-gradient(180deg, #fbfdff 0%, #f4f9ff 34%, #f7fbf8 100%);
       }
 
       /* ── RESET ── */
@@ -59,7 +64,7 @@ export class LandingPage extends LitElement {
         align-items: center;
         justify-content: space-between;
         padding: 15px 48px;
-        background: rgba(255, 255, 255, 0.9);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.88));
         backdrop-filter: blur(14px);
         border-bottom: 1px solid var(--border);
       }
@@ -137,13 +142,45 @@ export class LandingPage extends LitElement {
         overflow: hidden;
       }
 
+      .hero::before,
+      .hero::after {
+        content: '';
+        position: absolute;
+        z-index: 0;
+        pointer-events: none;
+        border-radius: 999px;
+        filter: blur(16px);
+      }
+
+      .hero::before {
+        width: 540px;
+        height: 540px;
+        left: -170px;
+        top: -170px;
+        background:
+          radial-gradient(circle at 42% 38%, rgba(74, 139, 196, 0.22) 0%, rgba(74, 139, 196, 0.08) 30%, rgba(74, 139, 196, 0) 72%);
+        animation: drift-a 14s ease-in-out infinite;
+      }
+
+      .hero::after {
+        width: 500px;
+        height: 500px;
+        right: -180px;
+        bottom: -180px;
+        background:
+          radial-gradient(circle at 52% 50%, rgba(122, 184, 74, 0.2) 0%, rgba(122, 184, 74, 0.07) 30%, rgba(122, 184, 74, 0) 72%);
+        animation: drift-b 16s ease-in-out infinite;
+      }
+
       .hero-bg {
         position: absolute;
         inset: 0;
         z-index: 0;
         background:
-          radial-gradient(900px 600px at -8% 110%, rgba(122, 184, 74, 0.08) 0%, transparent 60%),
-          radial-gradient(800px 500px at 110% -5%, rgba(47, 111, 166, 0.09) 0%, transparent 60%);
+          radial-gradient(680px 380px at 16% 72%, rgba(122, 184, 74, 0.14) 0%, rgba(122, 184, 74, 0.03) 40%, transparent 74%),
+          radial-gradient(720px 420px at 88% 22%, rgba(47, 111, 166, 0.16) 0%, rgba(47, 111, 166, 0.04) 42%, transparent 76%),
+          conic-gradient(from 220deg at 62% 60%, rgba(47, 111, 166, 0.08), rgba(122, 184, 74, 0.07), rgba(47, 111, 166, 0.08));
+        opacity: 0.95;
       }
 
       .hero-grid {
@@ -151,10 +188,27 @@ export class LandingPage extends LitElement {
         inset: 0;
         z-index: 0;
         background-image:
-          linear-gradient(rgba(12, 26, 39, 0.05) 1px, #ffffff 1px),
-          linear-gradient(90deg, rgba(12, 26, 39, 0.05) 1px, #ffffff 1px);
+          linear-gradient(rgba(12, 26, 39, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(12, 26, 39, 0.045) 1px, transparent 1px);
         background-size: 40px 40px;
-        mask-image: radial-gradient(ellipse at 50% 40%, black 20%, #ffffff 76%);
+        mask-image: radial-gradient(ellipse at 52% 42%, black 24%, #ffffff 82%);
+        opacity: 0.65;
+      }
+
+      .hero-grid::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          repeating-linear-gradient(
+            -35deg,
+            rgba(255, 255, 255, 0.14) 0,
+            rgba(255, 255, 255, 0.14) 2px,
+            rgba(255, 255, 255, 0) 2px,
+            rgba(255, 255, 255, 0) 22px
+          );
+        mix-blend-mode: soft-light;
+        opacity: 0.45;
       }
 
       .hero-left {
@@ -633,6 +687,24 @@ export class LandingPage extends LitElement {
         50%       { transform: translateY(-9px); }
       }
 
+      @keyframes drift-a {
+        0%, 100% {
+          transform: translate3d(0, 0, 0) scale(1);
+        }
+        50% {
+          transform: translate3d(24px, 20px, 0) scale(1.06);
+        }
+      }
+
+      @keyframes drift-b {
+        0%, 100% {
+          transform: translate3d(0, 0, 0) scale(1);
+        }
+        50% {
+          transform: translate3d(-24px, -22px, 0) scale(1.05);
+        }
+      }
+
       /* ── SCROLL REVEAL ── */
       .reveal {
         opacity: 0;
@@ -658,6 +730,13 @@ export class LandingPage extends LitElement {
         .tgrid { grid-template-columns: 1fr; gap: 14px; }
         .stats-section .section-inner { grid-template-columns: repeat(2, 1fr); }
         .footer { flex-direction: column; gap: 14px; text-align: center; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .hero::before,
+        .hero::after {
+          animation: none;
+        }
       }
     `,
   ];
