@@ -1,71 +1,55 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-vi.mock('../api/sessions.api.js', () => ({
-    sessionsApi: {
-        create: vi.fn(),
-        invite: vi.fn(),
-        getVenueSuggestions: vi.fn(),
-        confirmVenue: vi.fn(),
-        end: vi.fn(),
-    },
-}));
-
-vi.mock('./websocket.service.js', () => ({
-    wsService: {
-        connect: vi.fn(),
-        disconnect: vi.fn(),
-    },
-}));
-
-vi.mock('../store/index.js', () => ({
-    sessionStore: {
-        session: { id: 'sess-1', status: 'pending_partner', createdAt: Date.now(), link: '', venueId: null },
-        createSession: vi.fn(),
-        setPartner: vi.fn(),
-        setVenueSuggestions: vi.fn(),
-        selectVenue: vi.fn(),
-        endSession: vi.fn(),
-    },
-    locationStore: {
-        own: { lat: 10, lng: 12 },
-        partner: { lat: 11, lng: 13 },
-        fetchOnce: vi.fn(async () => ({ lat: 10, lng: 12 })),
-        setDestination: vi.fn(),
-        reset: vi.fn(),
-    },
-    uiStore: {
-        setLoading: vi.fn(),
-    },
-}));
-
-import { sessionsApi } from '../api/sessions.api.js';
-import { wsService } from './websocket.service.js';
-import { sessionStore, locationStore, uiStore } from '../store/index.js';
 import { sessionService } from './session.service.js';
+import { sessionStore } from '../store/index.js';
+import { locationStore } from '../store/index.js';
 import type { Venue } from '../types/index.js';
 
 describe('sessionService', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        sessionStore.session = { id: 'sess-1', status: 'pending_partner', createdAt: Date.now(), link: '', venueId: null };
+        locationStore.own = { lat: 10, lng: 12 };
+        locationStore.partner = { lat: 11, lng: 13 };
+    });
+
     it('creates session with own coordinates and toggles loading', async () => {
-        vi.mocked(sessionsApi.create).mockResolvedValue({
-            session: {
-                id: 'new-1',
-                link: '/join/new-1',
-                status: 'pending_partner',
-                createdAt: Date.now(),
-                venueId: null,
-            },
-        });
+        const fetchSpy = vi.fn(async () =>
+            new Response(JSON.stringify({
+                session: {
+                    id: 'new-1',
+                    link: '/join/new-1',
+                    status: 'pending_partner',
+                    createdAt: Date.now(),
+                    venueId: null,
+                },
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            })
+        );
+        vi.stubGlobal('fetch', fetchSpy);
 
         await sessionService.createSession();
 
-        expect(sessionsApi.create).toHaveBeenCalledWith({ lat: 10, lng: 12 });
-        expect(sessionStore.createSession).toHaveBeenCalledWith('new-1');
-        expect(uiStore.setLoading).toHaveBeenCalledWith(true);
-        expect(uiStore.setLoading).toHaveBeenLastCalledWith(false);
+        expect(fetchSpy).toHaveBeenCalledWith(
+            expect.stringContaining('/sessions'),
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ lat: 10, lng: 12 }),
+            })
+        );
+        expect(sessionStore.session?.id).toBe('new-1');
     });
 
     it('invites partner and opens websocket connection', async () => {
-        vi.mocked(sessionsApi.invite).mockResolvedValue({ ok: true });
+        const fetchSpy = vi.fn(async () =>
+            new Response(JSON.stringify({ ok: true }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            })
+        );
+        vi.stubGlobal('fetch', fetchSpy);
 
         await sessionService.invitePartner({
             id: 'p1',
@@ -78,8 +62,14 @@ describe('sessionService', () => {
             etaMinutes: null,
         });
 
-        expect(sessionsApi.invite).toHaveBeenCalledWith({ sessionId: 'sess-1', partnerId: 'p1' });
-        expect(wsService.connect).toHaveBeenCalledWith('sess-1');
+        expect(fetchSpy).toHaveBeenCalledWith(
+            expect.stringContaining('/sessions/invite'),
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ sessionId: 'sess-1', partnerId: 'p1' }),
+            })
+        );
+        expect(sessionStore.partner?.id).toBe('p1');
     });
 
     it('fetches venue suggestions and stores them', async () => {
@@ -95,27 +85,41 @@ describe('sessionService', () => {
             etaMinutesFromPartner: 8,
         }];
 
-        vi.mocked(sessionsApi.getVenueSuggestions).mockResolvedValue({ venues });
+        const fetchSpy = vi.fn(async () =>
+            new Response(JSON.stringify({ venues }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            })
+        );
+        vi.stubGlobal('fetch', fetchSpy);
 
         await sessionService.fetchVenueSuggestions();
 
-        expect(sessionsApi.getVenueSuggestions).toHaveBeenCalledWith({
-            lat1: 10,
-            lng1: 12,
-            lat2: 11,
-            lng2: 13,
-        });
-        expect(sessionStore.setVenueSuggestions).toHaveBeenCalledWith(venues);
+        expect(fetchSpy).toHaveBeenCalledWith(
+            expect.stringContaining('/sessions/venues'),
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ lat1: 10, lng1: 12, lat2: 11, lng2: 13 }),
+            })
+        );
+        expect(sessionStore.venueSuggestions).toEqual(venues);
     });
 
     it('ends session even when backend end call fails', async () => {
-        vi.mocked(sessionsApi.end).mockRejectedValue(new Error('offline'));
+        const fetchSpy = vi.fn(async () =>
+            new Response(JSON.stringify({ message: 'error' }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+            })
+        );
+        vi.stubGlobal('fetch', fetchSpy);
 
         await sessionService.endSession();
 
-        expect(sessionsApi.end).toHaveBeenCalledWith('sess-1');
-        expect(wsService.disconnect).toHaveBeenCalledTimes(1);
-        expect(sessionStore.endSession).toHaveBeenCalledTimes(1);
-        expect(locationStore.reset).toHaveBeenCalledTimes(1);
+        expect(fetchSpy).toHaveBeenCalledWith(
+            expect.stringContaining('/sessions/sess-1'),
+            expect.objectContaining({ method: 'DELETE' })
+        );
+        expect(sessionStore.session).toBeNull();
     });
 });

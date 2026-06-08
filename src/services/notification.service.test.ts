@@ -1,15 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-vi.mock('../api/client.js', () => ({
-    api: {
-        post: vi.fn(async () => ({ ok: true })),
-    },
-}));
-
-import { api } from '../api/client.js';
 import { notificationService } from './notification.service.js';
 
 describe('notificationService', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('returns denied when Notification API is missing', async () => {
         Object.defineProperty(globalThis, 'Notification', {
             value: undefined,
@@ -20,6 +17,14 @@ describe('notificationService', () => {
     });
 
     it('posts unsubscribe payload when subscription exists', async () => {
+        const fetchSpy = vi.fn(async () =>
+            new Response(JSON.stringify({ ok: true }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            })
+        );
+        vi.stubGlobal('fetch', fetchSpy);
+
         const unsubscribe = vi.fn(async () => true);
         const subscription = {
             endpoint: 'https://push.endpoint',
@@ -44,6 +49,12 @@ describe('notificationService', () => {
         await notificationService.unsubscribe();
 
         expect(unsubscribe).toHaveBeenCalledTimes(1);
-        expect(api.post).toHaveBeenCalledWith('/notifications/unsubscribe', { endpoint: 'https://push.endpoint' });
+        expect(fetchSpy).toHaveBeenCalledWith(
+            expect.stringContaining('/notifications/unsubscribe'),
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ endpoint: 'https://push.endpoint' }),
+            })
+        );
     });
 });
