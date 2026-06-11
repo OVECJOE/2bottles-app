@@ -72,6 +72,15 @@ export class LocationInput extends LitElement {
       animation: slide-down var(--duration-fast) var(--ease-out) both;
     }
 
+    @media (min-width: 1024px) {
+      .dropdown {
+        bottom: auto;
+        top: 100%;
+        margin-top: var(--space-2);
+        max-height: min(240px, 50dvh);
+      }
+    }
+
     .suggestion {
       display: flex; align-items: flex-start; gap: var(--space-3);
       padding: var(--space-3) var(--space-4);

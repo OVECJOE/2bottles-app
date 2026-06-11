@@ -1,6 +1,6 @@
-export * from './location.types';
-export * from './session.types';
-export * from './venue.types';
+export * from './location.types.js';
+export * from './session.types.js';
+export * from './venue.types.js';
 
 export type AppScreen =
     | 'landing'
@@ -15,9 +15,18 @@ export type AppScreen =
     | 'live-chat'            // full-screen chat during tracking
     | 'end-session';         // arrived, wrap up
 
+export interface DialogConfig {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+}
+
 export interface UIState {
     screen: AppScreen;
     sheetOpen: boolean;
     isLoading: boolean;
+    isPartnerOnline: boolean;
     toastMessage: string | null;
+    dialogConfig: DialogConfig | null;
 }

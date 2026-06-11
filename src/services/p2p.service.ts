@@ -17,11 +17,18 @@ class P2PService {
     private _conn: DataConnection | null = null;
     private _isHost = false;
     private _sendQueue: P2PMessage[] = [];
-    private _reconnectTimer: any = null;
-    private _reconciliationTimer: any = null;
+    private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    private _reconciliationTimer: ReturnType<typeof setInterval> | null = null;
     private _signalingReconnectAttempts = 0;
-    private _signalingReconnectTimer: any = null;
+    private _signalingReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    private _partnerReconnectAttempts = 0;
+    private _maxPartnerReconnectAttempts = 10;
     private _maxQueueSize = 300;
+    private _maxInitRetries = 3;
+
+    constructor() {
+        locationStore.setOnLocationChange((coords) => this.broadcastLocation(coords));
+    }
 
     private _buildPeerOptions(): PeerJSOption {
         const defaultStun: RTCIceServer[] = [
@@ -96,7 +103,7 @@ class P2PService {
         return !!this._conn?.open;
     }
 
-    async init(id?: string): Promise<string> {
+    async init(id?: string, _retryCount = 0): Promise<string> {
         if (this._peer && !this._peer.destroyed) {
             if (id && this._peer.id === id) return this._peer.id;
             this._peer.destroy();
@@ -117,7 +124,7 @@ class P2PService {
                 resolve(peerId);
             });
 
-            this._peer.on('error', (err: any) => {
+            this._peer.on('error', (err: { type: string; message?: string }) => {
                 clearTimeout(timeout);
                 
                 const errorMap: Record<string, string> = {
@@ -127,15 +134,16 @@ class P2PService {
                     'network': 'Check your internet connection.'
                 };
 
-                if (err.type === 'id-taken' && id) {
+                if (err.type === 'id-taken' && id && _retryCount < this._maxInitRetries) {
                     const newId = `${id}-${Math.floor(Math.random() * 1000)}`;
                     if (sessionStore.session) {
                         void sessionStore.setSessionIdentity(newId);
                     }
-                    this.init(newId).then(resolve).catch(reject);
+                    this._peer?.destroy();
+                    this.init(newId, _retryCount + 1).then(resolve).catch(reject);
                 } else if (err.type === 'id-taken') {
-                    this._peer?.reconnect();
-                    resolve(this._peer?.id ?? '');
+                    this._peer?.destroy();
+                    reject(new Error('Could not acquire unique peer ID after retries'));
                 } else {
                     const msg = errorMap[err.type] || `P2P error: ${err.type || 'Unknown'}`;
                     if (this._signalingReconnectAttempts > 2) uiStore.showToast(msg);
@@ -183,6 +191,11 @@ class P2PService {
         if (!this._peer) return;
 
         this._peer.on('connection', (conn) => {
+            const sessionId = sessionStore.session?.id;
+            if (!sessionId) {
+                conn.close();
+                return;
+            }
             this._isHost = true;
             this._setupConnection(conn);
         });
@@ -251,7 +264,7 @@ class P2PService {
         }
 
         conn.on('data', (data) => {
-            this._handleMessage(data as P2PMessage);
+            this._handleMessage(data);
         });
 
         conn.on('close', () => {
@@ -276,14 +289,20 @@ class P2PService {
     private _attemptReconnect() {
         if (this._reconnectTimer) return;
         if (!sessionStore.session || sessionStore.session.status === 'ended') return;
+        if (this._partnerReconnectAttempts >= this._maxPartnerReconnectAttempts) {
+            uiStore.showToast('Could not reconnect to partner. Please restart the session.');
+            return;
+        }
 
+        this._partnerReconnectAttempts++;
         this._reconnectTimer = setTimeout(async () => {
             this._reconnectTimer = null;
             try {
                 if (sessionStore.session?.id) {
                     await this.connect(sessionStore.session.id);
+                    this._partnerReconnectAttempts = 0;
                 }
-            } catch (e) {
+            } catch {
                 this._attemptReconnect();
             }
         }, 3000);
@@ -346,7 +365,38 @@ class P2PService {
         this.send({ type: 'session:reset' });
     }
 
-    private _handleMessage(msg: P2PMessage) {
+    private _isValidMessage(data: unknown): data is P2PMessage {
+        if (!data || typeof data !== 'object') return false;
+        const msg = data as Record<string, unknown>;
+        if (typeof msg.type !== 'string') return false;
+
+        switch (msg.type) {
+            case 'location:update':
+                return msg.coords !== null && typeof msg.coords === 'object';
+            case 'partner:status':
+            case 'session:status':
+                return typeof msg.status === 'string';
+            case 'session:venue':
+                return msg.venue !== null && typeof msg.venue === 'object';
+            case 'session:agree':
+            case 'session:reset':
+                return true;
+            case 'user:info':
+                return typeof msg.name === 'string';
+            case 'chat:message':
+                return typeof msg.text === 'string' && typeof msg.timestamp === 'number';
+            default:
+                return false;
+        }
+    }
+
+    private _handleMessage(data: unknown) {
+        if (!this._isValidMessage(data)) {
+            console.warn('[P2P] Received invalid message:', data);
+            return;
+        }
+        const msg = data;
+
         switch (msg.type) {
             case 'location:update':
                 locationStore.setPartnerLocation(msg.coords);
@@ -419,6 +469,7 @@ class P2PService {
         }
         this._stopReconciliation();
         this._sendQueue = [];
+        this._partnerReconnectAttempts = 0;
         this._conn?.close();
         this._peer?.destroy();
         this._peer = null;
@@ -427,7 +478,9 @@ class P2PService {
     }
 
     endSessionForAll() {
-        this.broadcastSessionStatus('ended');
+        if (this._conn && this._conn.open) {
+            this._conn.send({ type: 'session:status', status: 'ended' });
+        }
         this.disconnect();
     }
 }

@@ -160,8 +160,8 @@ export class InvitePartner extends LitElement {
           text: 'Join me for a rendezvous!',
           url: link
         });
-      } catch (err) {
-        console.log('Share canceled or failed', err);
+      } catch {
+        // Share canceled or failed - user can copy link manually
       }
     } else {
       const ok = await copyText(link);

@@ -10,6 +10,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { sharedStyles } from '../../styles/shared-styles.js';
+import './hero-gallery.js';
 
 type LandingCta = 'start' | 'install' | 'skip';
 
@@ -133,11 +134,11 @@ export class LandingPage extends LitElement {
       /* ── HERO ── */
       .hero {
         display: grid;
-        grid-template-columns: 1.1fr 1fr;
+        grid-template-columns: 1.4fr 1fr;
         align-items: center;
         min-height: calc(100dvh - 61px);
         padding: 72px 48px 64px;
-        gap: 64px;
+        gap: 48px;
         position: relative;
         overflow: hidden;
       }
@@ -216,34 +217,6 @@ export class LandingPage extends LitElement {
         z-index: 1;
       }
 
-      /* Status chip — earned, not generic */
-      .hero-status {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 26px;
-        padding: 7px 14px;
-        border: 1px solid var(--border-strong);
-        border-radius: 99px;
-        background: var(--white);
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--ink-soft);
-      }
-
-      .status-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: var(--green);
-        animation: pulse 2s ease-in-out infinite;
-      }
-
-      .status-count {
-        font-variant-numeric: tabular-nums;
-        color: var(--blue);
-      }
-
       .hero-title {
         font-size: clamp(40px, 5.2vw, 66px);
         font-weight: 800;
@@ -320,46 +293,15 @@ export class LandingPage extends LitElement {
         color: var(--ink);
       }
 
-      .social-proof {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        font-size: 13px;
-        color: var(--ink-muted);
-      }
-
-      .avatar-stack { display: flex; }
-
-      .avatar {
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        border: 2px solid #fff;
-        margin-left: -7px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 10px;
-        font-weight: 700;
-        color: #fff;
-        flex-shrink: 0;
-      }
-
-      .avatar:first-child { margin-left: 0; }
-
       .hero-right {
         position: relative;
         z-index: 1;
         display: flex;
         justify-content: center;
+        min-height: 500px;
       }
 
-      .hero-card {
-        width: 100%;
-        max-width: 420px;
-        filter: drop-shadow(0 24px 52px rgba(12, 26, 39, 0.13));
-        animation: float 5s ease-in-out infinite;
-      }
+
 
       /* ── SECTION BASE ── */
       .section { padding: 96px 48px; }
@@ -677,16 +619,6 @@ export class LandingPage extends LitElement {
       .footer-links a:hover { color: var(--white); }
 
       /* ── ANIMATIONS ── */
-      @keyframes pulse {
-        0%, 100% { transform: scale(0.85); opacity: 0.65; }
-        50%       { transform: scale(1.3);  opacity: 1; }
-      }
-
-      @keyframes float {
-        0%, 100% { transform: translateY(0);    }
-        50%       { transform: translateY(-9px); }
-      }
-
       @keyframes drift-a {
         0%, 100% {
           transform: translate3d(0, 0, 0) scale(1);
@@ -722,7 +654,10 @@ export class LandingPage extends LitElement {
         .nav { padding: 14px 22px; }
         .nav-links { display: none; }
         .hero { grid-template-columns: 1fr; padding: 60px 22px 52px; min-height: auto; gap: 44px; }
-        .hero-right { display: none; }
+        .hero-left { text-align: center; }
+        .hero-sub { margin-left: auto; margin-right: auto; }
+        .hero-actions { justify-content: center; }
+        .hero-right { min-height: 0; }
         .section { padding: 64px 22px; }
         .problem-section .section-inner,
         .fairness-section .section-inner { grid-template-columns: 1fr; gap: 44px; }
@@ -730,6 +665,21 @@ export class LandingPage extends LitElement {
         .tgrid { grid-template-columns: 1fr; gap: 14px; }
         .stats-section .section-inner { grid-template-columns: repeat(2, 1fr); }
         .footer { flex-direction: column; gap: 14px; text-align: center; }
+      }
+
+      @media (max-width: 480px) {
+        .nav { padding: 12px 16px; }
+        .hero { padding: 44px 16px 36px; gap: 32px; }
+        .hero-left { text-align: center; }
+        .hero-right { min-height: 0; }
+        .hero-title { font-size: 32px; letter-spacing: -1.5px; }
+        .hero-sub { font-size: 14px; margin-left: auto; margin-right: auto; margin-bottom: 24px; }
+        .hero-actions { justify-content: center; flex-direction: column; align-items: center; }
+        .btn-primary, .btn-ghost { width: 100%; justify-content: center; }
+        .section { padding: 48px 16px; }
+        .cta-section { padding: 72px 16px; }
+        .stats-section { padding: 48px 16px; }
+        .footer { padding: 20px 16px; }
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -754,6 +704,15 @@ export class LandingPage extends LitElement {
     }));
   }
 
+  private _handleNavClick(event: Event) {
+    event.preventDefault();
+    const target = event.currentTarget as HTMLAnchorElement;
+    const id = target.getAttribute('href')?.slice(1);
+    if (id) {
+      this.renderRoot.querySelector(`#${id}`)?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
   override firstUpdated() {
     const obs = new IntersectionObserver(
       (entries) => entries.forEach((e) => { if (e.isIntersecting) e.target.classList.add('visible'); }),
@@ -764,146 +723,49 @@ export class LandingPage extends LitElement {
 
   /* ── SVG ILLUSTRATIONS ── */
 
-  private _heroCardSvg() {
-    return html`
-      <svg class="hero-card" viewBox="0 0 420 490" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- Card shell -->
-        <rect x="8" y="8" width="404" height="474" rx="22" fill="white" stroke="rgba(12,26,39,0.09)" stroke-width="1"/>
-
-        <!-- Map background -->
-        <rect x="24" y="56" width="372" height="272" rx="12" fill="#eef5fb"/>
-
-        <!-- Street grid (subtle) -->
-        <line x1="24"  y1="180" x2="396" y2="180" stroke="rgba(47,111,166,0.07)" stroke-width="5"/>
-        <line x1="24"  y1="228" x2="396" y2="228" stroke="rgba(47,111,166,0.06)" stroke-width="4"/>
-        <line x1="168" y1="56"  x2="168" y2="328" stroke="rgba(47,111,166,0.07)" stroke-width="4"/>
-        <line x1="264" y1="56"  x2="264" y2="328" stroke="rgba(47,111,166,0.06)" stroke-width="4"/>
-        <line x1="80"  y1="56"  x2="80"  y2="328" stroke="rgba(47,111,166,0.05)" stroke-width="3"/>
-        <line x1="350" y1="56"  x2="350" y2="328" stroke="rgba(47,111,166,0.05)" stroke-width="3"/>
-
-        <!-- Lagoon blob -->
-        <ellipse cx="88" cy="306" rx="60" ry="26" fill="rgba(47,111,166,0.10)" stroke="rgba(47,111,166,0.15)" stroke-width="1"/>
-
-        <!-- Route A — dashed blue -->
-        <path d="M82 278 Q112 260 148 244 Q178 230 206 215" stroke="#2f6fa6" stroke-width="2.5" fill="none" stroke-dasharray="7 5" stroke-linecap="round" opacity=".75"/>
-
-        <!-- Route B — dashed green -->
-        <path d="M320 108 Q302 136 284 162 Q264 188 244 206" stroke="#5da030" stroke-width="2.5" fill="none" stroke-dasharray="7 5" stroke-linecap="round" opacity=".75"/>
-
-        <!-- Midpoint glow rings -->
-        <circle cx="222" cy="213" r="38" fill="rgba(47,111,166,0.07)"/>
-        <circle cx="222" cy="213" r="24" fill="rgba(47,111,166,0.11)"/>
-
-        <!-- Midpoint pin -->
-        <circle cx="222" cy="213" r="13" fill="#2f6fa6"/>
-        <circle cx="222" cy="213" r="8"  fill="white"/>
-        <circle cx="222" cy="213" r="4"  fill="#2f6fa6"/>
-
-        <!-- Pin A -->
-        <ellipse cx="82" cy="290" rx="9" ry="4" fill="rgba(47,111,166,0.18)"/>
-        <path d="M82 278 C82 278 71 265 71 258 C71 251.4 76 246 82 246 C88 246 93 251.4 93 258 C93 265 82 278 82 278Z" fill="#2f6fa6"/>
-        <circle cx="82" cy="257" r="5" fill="white"/>
-        <text x="82" y="260" text-anchor="middle" font-size="6.5" font-weight="700" fill="#2f6fa6" font-family="Sora,sans-serif">A</text>
-
-        <!-- ETA A -->
-        <rect x="98" y="248" width="40" height="18" rx="9" fill="white" stroke="rgba(47,111,166,0.28)" stroke-width="1"/>
-        <text x="118" y="260" text-anchor="middle" font-size="8.5" font-weight="600" fill="#0e3d66" font-family="Sora,sans-serif">12 min</text>
-
-        <!-- Pin B -->
-        <ellipse cx="320" cy="122" rx="9" ry="4" fill="rgba(93,160,48,0.18)"/>
-        <path d="M320 110 C320 110 309 97 309 90 C309 83.4 314 78 320 78 C326 78 331 83.4 331 90 C331 97 320 110 320 110Z" fill="#5da030"/>
-        <circle cx="320" cy="89" r="5" fill="white"/>
-        <text x="320" y="92" text-anchor="middle" font-size="6.5" font-weight="700" fill="#294f10" font-family="Sora,sans-serif">B</text>
-
-        <!-- ETA B -->
-        <rect x="278" y="97" width="40" height="18" rx="9" fill="white" stroke="rgba(93,160,48,0.3)" stroke-width="1"/>
-        <text x="298" y="109" text-anchor="middle" font-size="8.5" font-weight="600" fill="#294f10" font-family="Sora,sans-serif">14 min</text>
-
-        <!-- Venue popup -->
-        <rect x="234" y="164" width="148" height="60" rx="12" fill="white" stroke="rgba(12,26,39,0.10)" stroke-width="1"/>
-        <rect x="234" y="164" width="4"   height="60" rx="2" fill="#2f6fa6"/>
-        <text x="249" y="182" font-size="10.5" font-weight="700" fill="#0c1a27" font-family="Sora,sans-serif">Muri Square Café</text>
-        <text x="249" y="197" font-size="9"    fill="#3d5568"  font-family="Sora,sans-serif">Fair for both · 0.4 km</text>
-        <rect x="249" y="206" width="52" height="10" rx="5" fill="#e4f3d0"/>
-        <text x="275" y="214" text-anchor="middle" font-size="7.5" font-weight="700" fill="#294f10" font-family="Sora,sans-serif">✓ Best match</text>
-
-        <!-- Map header bar -->
-        <rect x="24" y="56" width="372" height="32" rx="12" fill="white"/>
-        <rect x="24" y="76"  width="372" height="12" fill="white"/>
-        <text x="40" y="77"  font-size="10.5" font-weight="600" fill="#0c1a27" font-family="Sora,sans-serif">Live Rendezvous</text>
-        <circle cx="380" cy="72" r="5" fill="#7ab84a"/>
-        <text x="368" y="76" font-size="7.5" font-weight="600" fill="#294f10" font-family="Sora,sans-serif">LIVE</text>
-
-        <!-- Bottom panel -->
-        <rect x="24" y="338" width="372" height="126" rx="12" fill="white"/>
-
-        <text x="40" y="360" font-size="12" font-weight="700" fill="#0c1a27" font-family="Sora,sans-serif">Fairest meeting point found</text>
-
-        <!-- Person A bar -->
-        <text x="40" y="381" font-size="9.5" fill="#3d5568" font-family="Sora,sans-serif">Person A</text>
-        <rect x="100" y="371" width="192" height="8" rx="4" fill="#eef5fb"/>
-        <rect x="100" y="371" width="115" height="8" rx="4" fill="#2f6fa6"/>
-        <text x="300" y="380" font-size="9.5" font-weight="600" fill="#0e3d66" font-family="Sora,sans-serif">12 min</text>
-
-        <!-- Person B bar -->
-        <text x="40" y="400" font-size="9.5" fill="#3d5568" font-family="Sora,sans-serif">Person B</text>
-        <rect x="100" y="390" width="192" height="8" rx="4" fill="#eef5fb"/>
-        <rect x="100" y="390" width="135" height="8" rx="4" fill="#5da030"/>
-        <text x="300" y="399" font-size="9.5" font-weight="600" fill="#294f10" font-family="Sora,sans-serif">14 min</text>
-
-        <!-- Fairness chip + CTA -->
-        <rect x="40"  y="415" width="90"  height="26" rx="13" fill="#e4f3d0"/>
-        <text x="85"  y="432" text-anchor="middle" font-size="9.5" font-weight="700" fill="#294f10" font-family="Sora,sans-serif">⚖ 96% fair</text>
-
-        <rect x="140" y="415" width="118" height="26" rx="13" fill="#0c1a27"/>
-        <text x="199" y="432" text-anchor="middle" font-size="9.5" font-weight="600" fill="#ffffff" font-family="Sora,sans-serif">Confirm venue →</text>
-      </svg>
-    `;
-  }
-
   private _problemSvg() {
     return html`
       <svg width="100%" viewBox="0 0 380 290" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- Without label -->
-        <text x="190" y="22" text-anchor="middle" font-size="10.5" font-weight="600" fill="rgba(255,255,255,0.38)" font-family="Sora,sans-serif">Without 2bottles</text>
+        <text x="190" y="22" text-anchor="middle" font-size="10.5" font-weight="600" fill="rgba(255,255,255,0.38)" font-family="DM Sans,system-ui,-apple-system,sans-serif">Without 2bottles</text>
 
         <!-- Road -->
         <line x1="64"  y1="90" x2="316" y2="90" stroke="rgba(255,255,255,0.09)" stroke-width="10" stroke-linecap="round"/>
 
         <!-- Person A -->
         <circle cx="46"  cy="90" r="19" fill="rgba(47,111,166,0.22)" stroke="#4a8bc4" stroke-width="1.5"/>
-        <text   x="46"  y="95" text-anchor="middle" font-size="11"  font-weight="700" fill="#85b7eb" font-family="Sora,sans-serif">A</text>
+        <text   x="46"  y="95" text-anchor="middle" font-size="11"  font-weight="700" fill="#85b7eb" font-family="DM Sans,system-ui,-apple-system,sans-serif">A</text>
 
         <!-- Person B -->
         <circle cx="334" cy="90" r="19" fill="rgba(93,160,48,0.22)"  stroke="#7ab84a" stroke-width="1.5"/>
-        <text   x="334" y="95" text-anchor="middle" font-size="11"  font-weight="700" fill="#c0dd97" font-family="Sora,sans-serif">B</text>
+        <text   x="334" y="95" text-anchor="middle" font-size="11"  font-weight="700" fill="#c0dd97" font-family="DM Sans,system-ui,-apple-system,sans-serif">B</text>
 
         <!-- Unfair pin — skewed left -->
         <line x1="128" y1="68" x2="128" y2="112" stroke="rgba(232,89,60,0.75)" stroke-width="2"/>
         <circle cx="128" cy="64" r="10" fill="#E8593C"/>
-        <text   x="128" y="68" text-anchor="middle" font-size="9"  font-weight="700" fill="white" font-family="Sora,sans-serif">✕</text>
+        <text   x="128" y="68" text-anchor="middle" font-size="9"  font-weight="700" fill="white" font-family="DM Sans,system-ui,-apple-system,sans-serif">✕</text>
 
         <!-- Distance labels -->
-        <text x="87"  y="82" text-anchor="middle" font-size="9" font-weight="600" fill="#E8593C"             font-family="Sora,sans-serif">20 min</text>
-        <text x="232" y="82" text-anchor="middle" font-size="9" font-weight="500" fill="rgba(255,255,255,0.38)" font-family="Sora,sans-serif">48 min</text>
-        <text x="128" y="130" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.4)"              font-family="Sora,sans-serif">"the usual spot"</text>
+        <text x="87"  y="82" text-anchor="middle" font-size="9" font-weight="600" fill="#E8593C"             font-family="DM Sans,system-ui,-apple-system,sans-serif">20 min</text>
+        <text x="232" y="82" text-anchor="middle" font-size="9" font-weight="500" fill="rgba(255,255,255,0.38)" font-family="DM Sans,system-ui,-apple-system,sans-serif">48 min</text>
+        <text x="128" y="130" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.4)"              font-family="DM Sans,system-ui,-apple-system,sans-serif">"the usual spot"</text>
 
         <!-- Divider -->
         <line x1="40" y1="155" x2="340" y2="155" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
 
         <!-- With label -->
-        <text x="190" y="177" text-anchor="middle" font-size="10.5" font-weight="600" fill="rgba(122,184,74,0.75)" font-family="Sora,sans-serif">With 2bottles</text>
+        <text x="190" y="177" text-anchor="middle" font-size="10.5" font-weight="600" fill="rgba(122,184,74,0.75)" font-family="DM Sans,system-ui,-apple-system,sans-serif">With 2bottles</text>
 
         <!-- Road 2 -->
         <line x1="64"  y1="232" x2="316" y2="232" stroke="rgba(255,255,255,0.09)" stroke-width="10" stroke-linecap="round"/>
 
         <!-- Person A2 -->
         <circle cx="46"  cy="232" r="19" fill="rgba(47,111,166,0.22)" stroke="#4a8bc4" stroke-width="1.5"/>
-        <text   x="46"  y="237" text-anchor="middle" font-size="11"  font-weight="700" fill="#85b7eb" font-family="Sora,sans-serif">A</text>
+        <text   x="46"  y="237" text-anchor="middle" font-size="11"  font-weight="700" fill="#85b7eb" font-family="DM Sans,system-ui,-apple-system,sans-serif">A</text>
 
         <!-- Person B2 -->
         <circle cx="334" cy="232" r="19" fill="rgba(93,160,48,0.22)"  stroke="#7ab84a" stroke-width="1.5"/>
-        <text   x="334" y="237" text-anchor="middle" font-size="11"  font-weight="700" fill="#c0dd97" font-family="Sora,sans-serif">B</text>
+        <text   x="334" y="237" text-anchor="middle" font-size="11"  font-weight="700" fill="#c0dd97" font-family="DM Sans,system-ui,-apple-system,sans-serif">B</text>
 
         <!-- Route dashes -->
         <line x1="67"  y1="232" x2="179" y2="232" stroke="#4a8bc4" stroke-width="2" stroke-dasharray="5 3" opacity=".65"/>
@@ -912,12 +774,12 @@ export class LandingPage extends LitElement {
         <!-- Fair pin -->
         <line x1="190" y1="210" x2="190" y2="252" stroke="rgba(122,184,74,0.75)" stroke-width="2"/>
         <circle cx="190" cy="206" r="10" fill="#5da030"/>
-        <text   x="190" y="210" text-anchor="middle" font-size="9"  font-weight="700" fill="white" font-family="Sora,sans-serif">✓</text>
+        <text   x="190" y="210" text-anchor="middle" font-size="9"  font-weight="700" fill="white" font-family="DM Sans,system-ui,-apple-system,sans-serif">✓</text>
 
         <!-- Equal ETAs -->
-        <text x="115" y="224" text-anchor="middle" font-size="9" font-weight="600" fill="#85b7eb" font-family="Sora,sans-serif">22 min</text>
-        <text x="262" y="224" text-anchor="middle" font-size="9" font-weight="600" fill="#c0dd97" font-family="Sora,sans-serif">23 min</text>
-        <text x="190" y="268" text-anchor="middle" font-size="9" fill="rgba(122,184,74,0.65)" font-family="Sora,sans-serif">Balanced for both</text>
+        <text x="115" y="224" text-anchor="middle" font-size="9" font-weight="600" fill="#85b7eb" font-family="DM Sans,system-ui,-apple-system,sans-serif">22 min</text>
+        <text x="262" y="224" text-anchor="middle" font-size="9" font-weight="600" fill="#c0dd97" font-family="DM Sans,system-ui,-apple-system,sans-serif">23 min</text>
+        <text x="190" y="268" text-anchor="middle" font-size="9" fill="rgba(122,184,74,0.65)" font-family="DM Sans,system-ui,-apple-system,sans-serif">Balanced for both</text>
       </svg>
     `;
   }
@@ -933,44 +795,44 @@ export class LandingPage extends LitElement {
 
         <!-- Step 1 -->
         <rect x="20" y="52" width="108" height="56" rx="12" fill="#dfedfb" stroke="rgba(47,111,166,0.22)" stroke-width="1"/>
-        <text x="74" y="78" text-anchor="middle" font-size="12" font-weight="700" fill="#0e3d66" font-family="Sora,sans-serif">Share</text>
-        <text x="74" y="96" text-anchor="middle" font-size="10" fill="#2f6fa6"  font-family="Sora,sans-serif">location pins</text>
+        <text x="74" y="78" text-anchor="middle" font-size="12" font-weight="700" fill="#0e3d66" font-family="DM Sans,system-ui,-apple-system,sans-serif">Share</text>
+        <text x="74" y="96" text-anchor="middle" font-size="10" fill="#2f6fa6"  font-family="DM Sans,system-ui,-apple-system,sans-serif">location pins</text>
 
         <line x1="130" y1="80" x2="158" y2="80" stroke="#2f6fa6" stroke-width="1.5" marker-end="url(#arr)" opacity=".45"/>
 
         <!-- Step 2 -->
         <rect x="160" y="52" width="108" height="56" rx="12" fill="#dfedfb" stroke="rgba(47,111,166,0.22)" stroke-width="1"/>
-        <text x="214" y="78" text-anchor="middle" font-size="12" font-weight="700" fill="#0e3d66" font-family="Sora,sans-serif">Invite</text>
-        <text x="214" y="96" text-anchor="middle" font-size="10" fill="#2f6fa6"  font-family="Sora,sans-serif">partner joins</text>
+        <text x="214" y="78" text-anchor="middle" font-size="12" font-weight="700" fill="#0e3d66" font-family="DM Sans,system-ui,-apple-system,sans-serif">Invite</text>
+        <text x="214" y="96" text-anchor="middle" font-size="10" fill="#2f6fa6"  font-family="DM Sans,system-ui,-apple-system,sans-serif">partner joins</text>
 
         <line x1="270" y1="80" x2="298" y2="80" stroke="#2f6fa6" stroke-width="1.5" marker-end="url(#arr)" opacity=".45"/>
 
         <!-- Step 3 — highlighted -->
         <rect x="300" y="40" width="124" height="80" rx="14" fill="#2f6fa6"/>
-        <text x="362" y="72" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff"              font-family="Sora,sans-serif">Fairness</text>
-        <text x="362" y="90" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.78)" font-family="Sora,sans-serif">engine ranks</text>
-        <text x="362" y="107" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.6)"  font-family="Sora,sans-serif">venues</text>
+        <text x="362" y="72" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff"              font-family="DM Sans,system-ui,-apple-system,sans-serif">Fairness</text>
+        <text x="362" y="90" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.78)" font-family="DM Sans,system-ui,-apple-system,sans-serif">engine ranks</text>
+        <text x="362" y="107" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.6)"  font-family="DM Sans,system-ui,-apple-system,sans-serif">venues</text>
 
         <line x1="426" y1="80" x2="454" y2="80" stroke="#5da030" stroke-width="1.5" marker-end="url(#arr)" opacity=".55"/>
 
         <!-- Step 4 -->
         <rect x="456" y="52" width="108" height="56" rx="12" fill="#e4f3d0" stroke="rgba(93,160,48,0.28)" stroke-width="1"/>
-        <text x="510" y="78" text-anchor="middle" font-size="12" font-weight="700" fill="#294f10" font-family="Sora,sans-serif">Confirm</text>
-        <text x="510" y="96" text-anchor="middle" font-size="10" fill="#3d7318"  font-family="Sora,sans-serif">venue locked</text>
+        <text x="510" y="78" text-anchor="middle" font-size="12" font-weight="700" fill="#294f10" font-family="DM Sans,system-ui,-apple-system,sans-serif">Confirm</text>
+        <text x="510" y="96" text-anchor="middle" font-size="10" fill="#3d7318"  font-family="DM Sans,system-ui,-apple-system,sans-serif">venue locked</text>
 
         <line x1="566" y1="80" x2="594" y2="80" stroke="#5da030" stroke-width="1.5" marker-end="url(#arr)" opacity=".55"/>
 
         <!-- Step 5 -->
         <rect x="596" y="52" width="68" height="56" rx="12" fill="#e4f3d0" stroke="rgba(93,160,48,0.28)" stroke-width="1"/>
-        <text x="630" y="82" text-anchor="middle" font-size="20" font-family="Sora,sans-serif">🚗</text>
-        <text x="630" y="98" text-anchor="middle" font-size="9.5" font-weight="600" fill="#294f10" font-family="Sora,sans-serif">Go!</text>
+        <text x="630" y="82" text-anchor="middle" font-size="20" font-family="DM Sans,system-ui,-apple-system,sans-serif">🚗</text>
+        <text x="630" y="98" text-anchor="middle" font-size="9.5" font-weight="600" fill="#294f10" font-family="DM Sans,system-ui,-apple-system,sans-serif">Go!</text>
 
         <!-- Step labels -->
-        <text x="74"  y="130" text-anchor="middle" font-size="10" fill="#6b8699" font-family="Sora,sans-serif">Step 1</text>
-        <text x="214" y="130" text-anchor="middle" font-size="10" fill="#6b8699" font-family="Sora,sans-serif">Step 2</text>
-        <text x="362" y="136" text-anchor="middle" font-size="10" font-weight="600" fill="#2f6fa6" font-family="Sora,sans-serif">Step 3 · the magic</text>
-        <text x="510" y="130" text-anchor="middle" font-size="10" fill="#6b8699" font-family="Sora,sans-serif">Step 4</text>
-        <text x="630" y="130" text-anchor="middle" font-size="10" fill="#294f10" font-family="Sora,sans-serif">Done</text>
+        <text x="74"  y="130" text-anchor="middle" font-size="10" fill="#6b8699" font-family="DM Sans,system-ui,-apple-system,sans-serif">Step 1</text>
+        <text x="214" y="130" text-anchor="middle" font-size="10" fill="#6b8699" font-family="DM Sans,system-ui,-apple-system,sans-serif">Step 2</text>
+        <text x="362" y="136" text-anchor="middle" font-size="10" font-weight="600" fill="#2f6fa6" font-family="DM Sans,system-ui,-apple-system,sans-serif">Step 3 · the magic</text>
+        <text x="510" y="130" text-anchor="middle" font-size="10" fill="#6b8699" font-family="DM Sans,system-ui,-apple-system,sans-serif">Step 4</text>
+        <text x="630" y="130" text-anchor="middle" font-size="10" fill="#294f10" font-family="DM Sans,system-ui,-apple-system,sans-serif">Done</text>
       </svg>
     `;
   }
@@ -993,38 +855,38 @@ export class LandingPage extends LitElement {
         <line x1="152" y1="174" x2="188" y2="174" stroke="white" stroke-width="2"   stroke-linecap="round"/>
         <circle cx="152" cy="186" r="9"  fill="rgba(255,255,255,0.22)" stroke="white" stroke-width="1.5"/>
         <circle cx="188" cy="186" r="9"  fill="rgba(255,255,255,0.22)" stroke="white" stroke-width="1.5"/>
-        <text x="152" y="190" text-anchor="middle" font-size="8" font-weight="700" fill="white" font-family="Sora,sans-serif">A</text>
-        <text x="188" y="190" text-anchor="middle" font-size="8" font-weight="700" fill="white" font-family="Sora,sans-serif">B</text>
-        <text x="170" y="212" text-anchor="middle" font-size="9" font-weight="700" fill="white" font-family="Sora,sans-serif">FAIR</text>
+        <text x="152" y="190" text-anchor="middle" font-size="8" font-weight="700" fill="white" font-family="DM Sans,system-ui,-apple-system,sans-serif">A</text>
+        <text x="188" y="190" text-anchor="middle" font-size="8" font-weight="700" fill="white" font-family="DM Sans,system-ui,-apple-system,sans-serif">B</text>
+        <text x="170" y="212" text-anchor="middle" font-size="9" font-weight="700" fill="white" font-family="DM Sans,system-ui,-apple-system,sans-serif">FAIR</text>
 
         <!-- Input: Traffic (top) -->
         <circle cx="170" cy="52" r="28" fill="white" stroke="rgba(47,111,166,0.16)" stroke-width="1"/>
-        <text x="170" y="47"  text-anchor="middle" font-size="17" font-family="Sora,sans-serif">🚦</text>
-        <text x="170" y="66"  text-anchor="middle" font-size="9"  font-weight="600" fill="#0e3d66" font-family="Sora,sans-serif">Traffic</text>
+        <text x="170" y="47"  text-anchor="middle" font-size="17" font-family="DM Sans,system-ui,-apple-system,sans-serif">🚦</text>
+        <text x="170" y="66"  text-anchor="middle" font-size="9"  font-weight="600" fill="#0e3d66" font-family="DM Sans,system-ui,-apple-system,sans-serif">Traffic</text>
         <line x1="170" y1="82" x2="170" y2="122" stroke="#2f6fa6" stroke-width="1.5" stroke-dasharray="4 3" opacity=".38"/>
 
         <!-- Input: Routes (left-top) -->
         <circle cx="50" cy="152" r="28" fill="white" stroke="rgba(47,111,166,0.16)" stroke-width="1"/>
-        <text x="50"  y="147" text-anchor="middle" font-size="17" font-family="Sora,sans-serif">🗺️</text>
-        <text x="50"  y="166" text-anchor="middle" font-size="9"  font-weight="600" fill="#0e3d66" font-family="Sora,sans-serif">Routes</text>
+        <text x="50"  y="147" text-anchor="middle" font-size="17" font-family="DM Sans,system-ui,-apple-system,sans-serif">🗺️</text>
+        <text x="50"  y="166" text-anchor="middle" font-size="9"  font-weight="600" fill="#0e3d66" font-family="DM Sans,system-ui,-apple-system,sans-serif">Routes</text>
         <line x1="78" y1="168" x2="116" y2="182" stroke="#2f6fa6" stroke-width="1.5" stroke-dasharray="4 3" opacity=".38"/>
 
         <!-- Input: Timing (left-bottom) -->
         <circle cx="50" cy="248" r="28" fill="white" stroke="rgba(47,111,166,0.16)" stroke-width="1"/>
-        <text x="50"  y="243" text-anchor="middle" font-size="17" font-family="Sora,sans-serif">🕐</text>
-        <text x="50"  y="262" text-anchor="middle" font-size="9"  font-weight="600" fill="#0e3d66" font-family="Sora,sans-serif">Timing</text>
+        <text x="50"  y="243" text-anchor="middle" font-size="17" font-family="DM Sans,system-ui,-apple-system,sans-serif">🕐</text>
+        <text x="50"  y="262" text-anchor="middle" font-size="9"  font-weight="600" fill="#0e3d66" font-family="DM Sans,system-ui,-apple-system,sans-serif">Timing</text>
         <line x1="78" y1="238" x2="116" y2="216" stroke="#2f6fa6" stroke-width="1.5" stroke-dasharray="4 3" opacity=".38"/>
 
         <!-- Input: Venues (right-top) -->
         <circle cx="290" cy="152" r="28" fill="white" stroke="rgba(47,111,166,0.16)" stroke-width="1"/>
-        <text x="290" y="147" text-anchor="middle" font-size="17" font-family="Sora,sans-serif">⭐</text>
-        <text x="290" y="166" text-anchor="middle" font-size="9"  font-weight="600" fill="#0e3d66" font-family="Sora,sans-serif">Venues</text>
+        <text x="290" y="147" text-anchor="middle" font-size="17" font-family="DM Sans,system-ui,-apple-system,sans-serif">⭐</text>
+        <text x="290" y="166" text-anchor="middle" font-size="9"  font-weight="600" fill="#0e3d66" font-family="DM Sans,system-ui,-apple-system,sans-serif">Venues</text>
         <line x1="262" y1="168" x2="224" y2="182" stroke="#5da030" stroke-width="1.5" stroke-dasharray="4 3" opacity=".38"/>
 
         <!-- Input: Vibes (right-bottom) -->
         <circle cx="290" cy="248" r="28" fill="white" stroke="rgba(47,111,166,0.16)" stroke-width="1"/>
-        <text x="290" y="243" text-anchor="middle" font-size="17" font-family="Sora,sans-serif">💬</text>
-        <text x="290" y="262" text-anchor="middle" font-size="9"  font-weight="600" fill="#0e3d66" font-family="Sora,sans-serif">Vibe</text>
+        <text x="290" y="243" text-anchor="middle" font-size="17" font-family="DM Sans,system-ui,-apple-system,sans-serif">💬</text>
+        <text x="290" y="262" text-anchor="middle" font-size="9"  font-weight="600" fill="#0e3d66" font-family="DM Sans,system-ui,-apple-system,sans-serif">Vibe</text>
         <line x1="262" y1="238" x2="224" y2="214" stroke="#5da030" stroke-width="1.5" stroke-dasharray="4 3" opacity=".38"/>
 
         <!-- Output arrow -->
@@ -1037,8 +899,8 @@ export class LandingPage extends LitElement {
 
         <!-- Output pill -->
         <rect x="90" y="338" width="160" height="46" rx="23" fill="#e4f3d0" stroke="rgba(93,160,48,0.38)" stroke-width="1"/>
-        <text x="170" y="356" text-anchor="middle" font-size="10" font-weight="700" fill="#294f10" font-family="Sora,sans-serif">Ranked fair venues</text>
-        <text x="170" y="373" text-anchor="middle" font-size="9"  fill="#3d7318"  font-family="Sora,sans-serif">sorted by balance score</text>
+        <text x="170" y="356" text-anchor="middle" font-size="10" font-weight="700" fill="#294f10" font-family="DM Sans,system-ui,-apple-system,sans-serif">Ranked fair venues</text>
+        <text x="170" y="373" text-anchor="middle" font-size="9"  fill="#3d7318"  font-family="DM Sans,system-ui,-apple-system,sans-serif">sorted by balance score</text>
       </svg>
     `;
   }
@@ -1048,11 +910,11 @@ export class LandingPage extends LitElement {
       <svg width="100%" viewBox="0 0 560 112" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:36px">
         <!-- You -->
         <circle cx="40"  cy="56" r="20" fill="#dfedfb" stroke="#2f6fa6" stroke-width="1.5"/>
-        <text   x="40"  y="60" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0e3d66" font-family="Sora,sans-serif">You</text>
+        <text   x="40"  y="60" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0e3d66" font-family="DM Sans,system-ui,-apple-system,sans-serif">You</text>
 
         <!-- Them -->
         <circle cx="520" cy="56" r="20" fill="#e4f3d0" stroke="#5da030" stroke-width="1.5"/>
-        <text   x="520" y="60" text-anchor="middle" font-size="10.5" font-weight="700" fill="#294f10" font-family="Sora,sans-serif">Them</text>
+        <text   x="520" y="60" text-anchor="middle" font-size="10.5" font-weight="700" fill="#294f10" font-family="DM Sans,system-ui,-apple-system,sans-serif">Them</text>
 
         <!-- Paths converging -->
         <path d="M62 56 Q160 28 262 56"  stroke="#2f6fa6" stroke-width="2" stroke-dasharray="6 4" fill="none" stroke-linecap="round" opacity=".6"/>
@@ -1061,8 +923,8 @@ export class LandingPage extends LitElement {
         <!-- Meeting point -->
         <circle cx="272" cy="56" r="30" fill="rgba(47,111,166,0.07)" stroke="rgba(47,111,166,0.14)" stroke-width="1"/>
         <circle cx="272" cy="56" r="18" fill="#0c1a27"/>
-        <text   x="272" y="52" text-anchor="middle" font-size="9.5" fill="white" font-family="Sora,sans-serif">meet</text>
-        <text   x="272" y="65" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,0.72)" font-family="Sora,sans-serif">here</text>
+        <text   x="272" y="52" text-anchor="middle" font-size="9.5" fill="white" font-family="DM Sans,system-ui,-apple-system,sans-serif">meet</text>
+        <text   x="272" y="65" text-anchor="middle" font-size="8.5" fill="rgba(255,255,255,0.72)" font-family="DM Sans,system-ui,-apple-system,sans-serif">here</text>
       </svg>
     `;
   }
@@ -1071,16 +933,16 @@ export class LandingPage extends LitElement {
     return html`
       <!-- NAV -->
       <nav class="nav">
-        <a class="nav-logo" href="#">
+        <a class="nav-logo" href="#" @click=${(e: Event) => { e.preventDefault(); (this.renderRoot as ShadowRoot).querySelector('.hero')?.scrollIntoView({ behavior: 'smooth' }); }}>
           <div class="logo-mark">
             <img src="/favicon.svg" alt="" aria-hidden="true" />
           </div>
           2bottles
         </a>
         <div class="nav-links">
-          <a href="#how">How it works</a>
-          <a href="#fairness">Fairness</a>
-          <a href="#stories">Stories</a>
+          <a href="#how" @click=${this._handleNavClick}>How it works</a>
+          <a href="#fairness" @click=${this._handleNavClick}>Fairness</a>
+          <a href="#stories" @click=${this._handleNavClick}>Stories</a>
         </div>
         <button class="nav-cta" @click=${(event: Event) => this._emit('start', event)}>Start a rendezvous</button>
       </nav>
@@ -1090,10 +952,6 @@ export class LandingPage extends LitElement {
         <div class="hero-bg"></div>
         <div class="hero-grid"></div>
         <div class="hero-left">
-          <div class="hero-status">
-            <span class="status-dot"></span>
-            <span class="status-count">4,200</span> meetups coordinated so far
-          </div>
           <h1 class="hero-title">
             Meet in the<br>
             <em>middle.</em><br>
@@ -1112,18 +970,9 @@ export class LandingPage extends LitElement {
             </button>
             <button class="btn-ghost">See how it works</button>
           </div>
-          <div class="social-proof">
-            <div class="avatar-stack">
-              <div class="avatar" style="background:#2f6fa6">TI</div>
-              <div class="avatar" style="background:#5da030">AF</div>
-              <div class="avatar" style="background:#8a4fff">NK</div>
-              <div class="avatar" style="background:#c04828">BF</div>
-            </div>
-            <span>People who stopped arguing about where to meet</span>
-          </div>
         </div>
         <div class="hero-right">
-          ${this._heroCardSvg()}
+          <hero-gallery></hero-gallery>
         </div>
       </section>
 
@@ -1180,8 +1029,8 @@ export class LandingPage extends LitElement {
                   <line x1="14" y1="12" x2="34" y2="12" stroke="#5da030" stroke-width="2" stroke-linecap="round"/>
                   <circle cx="14" cy="19" r="7" fill="rgba(93,160,48,0.2)" stroke="#5da030" stroke-width="1.5"/>
                   <circle cx="34" cy="19" r="7" fill="rgba(93,160,48,0.2)" stroke="#5da030" stroke-width="1.5"/>
-                  <text x="14" y="23" text-anchor="middle" font-size="7" font-weight="700" fill="#294f10" font-family="Sora,sans-serif">A</text>
-                  <text x="34" y="23" text-anchor="middle" font-size="7" font-weight="700" fill="#294f10" font-family="Sora,sans-serif">B</text>
+                  <text x="14" y="23" text-anchor="middle" font-size="7" font-weight="700" fill="#294f10" font-family="DM Sans,system-ui,-apple-system,sans-serif">A</text>
+                  <text x="34" y="23" text-anchor="middle" font-size="7" font-weight="700" fill="#294f10" font-family="DM Sans,system-ui,-apple-system,sans-serif">B</text>
                   <rect x="18" y="34" width="12" height="4" rx="2" fill="#5da030"/>
                 </svg>
               </div>

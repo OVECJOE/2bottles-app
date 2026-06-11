@@ -1,11 +1,11 @@
 import { get, set } from 'idb-keyval';
-import { p2pService } from '../services/p2p.service.js';
 import { uiStore } from './index.js';
 import type { Coordinates, LocationState } from '../types/index.js';
 
 const DB_KEY = '2b:location_store';
 
 type Listener = () => void;
+type LocationChangeCallback = (coords: Coordinates) => void;
 
 class LocationStore implements LocationState {
     own: Coordinates | null = null;
@@ -26,6 +26,8 @@ class LocationStore implements LocationState {
     private _lastErrorLogTime = 0;
     private _lastPermissionToastAt = 0;
     private _lastSignalToastAt = 0;
+    private _onLocationChange: LocationChangeCallback | null = null;
+    private _coolingOffTimer: ReturnType<typeof setTimeout> | null = null;
 
     private _canUseGeolocation(): boolean {
         return typeof window !== 'undefined' && !!navigator.geolocation && window.isSecureContext;
@@ -80,13 +82,17 @@ class LocationStore implements LocationState {
         this._listeners.forEach((fn) => fn());
     }
 
+    setOnLocationChange(callback: LocationChangeCallback | null) {
+        this._onLocationChange = callback;
+    }
+
     setOwnLocation(coords: Coordinates, accuracy?: number) {
         if (!this._isValidCoords(coords)) return;
         this.own = coords;
         this.accuracy = accuracy ?? null;
         this._notify();
         this._save();
-        p2pService.broadcastLocation(coords);
+        this._onLocationChange?.(coords);
     }
 
     startWatching() {
@@ -181,7 +187,8 @@ class LocationStore implements LocationState {
                 this.stopWatching();
                 this._notify();
 
-                setTimeout(() => {
+                this._coolingOffTimer = setTimeout(() => {
+                    this._coolingOffTimer = null;
                     this.isCoolingOff = false;
                     this._errorCount = 0;
                     if (this._canUseGeolocation()) {
@@ -308,6 +315,10 @@ class LocationStore implements LocationState {
 
     reset() {
         this.stopWatching();
+        if (this._coolingOffTimer) {
+            clearTimeout(this._coolingOffTimer);
+            this._coolingOffTimer = null;
+        }
         this.own = null;
         this.partner = null;
         this.destination = null;

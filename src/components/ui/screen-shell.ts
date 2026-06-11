@@ -69,7 +69,7 @@ export class ScreenShell extends LitElement {
     .time {
       font-size: var(--text-xs); font-weight: var(--weight-bold);
       letter-spacing: 0.2px;
-      color: rgba(20, 27, 36, 0.92);
+      color: var(--color-text);
       background: var(--color-surface);
       border: 1px solid var(--glass-border);
       border-radius: var(--border-radius-pill);
@@ -93,7 +93,7 @@ export class ScreenShell extends LitElement {
       display: flex; align-items: center; gap: 2px;
       box-shadow: var(--shadow-sm);
       transition: background var(--duration-fast), transform var(--duration-fast);
-      color: var(--color-text-primary);
+      color: var(--color-text);
       -webkit-tap-highlight-color: transparent;
       line-height: 1;
     }

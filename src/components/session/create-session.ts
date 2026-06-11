@@ -230,9 +230,8 @@ export class CreateSession extends LitElement {
       await sessionStore.createSession(peerId);
 
       uiStore.goToInvite();
-    } catch (err: any) {
-      console.error('[CreateSession] Error:', err);
-      this._error = err?.message ?? 'Something went wrong. Please try again.';
+    } catch (err) {
+      this._error = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
     } finally {
       this._loading = false;
       uiStore.setLoading(false);

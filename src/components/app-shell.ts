@@ -202,7 +202,6 @@ export class AppShell extends LitElement {
         const session = sessionStore.session;
         
         if (session && session.status !== 'ended') {
-            console.log('[AppShell] Resuming existing session:', session.id);
             try {
                 if (sessionStore.isHost) {
                     await p2pService.init(session.id);
@@ -211,8 +210,8 @@ export class AppShell extends LitElement {
                 } else {
                     await p2pService.init(); 
                 }
-            } catch (err) {
-                console.warn('[AppShell] Re-connect failed:', err);
+            } catch {
+                // Reconnection failed silently - user can retry manually
             }
         }
     }

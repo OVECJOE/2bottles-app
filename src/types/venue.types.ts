@@ -1,4 +1,4 @@
-import type { Coordinates } from "./location.types";
+import type { Coordinates } from "./location.types.js";
 
 export interface Venue {
     id: string;

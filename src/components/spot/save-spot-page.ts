@@ -527,8 +527,7 @@ export class SaveSpotPage extends LitElement {
 
       uiStore.showToast(`Spot saved${uploads.length ? ` with ${uploads.length} upload${uploads.length > 1 ? 's' : ''}` : ''}.`);
       Router.go('/ended');
-    } catch (error) {
-      console.error('[SaveSpotPage] save failed:', error);
+    } catch {
       uiStore.showToast('Unable to save spot right now. Please try again.');
     } finally {
       this._saving = false;

@@ -24,7 +24,7 @@ export const sharedStyles = css`
   }
 
   .handle {
-    width: 36px; height: 4px; background: rgba(0,0,0,0.12);
+    width: 36px; height: 4px; background: var(--color-border-strong);
     border-radius: var(--border-radius-pill); margin: 0 auto var(--space-4);
     flex-shrink: 0;
   }
@@ -50,41 +50,40 @@ export const sharedStyles = css`
   .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
   .btn-primary {
-    background: var(--color-blue); color: var(--color-blue-text);
+    background: var(--color-action); color: var(--color-action-text);
   }
-  .btn-primary:hover { background: var(--color-blue-mid); }
+  .btn-primary:hover { background: var(--color-action-hover); }
 
   .btn-green {
-    background: var(--color-green); color: var(--color-green-text);
+    background: var(--color-success); color: var(--color-success-text);
   }
-  .btn-green:hover { background: var(--color-green-mid); }
+  .btn-green:hover { background: var(--color-success-hover); }
 
   .btn-outline {
-    background: transparent; color: var(--color-blue);
-    border: 1.5px solid var(--color-blue);
+    background: transparent; color: var(--color-action);
+    border: 1.5px solid var(--color-action);
   }
-  .btn-outline:hover { background: var(--color-blue-light); }
+  .btn-outline:hover { background: var(--color-surface-muted); }
 
   .btn-ghost {
     background: transparent; color: var(--color-text-muted);
     font-size: var(--text-sm);
   }
-  .btn-ghost:hover { color: var(--color-text-primary); }
+  .btn-ghost:hover { color: var(--color-text); }
 
   /* Inputs */
   .input-base {
     width: 100%; padding: 12px;
-    border: 1px solid rgba(0,0,0,0.1); border-radius: var(--border-radius-md);
+    border: 1px solid var(--color-border); border-radius: var(--border-radius-md);
     font-family: var(--font-sans); font-size: var(--text-md);
-    background: var(--color-surface);
-    backdrop-filter: blur(10px) saturate(130%);
-    -webkit-backdrop-filter: blur(10px) saturate(130%);
+    background: var(--color-surface-muted);
+    color: var(--color-text);
     transition: border-color var(--duration-fast);
     box-sizing: border-box;
   }
   .input-base:focus { 
-    outline: none; border-color: var(--color-blue); 
-    box-shadow: 0 0 0 2px rgba(77,114,152,0.1); 
+    outline: none; border-color: var(--color-action); 
+    box-shadow: 0 0 0 2px rgba(74,139,196,0.15); 
   }
   .input-base::placeholder { color: var(--color-text-muted); }
 
@@ -99,9 +98,9 @@ export const sharedStyles = css`
     border-radius: var(--border-radius-md);
     font-size: var(--text-xs); font-weight: var(--weight-medium);
   }
-  .status-strip.success { background: var(--color-success-bg); color: var(--color-success-text); }
-  .status-strip.warning { background: var(--color-warning-bg); color: var(--color-warning-text); }
-  .status-strip.danger  { background: var(--color-danger-bg);  color: var(--color-danger-text); }
-  .status-strip.info    { background: var(--color-blue-light); color: var(--color-blue-dark); }
+  .status-strip.success { background: var(--color-success); color: var(--color-success-text); }
+  .status-strip.warning { background: var(--color-warning); color: var(--color-warning-text); }
+  .status-strip.danger  { background: var(--color-danger);  color: var(--color-danger-text); }
+  .status-strip.info    { background: var(--color-info); color: var(--color-info-text); }
 
 `;

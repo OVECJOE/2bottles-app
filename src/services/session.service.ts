@@ -10,12 +10,21 @@ import type { Partner, Venue } from '../types/index.js';
 export const sessionService = {
 
     async createSession(): Promise<void> {
-        const coords = locationStore.own ?? await locationStore.fetchOnce();
+        let coords;
+        try {
+            coords = locationStore.own ?? await locationStore.fetchOnce();
+        } catch {
+            uiStore.showToast('Could not get your location. Please enable GPS or search manually.');
+            throw new Error('Location unavailable');
+        }
 
         uiStore.setLoading(true);
         try {
             const { session } = await sessionsApi.create({ lat: coords.lat, lng: coords.lng });
-            sessionStore.createSession(session.id);
+            await sessionStore.createSession(session.id);
+        } catch (err) {
+            uiStore.showToast('Failed to create session. Please try again.');
+            throw err;
         } finally {
             uiStore.setLoading(false);
         }
@@ -28,8 +37,11 @@ export const sessionService = {
         uiStore.setLoading(true);
         try {
             await sessionsApi.invite({ sessionId, partnerId: partner.id });
-            sessionStore.setPartner(partner);
+            await sessionStore.setPartner(partner);
             wsService.connect(sessionId);
+        } catch (err) {
+            uiStore.showToast('Failed to invite partner. Please try again.');
+            throw err;
         } finally {
             uiStore.setLoading(false);
         }
@@ -38,7 +50,10 @@ export const sessionService = {
     async fetchVenueSuggestions(): Promise<void> {
         const own = locationStore.own;
         const partner = locationStore.partner;
-        if (!own || !partner) return;
+        if (!own || !partner) {
+            uiStore.showToast('Waiting for both locations...');
+            return;
+        }
 
         uiStore.setLoading(true);
         try {
@@ -47,6 +62,9 @@ export const sessionService = {
                 lat2: partner.lat, lng2: partner.lng,
             });
             sessionStore.setVenueSuggestions(venues);
+        } catch (err) {
+            uiStore.showToast('Could not fetch venue suggestions. Please try again.');
+            throw err;
         } finally {
             uiStore.setLoading(false);
         }
@@ -56,12 +74,28 @@ export const sessionService = {
         const sessionId = sessionStore.session?.id;
         if (!sessionId) return;
 
+        const previousVenue = sessionStore.selectedVenue;
+        const previousDestination = locationStore.destination;
+        const previousVenueId = sessionStore.session?.venueId;
+
         sessionStore.selectVenue(venue);
         locationStore.setDestination(venue.coordinates);
 
         uiStore.setLoading(true);
         try {
             await sessionsApi.confirmVenue(sessionId, venue.id);
+        } catch (err) {
+            sessionStore.selectVenue(previousVenue!);
+            if (previousDestination) {
+                locationStore.setDestination(previousDestination);
+            } else {
+                locationStore.clearDestination();
+            }
+            if (sessionStore.session) {
+                sessionStore.session = { ...sessionStore.session, venueId: previousVenueId ?? null };
+            }
+            uiStore.showToast('Failed to confirm venue. Please try again.');
+            throw err;
         } finally {
             uiStore.setLoading(false);
         }
@@ -73,7 +107,7 @@ export const sessionService = {
             await sessionsApi.end(sessionId).catch(() => { });
         }
         wsService.disconnect();
-        sessionStore.endSession();
+        await sessionStore.endSession();
         locationStore.reset();
     },
 };

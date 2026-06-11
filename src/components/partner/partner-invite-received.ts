@@ -59,7 +59,6 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
   async onBeforeEnter(location: RouterLocation) {
     const peerId = location.params.peerId as string;
     if (peerId) {
-      console.log('[PartnerInviteReceived] Extracted peerId:', peerId);
       await this._handleAutoJoin(peerId);
     }
   }
@@ -71,15 +70,12 @@ export class PartnerInviteReceived extends LitElement implements BeforeEnterObse
     uiStore.setLoading(true);
     try {
       if (sessionStore.session) {
-        console.log('[PartnerInviteReceived] Clearing old session.');
         p2pService.disconnect();
         await sessionStore.endSession();
       }
       await sessionStore.joinSession(peerId);
       await p2pService.connect(peerId);
-      console.log('[PartnerInviteReceived] Join successful.');
-    } catch (err) {
-      console.error('[PartnerInviteReceived] Join failed:', err);
+    } catch {
       uiStore.showToast('Could not connect to partner.');
     } finally {
       this._connecting = false;

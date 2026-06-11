@@ -1,4 +1,4 @@
-import type { Coordinates } from "./location.types";
+import type { Coordinates } from "./location.types.js";
 
 export type SessionStatus =
     | 'idle'
@@ -22,7 +22,6 @@ export type PartnerStatus =
     | 'accepted'
     | 'rejected'
     | 'agreed'
-    | 'refused'
     | 'arrived';
 
 export interface Partner {
@@ -38,7 +37,7 @@ export interface Partner {
 
 export interface ChatMessage {
     id: string;
-    senderId: 'me' | string;   // 'me' or partner id
+    senderId: string;          // 'me' for own messages, partner id for partner messages
     text: string;
     timestamp: number;         // unix ms
 }
