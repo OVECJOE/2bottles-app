@@ -459,65 +459,6 @@ export class LandingPage extends LitElement {
         line-height: 1.6;
       }
 
-      /* ── TESTIMONIALS ── */
-      .testimonials-section { background: var(--surface); }
-      .testimonials-section .section-inner { text-align: center; }
-      .testimonials-section .section-kicker { color: var(--blue); }
-      .testimonials-section .section-title { color: var(--ink); }
-
-      .tgrid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
-        margin-top: 44px;
-        text-align: left;
-      }
-
-      .tcard {
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        background: var(--white);
-        padding: 24px;
-      }
-
-      .tcard-quote {
-        font-size: 14px;
-        line-height: 1.72;
-        color: var(--ink-soft);
-        margin-bottom: 20px;
-      }
-
-      .tcard-author {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .tcard-avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        font-weight: 700;
-        color: #fff;
-        flex-shrink: 0;
-      }
-
-      .tcard-name {
-        font-size: 13px;
-        font-weight: 700;
-        color: var(--ink);
-      }
-
-      .tcard-role {
-        font-size: 12px;
-        color: var(--ink-faint);
-        margin-top: 2px;
-      }
-
       /* ── STATS ── */
       .stats-section {
         background: var(--ink);
@@ -652,7 +593,6 @@ export class LandingPage extends LitElement {
       /* ── RESPONSIVE ── */
       @media (max-width: 900px) {
         .nav { padding: 14px 22px; }
-        .nav-links { display: none; }
         .hero { grid-template-columns: 1fr; padding: 60px 22px 52px; min-height: auto; gap: 44px; }
         .hero-left { text-align: center; }
         .hero-sub { margin-left: auto; margin-right: auto; }
@@ -662,7 +602,6 @@ export class LandingPage extends LitElement {
         .problem-section .section-inner,
         .fairness-section .section-inner { grid-template-columns: 1fr; gap: 44px; }
         .steps-grid { grid-template-columns: 1fr; gap: 16px; }
-        .tgrid { grid-template-columns: 1fr; gap: 14px; }
         .stats-section .section-inner { grid-template-columns: repeat(2, 1fr); }
         .footer { flex-direction: column; gap: 14px; text-align: center; }
       }
@@ -702,15 +641,6 @@ export class LandingPage extends LitElement {
       bubbles: true,
       composed: true,
     }));
-  }
-
-  private _handleNavClick(event: Event) {
-    event.preventDefault();
-    const target = event.currentTarget as HTMLAnchorElement;
-    const id = target.getAttribute('href')?.slice(1);
-    if (id) {
-      this.renderRoot.querySelector(`#${id}`)?.scrollIntoView({ behavior: 'smooth' });
-    }
   }
 
   override firstUpdated() {
@@ -939,11 +869,6 @@ export class LandingPage extends LitElement {
           </div>
           2bottles
         </a>
-        <div class="nav-links">
-          <a href="#how" @click=${this._handleNavClick}>How it works</a>
-          <a href="#fairness" @click=${this._handleNavClick}>Fairness</a>
-          <a href="#stories" @click=${this._handleNavClick}>Stories</a>
-        </div>
         <button class="nav-cta" @click=${(event: Event) => this._emit('start', event)}>Start a rendezvous</button>
       </nav>
 
@@ -953,13 +878,12 @@ export class LandingPage extends LitElement {
         <div class="hero-grid"></div>
         <div class="hero-left">
           <h1 class="hero-title">
-            Meet in the<br>
-            <em>middle.</em><br>
-            Not yours.
+            Meet <em>halfway.</em><br>
+            Actually halfway.
           </h1>
           <p class="hero-sub">
-            2bottles finds the genuinely fair meeting point between two people —
-            factoring real routes and real time, not just the nearest dot on a map.
+            Not the midpoint on a map. The midpoint in travel time. Two people start from anywhere.
+            2bottles finds the place that's fair for both — factoring real traffic, not guesswork.
           </p>
           <div class="hero-actions">
             <button class="btn-primary" @click=${(event: Event) => this._emit('start', event)}>
@@ -968,7 +892,6 @@ export class LandingPage extends LitElement {
               </svg>
               Start a Rendezvous
             </button>
-            <button class="btn-ghost">See how it works</button>
           </div>
         </div>
         <div class="hero-right">
@@ -980,17 +903,15 @@ export class LandingPage extends LitElement {
       <section class="problem-section section" id="problem">
         <div class="section-inner">
           <div class="reveal">
-            <p class="section-kicker">The honest problem</p>
+            <p class="section-kicker">The problem</p>
             <h2 class="section-title">
-              "Let's meet<br>
-              somewhere in the<br>
+              "Let's meet in the<br>
               <span class="problem-accent">middle."</span><br>
-              Whose middle?
+              Whose middle exactly?
             </h2>
             <p class="section-body">
-              That "middle" your friend suggested is probably near their neighbourhood.
-              2bottles finds the point where both of you travel roughly the same
-              time — not the same kilometres, not the same guess.
+              The "middle" your friend suggested is probably near their neighbourhood.
+              Every meetup is a negotiation — and someone always travels more.
             </p>
           </div>
           <div class="reveal" style="transition-delay:.14s">
@@ -1004,7 +925,7 @@ export class LandingPage extends LitElement {
         <div class="section-inner">
           <p class="section-kicker reveal">How it works</p>
           <h2 class="section-title reveal" style="transition-delay:.08s">
-            Three steps to a fair meetup
+            Three steps. One fair place.
           </h2>
 
           <div class="steps-grid">
@@ -1018,8 +939,8 @@ export class LandingPage extends LitElement {
                 </svg>
               </div>
               <div class="step-num">01</div>
-              <h3>Drop your pin</h3>
-              <p>Share your real location — or override with any address. Your partner does the same from wherever they are.</p>
+              <h3>Share your location</h3>
+              <p>Drop your pin — your real address or anywhere you choose. Your partner shares theirs too. No account needed.</p>
             </div>
             <div class="step-card reveal" style="transition-delay:.11s">
               <div class="step-icon">
@@ -1035,8 +956,8 @@ export class LandingPage extends LitElement {
                 </svg>
               </div>
               <div class="step-num">02</div>
-              <h3>Engine calculates</h3>
-              <p>Live traffic, route shape, time of day — all weighed to surface venues sorted by fairness, not just proximity.</p>
+              <h3>Engine finds the fairest spot</h3>
+              <p>Traffic, route shape, time of day, venue quality — all weighed to surface places sorted by fairness, not proximity.</p>
             </div>
             <div class="step-card reveal" style="transition-delay:.18s">
               <div class="step-icon">
@@ -1047,8 +968,8 @@ export class LandingPage extends LitElement {
                 </svg>
               </div>
               <div class="step-num">03</div>
-              <h3>Both confirm, both move</h3>
-              <p>Pick from ranked venues, confirm together, then track each other live as you head to the same fair place.</p>
+              <h3>Pick, confirm, and move</h3>
+              <p>Choose from ranked venues, confirm together, then track each other live as you head to the same fair place.</p>
             </div>
           </div>
 
@@ -1058,19 +979,18 @@ export class LandingPage extends LitElement {
         </div>
       </section>
 
-      <!-- FAIRNESS ENGINE -->
+      <!-- FAIRNESS AXIOMS -->
       <section class="fairness-section section" id="fairness">
         <div class="section-inner">
           <div class="reveal">
             ${this._engineSvg()}
           </div>
           <div class="reveal" style="transition-delay:.14s">
-            <p class="section-kicker">The fairness engine</p>
+            <p class="section-kicker">The fairness axioms</p>
             <h2 class="section-title">Not the nearest.<br>The <em style="font-style:normal;color:var(--blue)">fairest.</em></h2>
             <p class="section-body">
-              Most apps find the midpoint on a map. We find the midpoint in time —
-              accounting for traffic, road shape, and the quality of what's actually
-              there when you arrive.
+              These are not marketing claims. They are architectural constraints.
+              Every meetup scored by real travel time, not wishful thinking.
             </p>
             <div class="fairness-points">
               <div class="fairness-point">
@@ -1083,7 +1003,7 @@ export class LandingPage extends LitElement {
                   </svg>
                 </div>
                 <div>
-                  <div class="fp-title">Equal travel time, not distance</div>
+                  <div class="fp-title">I — Equal travel time, not distance</div>
                   <div class="fp-desc">Distance is a lie in Lagos traffic. We score on minutes — not kilometres.</div>
                 </div>
               </div>
@@ -1095,8 +1015,8 @@ export class LandingPage extends LitElement {
                   </svg>
                 </div>
                 <div>
-                  <div class="fp-title">Venue quality is part of the score</div>
-                  <div class="fp-desc">A perfectly-timed bad venue ranks lower than a great one that's slightly further.</div>
+                  <div class="fp-title">II — Venue quality is part of the score</div>
+                  <div class="fp-desc">A perfectly-timed bad venue ranks lower than a great one slightly further away.</div>
                 </div>
               </div>
               <div class="fairness-point">
@@ -1107,7 +1027,7 @@ export class LandingPage extends LitElement {
                   </svg>
                 </div>
                 <div>
-                  <div class="fp-title">Recalculates as you move</div>
+                  <div class="fp-title">III — Recalculates as you move</div>
                   <div class="fp-desc">Traffic shifts. 2bottles recalculates live so the meeting point stays fair end-to-end.</div>
                 </div>
               </div>
@@ -1116,45 +1036,7 @@ export class LandingPage extends LitElement {
         </div>
       </section>
 
-      <!-- TESTIMONIALS -->
-      <section class="testimonials-section section" id="stories">
-        <div class="section-inner">
-          <p class="section-kicker reveal">Real stories</p>
-          <h2 class="section-title reveal" style="transition-delay:.08s">People who stopped arguing</h2>
-          <div class="tgrid">
-            <div class="tcard reveal" style="transition-delay:.04s">
-              <p class="tcard-quote">"My friend lives in Victoria Island, I'm in Surulere. Before 2bottles we always ended up at his place or somewhere on the mainland — which meant I drove 45 minutes and he drove 8."</p>
-              <div class="tcard-author">
-                <div class="tcard-avatar" style="background:#2f6fa6">TI</div>
-                <div>
-                  <div class="tcard-name">Tunde Ibitoye</div>
-                  <div class="tcard-role">Lagos Island · frequent meetup planner</div>
-                </div>
-              </div>
-            </div>
-            <div class="tcard reveal" style="transition-delay:.12s">
-              <p class="tcard-quote">"I use it for client meetings now. Share a link, they confirm their location, nobody can say the venue was inconvenient. It's quietly become my professional superpower."</p>
-              <div class="tcard-author">
-                <div class="tcard-avatar" style="background:#5da030">AF</div>
-                <div>
-                  <div class="tcard-name">Amaka Fernandez</div>
-                  <div class="tcard-role">Consultant · Abuja</div>
-                </div>
-              </div>
-            </div>
-            <div class="tcard reveal" style="transition-delay:.2s">
-              <p class="tcard-quote">"It found a café on the Third Mainland neither of us knew existed. Equidistant, 4.6 stars, and we were both there in under 20 minutes. That is genuinely witchcraft."</p>
-              <div class="tcard-author">
-                <div class="tcard-avatar" style="background:#7f3fbf">NK</div>
-                <div>
-                  <div class="tcard-name">Ngozi Kalu</div>
-                  <div class="tcard-role">Port Harcourt → Lagos</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+
 
       <!-- STATS -->
       <section class="stats-section section">
@@ -1184,16 +1066,15 @@ export class LandingPage extends LitElement {
         <div class="section-inner reveal">
           ${this._ctaPathSvg()}
           <h2 class="section-title">
-            Your next meetup<br>
-            should be <em style="font-style:normal;background:linear-gradient(120deg,var(--blue-dark),var(--green-mid));-webkit-background-clip:text;background-clip:text;color:transparent">fair.</em>
+            Ready for a fair meetup?
           </h2>
           <p class="cta-sub">
-            Start a rendezvous in 30 seconds. No sign-up needed for the first session —
-            just share the link with whoever you're meeting.
+            No sign-up. No account. Just share a link with whoever you're meeting
+            and let the engine find the fairest place for both of you.
           </p>
           <div class="cta-actions">
             <button class="btn-primary" style="font-size:15px;padding:15px 26px" @click=${(event: Event) => this._emit('start', event)}>
-              Start your first rendezvous
+              Start a Rendezvous
             </button>
             ${this.canInstall ? html`
               <button class="btn-ghost" style="font-size:15px;padding:15px 26px" @click=${(event: Event) => this._emit('install', event)}>
