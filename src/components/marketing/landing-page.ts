@@ -869,7 +869,7 @@ export class LandingPage extends LitElement {
           </div>
           2bottles
         </a>
-        <button class="nav-cta" @click=${(event: Event) => this._emit('start', event)}>Start a rendezvous</button>
+        <button class="nav-cta" @click=${(event: Event) => this._emit('start', event)}>Find a fair place</button>
       </nav>
 
       <!-- HERO -->
@@ -882,15 +882,14 @@ export class LandingPage extends LitElement {
             Actually halfway.
           </h1>
           <p class="hero-sub">
-            Not the midpoint on a map. The midpoint in travel time. Two people start from anywhere.
-            2bottles finds the place that's fair for both — factoring real traffic, not guesswork.
+            Stop arguing about where to meet. 2bottles finds a place that's fair for both of you — based on how long it takes to get there, not where it sits on a map.
           </p>
           <div class="hero-actions">
             <button class="btn-primary" @click=${(event: Event) => this._emit('start', event)}>
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                 <path d="M5.5 4.5L10.5 7.5L5.5 10.5V4.5Z" fill="white"/>
               </svg>
-              Start a Rendezvous
+              Find a Fair Place
             </button>
           </div>
         </div>
@@ -910,8 +909,9 @@ export class LandingPage extends LitElement {
               Whose middle exactly?
             </h2>
             <p class="section-body">
-              The "middle" your friend suggested is probably near their neighbourhood.
-              Every meetup is a negotiation — and someone always travels more.
+              You know the drill. One person suggests a spot near them. The other person has to travel 45 minutes. Someone's always unhappy.
+              <br><br>
+              What if there was a way to find a place that's actually fair — where you both spend about the same time getting there?
             </p>
           </div>
           <div class="reveal" style="transition-delay:.14s">
@@ -939,8 +939,8 @@ export class LandingPage extends LitElement {
                 </svg>
               </div>
               <div class="step-num">01</div>
-              <h3>Share your location</h3>
-              <p>Drop your pin — your real address or anywhere you choose. Your partner shares theirs too. No account needed.</p>
+              <h3>Share where you are</h3>
+              <p>Drop your pin — your real address or anywhere you choose. Your friend does the same. No account needed.</p>
             </div>
             <div class="step-card reveal" style="transition-delay:.11s">
               <div class="step-icon">
@@ -956,8 +956,8 @@ export class LandingPage extends LitElement {
                 </svg>
               </div>
               <div class="step-num">02</div>
-              <h3>Engine finds the fairest spot</h3>
-              <p>Traffic, route shape, time of day, venue quality — all weighed to surface places sorted by fairness, not proximity.</p>
+              <h3>We find the fairest spots</h3>
+              <p>We look at travel times, not just distance. Then we show you great places nearby that work for both of you.</p>
             </div>
             <div class="step-card reveal" style="transition-delay:.18s">
               <div class="step-icon">
@@ -968,8 +968,8 @@ export class LandingPage extends LitElement {
                 </svg>
               </div>
               <div class="step-num">03</div>
-              <h3>Pick, confirm, and move</h3>
-              <p>Choose from ranked venues, confirm together, then track each other live as you head to the same fair place.</p>
+              <h3>Pick a place and go</h3>
+              <p>Choose from the suggestions, confirm together, then head out. You'll see each other's progress in real time.</p>
             </div>
           </div>
 
@@ -979,18 +979,17 @@ export class LandingPage extends LitElement {
         </div>
       </section>
 
-      <!-- FAIRNESS AXIOMS -->
+      <!-- FAIRNESS SECTION -->
       <section class="fairness-section section" id="fairness">
         <div class="section-inner">
           <div class="reveal">
             ${this._engineSvg()}
           </div>
           <div class="reveal" style="transition-delay:.14s">
-            <p class="section-kicker">The fairness axioms</p>
+            <p class="section-kicker">Why it's different</p>
             <h2 class="section-title">Not the nearest.<br>The <em style="font-style:normal;color:var(--blue)">fairest.</em></h2>
             <p class="section-body">
-              These are not marketing claims. They are architectural constraints.
-              Every meetup scored by real travel time, not wishful thinking.
+              We don't just pick the place in the middle of a map. We figure out what's actually fair — based on how long it takes each of you to get there.
             </p>
             <div class="fairness-points">
               <div class="fairness-point">
@@ -1003,8 +1002,8 @@ export class LandingPage extends LitElement {
                   </svg>
                 </div>
                 <div>
-                  <div class="fp-title">I — Equal travel time, not distance</div>
-                  <div class="fp-desc">Distance is a lie in Lagos traffic. We score on minutes — not kilometres.</div>
+                  <div class="fp-title">Time matters, not distance</div>
+                  <div class="fp-desc">A 5km trip can take 10 minutes or 40 minutes. We care about your time, not kilometers.</div>
                 </div>
               </div>
               <div class="fairness-point">
@@ -1015,8 +1014,8 @@ export class LandingPage extends LitElement {
                   </svg>
                 </div>
                 <div>
-                  <div class="fp-title">II — Venue quality is part of the score</div>
-                  <div class="fp-desc">A perfectly-timed bad venue ranks lower than a great one slightly further away.</div>
+                  <div class="fp-title">Great places, not just any places</div>
+                  <div class="fp-desc">We show you cafes, restaurants, and spots worth going to. Not just the closest option.</div>
                 </div>
               </div>
               <div class="fairness-point">
@@ -1027,8 +1026,8 @@ export class LandingPage extends LitElement {
                   </svg>
                 </div>
                 <div>
-                  <div class="fp-title">III — Recalculates as you move</div>
-                  <div class="fp-desc">Traffic shifts. 2bottles recalculates live so the meeting point stays fair end-to-end.</div>
+                  <div class="fp-title">See each other in real time</div>
+                  <div class="fp-desc">Once you pick a spot, you can watch each other's progress. No more "where are you?" texts.</div>
                 </div>
               </div>
             </div>
@@ -1038,43 +1037,20 @@ export class LandingPage extends LitElement {
 
 
 
-      <!-- STATS -->
-      <section class="stats-section section">
-        <div class="section-inner">
-          <div class="reveal">
-            <div class="stat-num" style="color:#7ab84a">4,200+</div>
-            <div class="stat-label">active users</div>
-          </div>
-          <div class="reveal" style="transition-delay:.07s">
-            <div class="stat-num" style="color:#4a8bc4">96%</div>
-            <div class="stat-label">avg fairness score</div>
-          </div>
-          <div class="reveal" style="transition-delay:.14s">
-            <div class="stat-num" style="color:#b0d882">18 min</div>
-            <div class="stat-label">avg saved per meetup</div>
-          </div>
-          <div class="reveal" style="transition-delay:.21s">
-            <div class="stat-num" style="color:#85b7eb">3 cities</div>
-            <div class="stat-label">Lagos · Abuja · Port Harcourt</div>
-          </div>
-        </div>
-      </section>
-
       <!-- CTA -->
       <section class="cta-section">
         <div class="cta-bg"></div>
         <div class="section-inner reveal">
           ${this._ctaPathSvg()}
           <h2 class="section-title">
-            Ready for a fair meetup?
+            Ready to meet somewhere fair?
           </h2>
           <p class="cta-sub">
-            No sign-up. No account. Just share a link with whoever you're meeting
-            and let the engine find the fairest place for both of you.
+            No sign-up. No account. Just share a link with whoever you're meeting and let 2bottles find the fairest place for both of you.
           </p>
           <div class="cta-actions">
             <button class="btn-primary" style="font-size:15px;padding:15px 26px" @click=${(event: Event) => this._emit('start', event)}>
-              Start a Rendezvous
+              Find a Fair Place
             </button>
             ${this.canInstall ? html`
               <button class="btn-ghost" style="font-size:15px;padding:15px 26px" @click=${(event: Event) => this._emit('install', event)}>
@@ -1082,7 +1058,7 @@ export class LandingPage extends LitElement {
               </button>
             ` : ''}
           </div>
-          <p class="cta-fine">No account needed &nbsp;·&nbsp; Works in Lagos, Abuja &amp; Port Harcourt &nbsp;·&nbsp; Free to start</p>
+          <p class="cta-fine">No account needed &nbsp;·&nbsp; Works everywhere &nbsp;·&nbsp; Free to use</p>
         </div>
       </section>
 
@@ -1094,7 +1070,7 @@ export class LandingPage extends LitElement {
           </div>
           2bottles
         </div>
-        <span>© 2026 2bottles. Built for Nigerian cities.</span>
+        <span>© 2026 2bottles</span>
         <div class="footer-links">
           <a href="#">Privacy</a>
           <a href="#">Terms</a>
