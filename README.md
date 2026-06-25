@@ -48,6 +48,7 @@ Core dependencies in `package.json`:
 - `peerjs`: peer-to-peer signaling/data channels.
 - `idb-keyval`: lightweight IndexedDB persistence.
 - `@lit/context`: context keys for store access patterns.
+- `@vercel/analytics`: optional Vercel analytics integration.
 
 TypeScript is strict and no-emit (`tsconfig.json`), while Vite handles bundling.
 
@@ -64,7 +65,7 @@ Entry point: `src/main.ts`.
 
 At startup:
 
-1. Global styles load and demo analytics are initialized.
+1. Global styles load and analytics are initialized (Vercel analytics if enabled via `VITE_ENABLE_VERCEL_ANALYTICS`).
 2. Boot mode is determined:
    - Landing mode for `/` and `/index.html`.
    - App mode for main routed experience.
@@ -75,7 +76,7 @@ At startup:
 4. Dynamic import failures are guarded with controlled reload logic.
 5. Service worker registration occurs only in production, after page load.
 
-Important localStorage keys used here:
+Important sessionStorage key used here:
 
 - `2b:sw-refresh-at`
 
@@ -120,7 +121,7 @@ Unknown routes redirect to `/create-session`.
 - `rendezvous/*`: fairness suggestions and venue selection.
 - `tracking/*`: live tracking, chat overlay, and end session summary.
 - `spot/save-spot-page.ts`: rating/media upload after meetup.
-- `ui/*`: reusable shell and primitives (dialogs, bottom sheet, location input, menu, etc.).
+- `ui/*`: reusable shell and primitives (dialogs, bottom sheet, location input, location permission dialog/toast, menu, etc.).
 
 `src/store`
 
@@ -136,10 +137,9 @@ Unknown routes redirect to `/create-session`.
 - `websocket.service.ts`: ws lifecycle + periodic location broadcast.
 - `geocoding.service.ts`: geocode/reverse geocode/venue scoring/routing metrics.
 - `notification.service.ts`: web push subscribe/unsubscribe.
-- `spot.service.ts`: spot create/rate/upload (with mock fallback).
+- `spot.service.ts`: spot create/rate/upload.
 - `demo-analytics.service.ts`: batched event flush.
 - `clipboard.service.ts`: copy utility.
-- `midpoint.service.ts`: currently empty placeholder.
 
 `src/api`
 
@@ -149,12 +149,15 @@ Unknown routes redirect to `/create-session`.
 
 `src/sw`
 
-- `sw.ts`: install/activate/fetch/push/notificationclick behavior.
-- `push-handler.ts`: currently empty.
+- `sw.ts`: install/activate lifecycle and message routing.
+- `fetch-handler.ts`: network-first navigation, fetch interception, and asset reload logic.
+- `push-handler.ts`: push payload parsing, notification display, and notificationclick handling.
+- `sw.constants.ts`: cache names, precache URLs, and asset reload signal.
 
 `src/styles`
 
 - `tokens.css`: design tokens and semantic variables.
+- `tokens.ts`: TypeScript constants for CSS custom property names.
 - `global.css`: reset, layout baseline, utility classes, keyframes.
 - `shared-styles.ts`: shared Lit CSS blocks.
 
@@ -164,45 +167,11 @@ Unknown routes redirect to `/create-session`.
 
 ## State management
 
-Stores are singleton class instances with:
+Stores are singleton class instances with mutable public fields, manual `subscribe()`/`_notify()`, and selective IndexedDB persistence.
 
-- mutable public fields
-- manual `subscribe()` + `_notify()` pattern
-- selective IndexedDB persistence
-
-### Session store
-
-Persists and manages:
-
-- session identity and status
-- partner data/status
-- selected venue and suggestions
-- agreement flags
-- chat history
-
-It auto-expires stale persisted sessions older than 24 hours on init.
-
-### Location store
-
-Manages:
-
-- geolocation watch lifecycle with error handling and cool-off strategy
-- own, partner, destination coordinates
-- ETA and distance snapshots
-- GPS accuracy and error code state
-
-It broadcasts own location through P2P on updates.
-
-### UI store
-
-Manages:
-
-- current app screen mapping to route paths
-- loading and toast state
-- confirm dialog lifecycle
-- partner online indicator
-
-Its `navigate()` translates app screens to URLs and calls router navigation.
+- **Session store**: session identity/status, partner data, venue/suggestions, agreement flags, chat history. Auto-expires stale sessions >24h.
+- **Location store**: geolocation watch lifecycle, own/partner/destination coordinates, ETA/distance, GPS accuracy. Broadcasts own location via P2P.
+- **UI store**: current screen, loading/toast/dialog state, partner online indicator. `navigate()` translates app screens to URLs.
 
 ## Data and realtime architecture
 
@@ -226,55 +195,17 @@ Used session endpoints (`src/api/sessions.api.ts`):
 
 ### P2P layer
 
-`src/services/p2p.service.ts` handles direct peer communication.
-
-- Host/join modes.
-- Signaling reconnect logic.
-- Message queue buffering when data channel is down.
-- Multiple env-driven ICE/server options.
-
-Message types currently handled:
-
-- `location:update`
-- `partner:status`
-- `session:status`
-- `session:venue`
-- `session:agree`
-- `session:reset`
-- `user:info`
-- `chat:message`
+`src/services/p2p.service.ts` handles direct peer communication with host/join modes, signaling reconnect, message queue buffering, and multiple env-driven ICE/server options. Handles messages: `location:update`, `partner:status`, `session:status`, `session:venue`, `session:agree`, `session:reset`, `user:info`, `chat:message`.
 
 ### WebSocket layer
 
-`src/services/websocket.service.ts` provides server-mediated sync.
+`src/services/websocket.service.ts` provides server-mediated sync with exponential reconnect, location broadcast every 4s, and partner/session status updates.
 
-- Connection per session id.
-- Exponential reconnect (capped attempts).
-- Broadcast own location every 4 seconds while connected.
-- Consumes partner/session status updates from server.
-
-In practice, P2P and WebSocket both affect runtime state. Keep side effects carefully reasoned when changing either.
+P2P and WebSocket both affect runtime state. Keep side effects carefully reasoned when changing either.
 
 ## Geocoding and venue suggestion engine
 
-`src/services/geocoding.service.ts` is one of the most complex subsystems.
-
-What it does:
-
-- Autocomplete with Nominatim primary and Photon fallback.
-- Reverse geocode with quantized keys and cooldown handling.
-- Venue candidate fetch from Geoapify (rect-based progressive widening).
-- Travel metric refinement with OSRM route calls.
-- Candidate scoring for fairness and practicality.
-
-Important behavior details:
-
-- Multiple TTL caches by concern (autocomplete, reverse, venues, route metrics).
-- Provider rate-limit cooldowns to avoid request storms.
-- Candidate de-duplication and category diversification.
-- Final venue list enriched with ETA and distance for each participant.
-
-This module is a major hotspot for product behavior, API-cost behavior, and perceived intelligence.
+`src/services/geocoding.service.ts` handles autocomplete (Nominatim/Photon), reverse geocoding, venue candidate fetch (Geoapify), travel metrics (OSRM), and candidate scoring. Uses multiple TTL caches, rate-limit cooldowns, de-duplication, and ETA/distance enrichment.
 
 ## Map system
 
@@ -292,7 +223,6 @@ Cross-component control is event-driven using window-level custom events.
 Events consumed:
 
 - `map-view:move-to`
-- `map-view:show-route`
 - `map-view:clear-route`
 - `map-view:show-midpoint`
 - `map-view:clear-midpoint`
@@ -301,6 +231,10 @@ Events consumed:
 - `map-view:follow-user`
 - `map-view:route-mode`
 
+Events dispatched:
+
+- `map-view:ready`
+
 ## PWA and Service Worker behavior
 
 `src/sw/sw.ts` provides:
@@ -308,7 +242,7 @@ Events consumed:
 - Install precache of app shell assets.
 - Activate cleanup of old caches.
 - Network-only for `/api`, `/ws`, and hashed `/assets/*` chunks.
-- Navigation fetch fallback to cached `/index.html` for offline shell behavior.
+- Navigation fetch is network-first, falling back to cached `/index.html` only on network failure.
 - Push notification display + notification click focus/open logic.
 
 A specific stale-asset defense exists:
@@ -374,9 +308,13 @@ Main environment flags consumed by frontend:
 - `VITE_VAPID_PUBLIC_KEY`
 - `VITE_DEMO_ANALYTICS_ENDPOINT`
 
+### Analytics
+
+- `VITE_ENABLE_VERCEL_ANALYTICS` (enables Vercel analytics integration)
+
 ### Spot service
 
-- `VITE_SPOT_API_BASE` (if absent, service uses local mock storage)
+- `VITE_SPOT_API_BASE` (if absent, service falls back to `/api`)
 
 ### PeerJS / ICE
 
@@ -404,6 +342,7 @@ Other commands:
 ```bash
 npm run build
 npm run preview
+npm run test
 ```
 
 Default ports:
@@ -452,27 +391,21 @@ Vite dev proxy expects backend at `http://localhost:8080` for `/api` and `/ws`.
 4. Session and UI persistence keys are string literals across modules.
 5. Chat history is unbounded in memory and persisted state.
 6. Route guards rely on current store state; stale/partial rehydration can influence navigation.
-7. Spot flow uses mock persistence unless API base is configured.
-8. Service worker strategy intentionally avoids caching hashed chunks; do not “optimize” this without understanding stale asset risks.
-9. `users.api.ts`, `venue.api.ts`, `midpoint.service.ts`, and `sw/push-handler.ts` are currently empty placeholders; avoid assuming they are wired.
+7. Spot flow falls back to `/api` when `VITE_SPOT_API_BASE` is not configured.
+8. Service worker strategy intentionally avoids caching hashed chunks; do not "optimize" this without understanding stale asset risks.
+9. `users.api.ts` and `venue.api.ts` are currently empty placeholders; avoid assuming they are wired.
 
 ## Contribution checklist
 
 Before opening a PR:
 
-- Build passes locally (`npm run build`).
-- Routes work after hard refresh and direct deep link navigation.
-- Session lifecycle still works end-to-end:
-  - create
-  - invite/join
-  - select venue
-  - agree
-  - live tracking
-  - end
-- Location denied/permitted flows still behave correctly.
-- Reconnect behavior still works when partner disconnects/rejoins.
-- No accidental breaking changes to event names or payload contracts.
-- New env vars are documented here.
+- `npm run build` passes locally
+- Routes work after hard refresh and direct deep link navigation
+- Session lifecycle works end-to-end (create → invite/join → select venue → agree → tracking → end)
+- Location denied/permitted flows behave correctly
+- Reconnect behavior works when partner disconnects/rejoins
+- No breaking changes to event names or payload contracts
+- New env vars documented in README
 
 ---
 
